@@ -140,7 +140,7 @@ template <typename T>
 inline size_t LZ4Compressor<T>::get_temp_size()
 {
   size_t comp_temp_bytes;
-  nvcompError_t status = LZ4CompressGetTempSize(
+  nvcompError_t status = nvcompLZ4CompressGetTempSize(
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
       this->get_type(),
@@ -156,7 +156,7 @@ inline size_t LZ4Compressor<T>::get_exact_output_size(
     void* const comp_temp, const size_t comp_temp_bytes)
 {
   size_t comp_out_bytes;
-  nvcompError_t status = LZ4CompressGetOutputSize(
+  nvcompError_t status = nvcompLZ4CompressGetOutputSize(
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
       this->get_type(),
@@ -175,7 +175,7 @@ inline size_t LZ4Compressor<T>::get_max_output_size(
     void* const comp_temp, const size_t comp_temp_bytes)
 {
   size_t comp_out_bytes;
-  nvcompError_t status = LZ4CompressGetOutputSize(
+  nvcompError_t status = nvcompLZ4CompressGetOutputSize(
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
       this->get_type(),
@@ -198,7 +198,7 @@ inline void LZ4Compressor<T>::do_compress(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = LZ4CompressAsync(
+  nvcompError_t status = nvcompLZ4CompressAsync(
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
       this->get_type(),
