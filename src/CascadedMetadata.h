@@ -50,20 +50,50 @@ class CascadedMetadata : public Metadata
 public:
   constexpr static const size_t MAX_NUM_RLES = 8;
 
+  union MinValue
+  {
+    MinValue() = default;
+    MinValue(const int8_t num) : i8(num)
+    {
+    }
+    MinValue(const uint8_t num) : u8(num)
+    {
+    }
+    MinValue(const int16_t num) : i16(num)
+    {
+    }
+    MinValue(const uint16_t num) : u16(num)
+    {
+    }
+    MinValue(const int32_t num) : i32(num)
+    {
+    }
+    MinValue(const uint32_t num) : u32(num)
+    {
+    }
+    MinValue(const int64_t num) : i64(num)
+    {
+    }
+    MinValue(const uint64_t num) : u64(num)
+    {
+    }
+
+    int8_t i8;
+    uint8_t u8;
+    int16_t i16;
+    uint16_t u16;
+    int32_t i32;
+    uint32_t u32;
+    int64_t i64;
+    uint64_t u64;
+  };
+
+  static_assert(std::is_pod<MinValue>::value, "MinValue must be a POD type.");
+
   struct Header
   {
     uint64_t length;
-    union
-    {
-      int8_t i8;
-      uint8_t u8;
-      int16_t i16;
-      uint16_t u16;
-      int32_t i32;
-      uint32_t u32;
-      int64_t i64;
-      uint64_t u64;
-    } minValue;
+    MinValue minValue;
     uint8_t numBits;
   };
 
