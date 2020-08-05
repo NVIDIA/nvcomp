@@ -53,14 +53,30 @@ public:
   union MinValue
   {
     MinValue() = default;
-    MinValue(const int8_t num) : i8(num) {}
-    MinValue(const uint8_t num) : u8(num) {}
-    MinValue(const int16_t num) : i16(num) {}
-    MinValue(const uint16_t num) : u16(num) {}
-    MinValue(const int32_t num) : i32(num) {}
-    MinValue(const uint32_t num) : u32(num) {}
-    MinValue(const int64_t num) : i64(num) {}
-    MinValue(const uint64_t num) : u64(num) {}
+    MinValue(const int8_t num) : i8(num)
+    {
+    }
+    MinValue(const uint8_t num) : u8(num)
+    {
+    }
+    MinValue(const int16_t num) : i16(num)
+    {
+    }
+    MinValue(const uint16_t num) : u16(num)
+    {
+    }
+    MinValue(const int32_t num) : i32(num)
+    {
+    }
+    MinValue(const uint32_t num) : u32(num)
+    {
+    }
+    MinValue(const int64_t num) : i64(num)
+    {
+    }
+    MinValue(const uint64_t num) : u64(num)
+    {
+    }
 
     int8_t i8;
     uint8_t u8;
