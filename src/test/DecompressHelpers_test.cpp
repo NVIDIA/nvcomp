@@ -109,10 +109,9 @@ TEST_CASE("Metadata-fcns", "[small]")
       sizeof(CascadedMetadata),
       sizeof(CascadedMetadata));
 
-
-  meta_in.setHeader(0, {9, 0, 0});
-  meta_in.setHeader(1, {37, 5, 3});
-  meta_in.setHeader(2, {49, 2, 5});
+  meta_in.setHeader(0, {9, {.i32 = 0u}, 0});
+  meta_in.setHeader(1, {37, {.i32 = 5u}, 3});
+  meta_in.setHeader(2, {49, {.i32 = 2u}, 5});
   meta_in.setDataOffset(0, 10);
   meta_in.setDataOffset(1, 38);
   meta_in.setDataOffset(2, 58);
