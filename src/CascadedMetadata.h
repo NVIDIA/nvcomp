@@ -72,6 +72,8 @@ public:
     uint64_t u64;
   };
 
+  static_assert(std::is_pod<MinValue>::value, "MinValue must be a POD type.");
+
   struct Header
   {
     uint64_t length;
