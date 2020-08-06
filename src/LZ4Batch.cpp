@@ -57,7 +57,7 @@ nvcompError_t nvcompBatchedLZ4DecompressGetMetadata(
     void** /*metadata_ptr*/,
     cudaStream_t /*stream*/)
 {
-  return nvcompSuccess;
+  return nvcompErrorNotSupported;
 }
 
 void nvcompBatchedLZ4DecompressDestroyMetadata(void* /*metadata_ptr*/)
@@ -66,8 +66,10 @@ void nvcompBatchedLZ4DecompressDestroyMetadata(void* /*metadata_ptr*/)
 }
 
 nvcompError_t
-nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
+nvcompBatchedLZ4DecompressGetTempSize(const void* /*metadata_ptr*/, size_t* /*temp_bytes*/)
 {
+  return nvcompErrorNotSupported;
+/*
   if (temp_bytes == NULL) {
     std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
@@ -79,13 +81,15 @@ nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_byt
     std::cerr << "Invalid, metadata ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
+
   return nvcompSuccess;
+*/
 }
 
 nvcompError_t
 nvcompBatchedLZ4DecompressGetOutputSize(const void* /*metadata_ptr*/, size_t /*batch_size*/, size_t* /*output_bytes*/)
 {
-  return nvcompSuccess;
+  return nvcompErrorNotSupported;
 }
 
 nvcompError_t nvcompBatchedLZ4DecompressAsync(
@@ -94,33 +98,36 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
     size_t /*batch_size*/,
     void* const /*temp_ptr*/,
     const size_t /*temp_bytes*/,
-    const void* const metadata_ptr,
+    const void* const /*metadata_ptr*/,
     void* const /*out_ptr*/,
     const size_t* /*out_bytes*/,
     cudaStream_t /*stream*/)
 {
 
+  return nvcompErrorNotSupported;
+/*
   if (metadata_ptr == NULL) {
     std::cerr << "Invalid, metadata NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
-
   return nvcompSuccess;
+*/
 }
 
 nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
     const void* const* /*in_ptr*/,
     const size_t* /*in_bytes*/,
     size_t /*batch_size*/,
-    const nvcompLZ4FormatOpts* format_opts,
+    const nvcompLZ4FormatOpts* /*format_opts*/,
     size_t* /*temp_bytes*/)
 {
+  return nvcompErrorNotSupported;
+/*
   try {
     if (format_opts == nullptr) {
       throw std::runtime_error("Format opts must not be null.");
     }
 
-/*
 // TODO - Change num_chunks to be total across entire batch.
     size_t batch_size = format_opts->chunk_size * CHUNKS_PER_BATCH;
     if (in_bytes < batch_size) {
@@ -132,13 +139,13 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
         std::min(CHUNKS_PER_BATCH, num_chunks), format_opts->chunk_size);
 
     *temp_bytes = req_temp_size;
-*/
   } catch (const std::exception& e) {
     std::cerr << "Failed to get temp size: " << e.what() << std::endl;
     return nvcompErrorCudaError;
   }
 
   return nvcompSuccess;
+*/
 }
 
 nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
@@ -150,7 +157,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
     size_t /*temp_bytes*/,
     size_t* /*out_bytes*/)
 {
-  return nvcompSuccess;
+  return nvcompErrorNotSupported;
 }
 
 nvcompError_t nvcompBatchedLZ4CompressAsync(
@@ -164,5 +171,5 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
     size_t* /*out_bytes*/,
     cudaStream_t /*stream*/)
 {
-  return nvcompSuccess;
+  return nvcompErrorNotSupported;
 }
