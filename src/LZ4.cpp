@@ -211,7 +211,7 @@ nvcompError_t nvcompLZ4DecompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t LZ4CompressGetTempSize(
+nvcompError_t nvcompLZ4CompressGetTempSize(
     const void* /*in_ptr*/,
     const size_t in_bytes,
     nvcompType_t /*in_type*/,
@@ -241,7 +241,7 @@ nvcompError_t LZ4CompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t LZ4CompressGetOutputSize(
+nvcompError_t nvcompLZ4CompressGetOutputSize(
     const void* /*in_ptr*/,
     const size_t in_bytes,
     const nvcompType_t /*in_type*/,
@@ -270,7 +270,7 @@ nvcompError_t LZ4CompressGetOutputSize(
   return nvcompSuccess;
 }
 
-nvcompError_t LZ4CompressAsync(
+nvcompError_t nvcompLZ4CompressAsync(
     const void* in_ptr,
     const size_t in_bytes,
     const nvcompType_t /*in_type*/,
