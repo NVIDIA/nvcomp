@@ -29,11 +29,11 @@
 #include "LZ4Metadata.h"
 #include "common.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
-#include <algorithm>
 
 #include <iostream>
 
@@ -70,14 +70,15 @@ LZ4Metadata::LZ4Metadata(
 
 LZ4Metadata::LZ4Metadata(const void* const memPtr, size_t compressedBytes) :
     LZ4Metadata(
-        NVCOMP_TYPE_UCHAR, 
+        NVCOMP_TYPE_UCHAR,
         ((const size_t*)memPtr)[ChunkSize],
         ((const size_t*)memPtr)[UncompressedSize],
         compressedBytes)
 {
-  m_chunkOffsets.resize(getNumChunks()+1);
-  std::copy(static_cast<const size_t*>(memPtr)+OffsetAddr,
-      static_cast<const size_t*>(memPtr)+OffsetAddr+getNumChunks(),
+  m_chunkOffsets.resize(getNumChunks() + 1);
+  std::copy(
+      static_cast<const size_t*>(memPtr) + OffsetAddr,
+      static_cast<const size_t*>(memPtr) + OffsetAddr + getNumChunks(),
       m_chunkOffsets.begin());
   m_chunkOffsets.back() = compressedBytes;
 }

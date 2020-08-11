@@ -39,7 +39,9 @@ namespace nvcomp
  *****************************************************************************/
 
 Metadata::Metadata(
-    const nvcompType_t type, const size_t uncompressedBytes, const size_t compressedBytes,
+    const nvcompType_t type,
+    const size_t uncompressedBytes,
+    const size_t compressedBytes,
     const int compressionType) :
     m_type(type),
     m_uncompressedBytes(uncompressedBytes),

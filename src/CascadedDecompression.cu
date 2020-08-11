@@ -1318,7 +1318,7 @@ nvcompError_t nvcompCascadedDecompressGetMetadata(
 
 void nvcompCascadedDecompressDestroyMetadata(void* const metadata_ptr)
 {
-  CascadedMetadata * metadata = static_cast<CascadedMetadata*>(metadata_ptr);
+  CascadedMetadata* metadata = static_cast<CascadedMetadata*>(metadata_ptr);
   ::operator delete(metadata);
 }
 

@@ -45,7 +45,10 @@ public:
    * @param compressedBytes The size of the data and metadata compressed.
    * @param compressionType The type of compressed metadata this is.
    */
-  Metadata(nvcompType_t type, size_t uncompressedBytes, size_t compressedBytes,
+  Metadata(
+      nvcompType_t type,
+      size_t uncompressedBytes,
+      size_t compressedBytes,
       int compressionType);
 
   virtual ~Metadata() = default;

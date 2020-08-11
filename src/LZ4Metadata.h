@@ -47,7 +47,7 @@ public:
   constexpr static int COMPRESSION_ID = 0x4000;
 
   /**
-   * @brief Order of header values stored at the beginning of the metadata.  Each
+   * @brief Order of header values stored at the beginning of the metadata. Each
    * offset is 8 bytes.
    */
   enum LZ4MetadataField
