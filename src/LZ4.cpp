@@ -191,11 +191,11 @@ nvcompError_t nvcompLZ4DecompressAsync(
     return nvcompErrorInvalidValue;
   }
 
-  LZ4Metadata metadata(metadata_ptr, in_bytes);
+  const LZ4Metadata * const metadata = static_cast<const LZ4Metadata*>(metadata_ptr);
 
-  if (in_bytes < metadata.getCompressedSize()) {
+  if (in_bytes < metadata->getCompressedSize()) {
     std::cerr << "Input buffer is smaller than compressed data size: "
-              << in_bytes << " < " << metadata.getCompressedSize()
+              << in_bytes << " < " << metadata->getCompressedSize()
               << std::endl;
     return nvcompErrorInvalidValue;
   }
@@ -205,9 +205,9 @@ nvcompError_t nvcompLZ4DecompressAsync(
       in_ptr,
       4 * sizeof(size_t), // Header has metadata size, decomp_size, and
                           // chunk_size before offsets
-      metadata.getUncompChunkSize(),
-      metadata.getUncompressedSize() % metadata.getUncompChunkSize(),
-      metadata.getNumChunks(),
+      metadata->getUncompChunkSize(),
+      metadata->getUncompressedSize() % metadata->getUncompChunkSize(),
+      metadata->getNumChunks(),
       stream);
 
   return nvcompSuccess;
@@ -247,7 +247,7 @@ nvcompError_t nvcompLZ4CompressGetOutputSize(
     const void* /*in_ptr*/,
     const size_t in_bytes,
     const nvcompType_t /*in_type*/,
-    const nvcompLZ4FormatOpts* /*format_opts */,
+    const nvcompLZ4FormatOpts* format_opts,
     void* const /*temp_ptr*/,
     const size_t /*temp_bytes*/,
     size_t* const out_bytes,
@@ -261,9 +261,18 @@ nvcompError_t nvcompLZ4CompressGetOutputSize(
                                "this time.");
     }
 
+
+    const size_t chunk_bytes = format_opts->chunk_size;
+    const int total_chunks = roundUpDiv(in_bytes, chunk_bytes);
+
+    const size_t metadata_bytes
+        = 4 * sizeof(size_t)
+          + (total_chunks + 1)
+                * sizeof(size_t); // 1 extra val to store total length
+
     const size_t max_comp_bytes = lz4ComputeMaxSize(in_bytes);
 
-    *out_bytes = sizeof(LZ4Metadata) + max_comp_bytes;
+    *out_bytes = metadata_bytes + max_comp_bytes;
   } catch (const std::exception& e) {
     std::cerr << "LZ4CompressGetOutputSize() Exception: " << e.what()
               << std::endl;

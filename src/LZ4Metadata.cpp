@@ -79,10 +79,7 @@ LZ4Metadata::LZ4Metadata(const void* const memPtr, size_t compressedBytes) :
   std::copy(static_cast<const size_t*>(memPtr)+OffsetAddr,
       static_cast<const size_t*>(memPtr)+OffsetAddr+getNumChunks(),
       m_chunkOffsets.begin());
-  for (size_t i = 0; i < getNumChunks(); ++i) {
-
-  }
-  m_chunkOffsets.emplace_back(compressedBytes);
+  m_chunkOffsets.back() = compressedBytes;
 }
 
 /******************************************************************************
