@@ -71,7 +71,8 @@ int LZ4IsData(const void* const in_ptr, size_t in_bytes)
 
 int LZ4IsMetadata(const void* const metadata_ptr)
 {
-  return (((const size_t*)metadata_ptr)[LZ4Header] == LZ4_FLAG);
+  const Metadata * const metadata = static_cast<const Metadata*>(metadata_ptr);
+  return metadata->getCompressionType() == LZ4Metadata::COMPRESSION_ID;
 }
 
 nvcompError_t nvcompLZ4DecompressGetMetadata(
@@ -113,18 +114,18 @@ nvcompError_t nvcompLZ4DecompressGetMetadata(
           + std::to_string(metadata_bytes) + " / " + std::to_string(in_bytes));
     }
 
-    *metadata_ptr = new char[metadata_bytes];
-
+    std::vector<char> metadata_buffer(metadata_bytes);
     err = cudaMemcpyAsync(
-        *metadata_ptr, in_ptr, metadata_bytes, cudaMemcpyDeviceToHost, stream);
+        metadata_buffer.data(), in_ptr, metadata_bytes, cudaMemcpyDeviceToHost, stream);
     if(err != cudaSuccess) {
-      ::operator delete (*metadata_ptr);
-      *metadata_ptr = NULL;
       throw std::runtime_error(
           "Failed to launch copy metadata from device "
           " to host: "
           + std::to_string(err));
     }
+
+    *metadata_ptr = new LZ4Metadata(metadata_buffer.data(),
+        metadata_buffer.size());
 
     err = cudaStreamSynchronize(stream);
     if (err != cudaSuccess) {
@@ -144,7 +145,8 @@ nvcompError_t nvcompLZ4DecompressGetMetadata(
 
 void nvcompLZ4DecompressDestroyMetadata(void* const metadata_ptr)
 {
-  ::operator delete(metadata_ptr);
+  LZ4Metadata * metadata = static_cast<LZ4Metadata*>(metadata_ptr);
+  ::operator delete(metadata);
 }
 
 nvcompError_t
@@ -296,10 +298,10 @@ nvcompError_t nvcompLZ4CompressAsync(
 
   const size_t LZ4_flag = LZ4_FLAG;
   cudaMemcpyAsync((void*)out_ptr, &LZ4_flag, sizeof(size_t), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+MetadataBytes), &metadata_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+UncompressedSize), &in_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+ChunkSize), &chunk_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+OffsetAddr), &start_offset, sizeof(size_t), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+LZ4Metadata::MetadataBytes), &metadata_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+LZ4Metadata::UncompressedSize), &in_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+LZ4Metadata::ChunkSize), &chunk_bytes, sizeof(size_t), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync((void*)(((size_t*)out_ptr)+LZ4Metadata::OffsetAddr), &start_offset, sizeof(size_t), cudaMemcpyHostToDevice, stream);
 
   const uint8_t* in_progress = static_cast<const uint8_t*>(in_ptr);
   uint8_t* metadata_progress = (uint8_t*)out_ptr + (5*sizeof(size_t)); // Offsets stored after initial header info

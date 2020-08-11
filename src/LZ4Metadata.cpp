@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <algorithm>
 
 #include <iostream>
 
@@ -55,10 +56,10 @@ constexpr const size_t NULL_OFFSET = static_cast<size_t>(-1);
 
 LZ4Metadata::LZ4Metadata(
     const nvcompType_t type,
-    size_t uncompChunkBytes,
-    size_t uncompressedBytes,
-    size_t compressedBytes) :
-    Metadata(type, uncompressedBytes, compressedBytes),
+    const size_t uncompChunkBytes,
+    const size_t uncompressedBytes,
+    const size_t compressedBytes) :
+    Metadata(type, uncompressedBytes, compressedBytes, COMPRESSION_ID),
     m_uncompChunkBytes(uncompChunkBytes),
     m_metadataBytes(),
     m_version(0),
@@ -68,17 +69,20 @@ LZ4Metadata::LZ4Metadata(
 }
 
 LZ4Metadata::LZ4Metadata(const void* const memPtr, size_t compressedBytes) :
-    Metadata(
-        NVCOMP_TYPE_UCHAR,
+    LZ4Metadata(
+        NVCOMP_TYPE_UCHAR, 
+        ((const size_t*)memPtr)[ChunkSize],
         ((const size_t*)memPtr)[UncompressedSize],
-        compressedBytes),
-    m_uncompChunkBytes(((const size_t*)memPtr)[ChunkSize]),
-    m_metadataBytes(((const size_t*)memPtr)[MetadataBytes]),
-    m_version(0),
-    m_chunkOffsets()
+        compressedBytes)
 {
-  m_chunkOffsets = ((size_t*)memPtr) + OffsetAddr;
-  m_chunkOffsets[getNumChunks()] = compressedBytes;
+  m_chunkOffsets.resize(getNumChunks()+1);
+  std::copy(static_cast<const size_t*>(memPtr)+OffsetAddr,
+      static_cast<const size_t*>(memPtr)+OffsetAddr+getNumChunks(),
+      m_chunkOffsets.begin());
+  for (size_t i = 0; i < getNumChunks(); ++i) {
+
+  }
+  m_chunkOffsets.emplace_back(compressedBytes);
 }
 
 /******************************************************************************
@@ -115,7 +119,7 @@ size_t LZ4Metadata::getMetadataSize() const
 
 size_t* LZ4Metadata::getOffsetArray()
 {
-  return m_chunkOffsets;
+  return m_chunkOffsets.data();
 }
 
 } // namespace nvcomp

@@ -41,22 +41,24 @@
 namespace nvcomp
 {
 
-/**
- * @brief Order of header values stored at the beginning of the metadata.  Each
- * offset is 8 bytes.
- */
-enum LZ4MetadataField
-{
-  LZ4Header = 0,
-  MetadataBytes = 1,
-  UncompressedSize = 2,
-  ChunkSize = 3,
-  OffsetAddr = 4
-};
-
 class LZ4Metadata : public Metadata
 {
 public:
+  constexpr static int COMPRESSION_ID = 0x4000;
+
+  /**
+   * @brief Order of header values stored at the beginning of the metadata.  Each
+   * offset is 8 bytes.
+   */
+  enum LZ4MetadataField
+  {
+    Header = 0,
+    MetadataBytes = 1,
+    UncompressedSize = 2,
+    ChunkSize = 3,
+    OffsetAddr = 4
+  };
+
   /**
    * @brief Create a new metadta object.
    *
@@ -121,7 +123,7 @@ private:
   /**
    * @brief The offsets of each chunk in the compressed dataset
    */
-  size_t* m_chunkOffsets;
+  std::vector<size_t> m_chunkOffsets;
 };
 
 } // namespace nvcomp

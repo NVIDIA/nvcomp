@@ -1287,7 +1287,7 @@ using namespace nvcomp;
  * They use many of the functions defined farther below, but provide an
  *easier-to-use wrapper around them that follows the new API outlined in the
  *google doc.
- *****************************)*********************************************************/
+ **************************************************************************************/
 
 nvcompError_t nvcompCascadedDecompressGetMetadata(
     const void* in_ptr,
@@ -1318,7 +1318,8 @@ nvcompError_t nvcompCascadedDecompressGetMetadata(
 
 void nvcompCascadedDecompressDestroyMetadata(void* const metadata_ptr)
 {
-  ::operator delete(metadata_ptr);
+  CascadedMetadata * metadata = static_cast<CascadedMetadata*>(metadata_ptr);
+  ::operator delete(metadata);
 }
 
 // TODO: improve estimate with a more sophistocated approach.

@@ -48,6 +48,8 @@ namespace nvcomp
 class CascadedMetadata : public Metadata
 {
 public:
+  constexpr static int COMPRESSION_ID = 0x1000;
+
   constexpr static const size_t MAX_NUM_RLES = 8;
 
   union MinValue
