@@ -51,13 +51,6 @@ namespace
 constexpr const size_t CHUNKS_PER_BATCH = 2048;
 }
 
-/**************************************************************************************
- *                New C-style API calls defined below.
- * They use many of the functions defined farther below, but provide an
- *easier-to-use wrapper around them that follows the new API outlined in the
- *google doc.
- *****************************)*********************************************************/
-
 int LZ4IsData(const void* const in_ptr, size_t in_bytes)
 {
   // Need at least 2 size_t variables to be valid.
