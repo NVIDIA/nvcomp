@@ -61,7 +61,7 @@ CascadedMetadata::CascadedMetadata(
     const nvcompType_t type,
     const size_t uncompressedBytes,
     const size_t compressedBytes) :
-    Metadata(type, uncompressedBytes, compressedBytes),
+    Metadata(type, uncompressedBytes, compressedBytes, COMPRESSION_ID),
     m_formatOpts(opts),
     m_headers(),
     m_dataOffsets(),

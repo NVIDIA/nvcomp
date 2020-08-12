@@ -43,8 +43,13 @@ public:
    * @param type The type of data element to compress.
    * @param uncompressedBytes The size of the data while uncompressed.
    * @param compressedBytes The size of the data and metadata compressed.
+   * @param compressionType The type of compressed metadata this is.
    */
-  Metadata(nvcompType_t type, size_t uncompressedBytes, size_t compressedBytes);
+  Metadata(
+      nvcompType_t type,
+      size_t uncompressedBytes,
+      size_t compressedBytes,
+      int compressionType);
 
   virtual ~Metadata() = default;
 
@@ -76,6 +81,13 @@ public:
    */
   size_t getNumUncompressedElements() const;
 
+  /**
+   * @brief Get the type of compression used.
+   *
+   * @return The type of compression.
+   */
+  int getCompressionType() const;
+
 private:
   /**
    * @brief The datatype of decompressed elements.
@@ -92,6 +104,8 @@ private:
    * metadata).
    */
   size_t m_compressedBytes;
+
+  int m_compressionType;
 };
 
 } // namespace nvcomp
