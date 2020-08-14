@@ -1,3 +1,9 @@
+# nvcomp 1.0.2 (2020-08-12)
+
+- Fix metadata freeing for LZ4, to avoid possible mismatch of `new[]` and
+`delete`.
+
+
 # nvcomp 1.0.1 (2020-08-07)
 
 - Fixed naming of nvcompLZ4CompressX functions in `include/lz4.h`, to have the

@@ -122,6 +122,8 @@ constexpr __host__ __device__ U roundUpTo(U const num, T const chunk)
 __inline__ size_t sizeOfnvcompType(nvcompType_t type)
 {
   switch (type) {
+  case NVCOMP_TYPE_BITS:
+    return 1;
   case NVCOMP_TYPE_CHAR:
     return sizeof(int8_t);
   case NVCOMP_TYPE_UCHAR:

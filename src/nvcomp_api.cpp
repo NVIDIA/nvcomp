@@ -55,7 +55,11 @@ nvcompError_t nvcompDecompressGetMetadata(
 
 void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 {
-  nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
+  if (LZ4IsMetadata(metadata_ptr)) {
+    nvcompLZ4DecompressDestroyMetadata(metadata_ptr);
+  } else {
+    nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
+  }
 }
 
 nvcompError_t nvcompDecompressGetTempSize(

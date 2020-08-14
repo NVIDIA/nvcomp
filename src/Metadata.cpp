@@ -39,10 +39,14 @@ namespace nvcomp
  *****************************************************************************/
 
 Metadata::Metadata(
-    nvcompType_t type, size_t uncompressedBytes, size_t compressedBytes) :
+    const nvcompType_t type,
+    const size_t uncompressedBytes,
+    const size_t compressedBytes,
+    const int compressionType) :
     m_type(type),
     m_uncompressedBytes(uncompressedBytes),
-    m_compressedBytes(compressedBytes)
+    m_compressedBytes(compressedBytes),
+    m_compressionType(compressionType)
 {
   if (m_uncompressedBytes % sizeOfnvcompType(m_type) != 0) {
     throw std::runtime_error(
@@ -75,6 +79,11 @@ size_t Metadata::getCompressedSize() const
 size_t Metadata::getNumUncompressedElements() const
 {
   return getUncompressedSize() / sizeOfnvcompType(m_type);
+}
+
+int Metadata::getCompressionType() const
+{
+  return m_compressionType;
 }
 
 } // namespace nvcomp
