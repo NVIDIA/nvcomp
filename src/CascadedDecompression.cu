@@ -1282,13 +1282,6 @@ nvcompError_t nvcompCreateHandleAsync(
 
 using namespace nvcomp;
 
-/**************************************************************************************
- *                New C-style API calls defined below.
- * They use many of the functions defined farther below, but provide an
- *easier-to-use wrapper around them that follows the new API outlined in the
- *google doc.
- **************************************************************************************/
-
 nvcompError_t nvcompCascadedDecompressGetMetadata(
     const void* in_ptr,
     size_t in_bytes,
