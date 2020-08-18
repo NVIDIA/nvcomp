@@ -51,25 +51,56 @@ using namespace nvcomp;
  *****************************)*********************************************************/
 
 nvcompError_t nvcompBatchedLZ4DecompressGetMetadata(
-    const void** /*in_ptr*/,
-    size_t* /*in_bytes*/,
-    size_t /*batch_size*/,
-    void** /*metadata_ptr*/,
-    cudaStream_t /*stream*/)
+    const void** in_ptr,
+    size_t* in_bytes,
+    size_t batch_size,
+    void** metadata_ptr,
+    cudaStream_t stream)
 {
-  return nvcompErrorNotSupported;
+  std::vector<LZ4Metadata*> batch_metadata;
+  batch_metadata.reserve(batch_size);
+
+  try {
+
+    for(size_t i=0; i<batch_size; i++) {
+      nvcompError_t err;
+      LZ4Metadata* m;
+
+      err = nvcompLZ4DecompressGetMetadata(
+              in_ptr[i], in_bytes[i], (void**)&m, stream);
+      if(err != nvcompSuccess) {
+        throw err;
+      }
+      batch_metadata.emplace_back(std::move(m));
+    }
+
+    cudaStreamSynchronize(stream);
+
+    *metadata_ptr = new std::vector<LZ4Metadata*>(std::move(batch_metadata));
+  }
+  catch (nvcompError_t err) {
+    for(size_t i=0; i<batch_metadata.size(); i++) {
+      nvcompLZ4DecompressDestroyMetadata(batch_metadata[i]);
+    }
+    return err;
+  }
+
+  return nvcompSuccess;
 }
 
-void nvcompBatchedLZ4DecompressDestroyMetadata(void* /*metadata_ptr*/)
+void nvcompBatchedLZ4DecompressDestroyMetadata(void* metadata_ptr)
 {
-//  ::operator delete(metadata_ptr);
+  std::vector<LZ4Metadata*>& metadata = *static_cast<std::vector<LZ4Metadata*>*>(metadata_ptr);
+
+  for(size_t i=0; i<metadata.size(); i++) {
+    nvcompLZ4DecompressDestroyMetadata(metadata[i]);
+  }
 }
 
 nvcompError_t
-nvcompBatchedLZ4DecompressGetTempSize(const void* /*metadata_ptr*/, size_t* /*temp_bytes*/)
+nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
 {
-  return nvcompErrorNotSupported;
-/*
+
   if (temp_bytes == NULL) {
     std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
@@ -83,35 +114,67 @@ nvcompBatchedLZ4DecompressGetTempSize(const void* /*metadata_ptr*/, size_t* /*te
   }
 
   return nvcompSuccess;
-*/
 }
 
 nvcompError_t
-nvcompBatchedLZ4DecompressGetOutputSize(const void* /*metadata_ptr*/, size_t /*batch_size*/, size_t* /*output_bytes*/)
+nvcompBatchedLZ4DecompressGetOutputSize(const void* metadata_ptr, size_t batch_size, size_t* output_bytes)
 {
-  return nvcompErrorNotSupported;
-}
-
-nvcompError_t nvcompBatchedLZ4DecompressAsync(
-    const void* const* /*in_ptr*/,
-    const size_t* /*in_bytes*/,
-    size_t /*batch_size*/,
-    void* const /*temp_ptr*/,
-    const size_t /*temp_bytes*/,
-    const void* const /*metadata_ptr*/,
-    void* const /*out_ptr*/,
-    const size_t* /*out_bytes*/,
-    cudaStream_t /*stream*/)
-{
-
-  return nvcompErrorNotSupported;
-/*
   if (metadata_ptr == NULL) {
     std::cerr << "Invalid, metadata NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
+
+  std::vector<LZ4Metadata*>& metadata = *static_cast<std::vector<LZ4Metadata*>*>((void*)metadata_ptr);
+
+  for(size_t i=0; i<batch_size; i++) {
+    nvcompError_t err;
+    err = nvcompLZ4DecompressGetOutputSize(metadata[i], &output_bytes[i]);
+
+    if(err != nvcompSuccess) {
+      return err;
+    }
+  }
+
   return nvcompSuccess;
-*/
+}
+
+nvcompError_t nvcompBatchedLZ4DecompressAsync(
+    const void* const* in_ptr,
+    const size_t* in_bytes,
+    size_t batch_size,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    const void* metadata_ptr,
+    void* const* out_ptr,
+    const size_t* out_bytes,
+    cudaStream_t stream)
+{
+
+  if (metadata_ptr == NULL) {
+    std::cerr << "Invalid, metadata NULL." << std::endl;
+    return nvcompErrorInvalidValue;
+  }
+
+  std::vector<LZ4Metadata*>& metadata = *static_cast<std::vector<LZ4Metadata*>*>((void*)metadata_ptr);
+
+  for(size_t i=0; i<batch_size; i++) {
+    nvcompError_t err;
+    err = nvcompLZ4DecompressAsync(
+        in_ptr[i],
+        in_bytes[i],
+        temp_ptr,
+        temp_bytes,
+        metadata[i],
+        out_ptr[i],
+        out_bytes[i],
+        stream);
+
+    if(err != nvcompSuccess) {
+      return err;
+    }
+  }
+
+  return nvcompSuccess;
 }
 
 nvcompError_t nvcompBatchedLZ4CompressGetTempSize(

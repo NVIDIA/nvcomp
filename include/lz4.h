@@ -293,7 +293,7 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
     size_t batch_size,
     void* const temp_ptr,
     const size_t temp_bytes,
-    const void* const metadata_ptr,
+    const void* metadata_ptr,
     void* const* out_ptr,
     const size_t* out_bytes,
     cudaStream_t stream);
