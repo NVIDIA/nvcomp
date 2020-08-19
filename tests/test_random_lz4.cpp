@@ -112,14 +112,19 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
       Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
 
-      size_t decomp_out_bytes = decompressor.get_output_size();
+      const size_t temp_bytes = decompressor.get_temp_size();
+      void* temp_ptr;
+      cudaMalloc(&temp_ptr, temp_bytes);
+
+      const size_t decomp_out_bytes = decompressor.get_output_size();
       T* out_ptr = NULL;
       cudaMalloc(&out_ptr, decomp_out_bytes);
 
       struct timespec start, end;
       clock_gettime(CLOCK_MONOTONIC, &start);
 
-      decompressor.decompress_async(NULL, 0, out_ptr, decomp_out_bytes, stream);
+      decompressor.decompress_async(
+          temp_ptr, temp_bytes, out_ptr, decomp_out_bytes, stream);
 
       CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -130,6 +135,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
       cudaStreamDestroy(stream);
       cudaFree(d_comp_out);
+      cudaFree(temp_ptr);
 
       std::vector<T> res(decomp_out_bytes / sizeof(T));
       cudaMemcpy(&res[0], out_ptr, decomp_out_bytes, cudaMemcpyDeviceToHost);

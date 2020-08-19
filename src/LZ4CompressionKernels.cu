@@ -40,9 +40,6 @@
 #pragma GCC diagnostic pop
 #endif
 
-// align all temp allocations by 512B
-#define CUDA_MEM_ALIGN(size) (((size) + 0x1FF) & ~0x1FF)
-
 #include "cuda_runtime.h"
 
 #include <cassert>
@@ -67,28 +64,24 @@ constexpr const position_type HASH_TABLE_SIZE = 1U << 14;
 constexpr const offset_type NULL_OFFSET = static_cast<offset_type>(-1);
 constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
 
-struct block_stats_st
+// ideally this would fit in a quad-word -- right now though it spills into
+// 24-bytes (instead of 16-bytes).
+struct chunk_header
 {
-  uint64_t cycles;
-  int copy_length_min;
-  int copy_length_max;
-  int copy_length_sum;
-  int copy_length_count;
-  int copy_lsic_count;
-  int match_length_min;
-  int match_length_max;
-  int match_length_sum;
-  int match_length_count;
-  int match_lsic_count;
-  int match_overlaps;
-  int offset_min;
-  int offset_max;
-  int offset_sum;
+  const uint8_t* src;
+  uint8_t* dst;
+  uint32_t size;
 };
 
 /******************************************************************************
  * DEVICE FUNCTIONS AND KERNELS ***********************************************
  *****************************************************************************/
+
+inline __device__ __host__ size_t maxSizeOfStream(const size_t size)
+{
+  const size_t expansion = size + 1 + roundUpDiv(size, 255);
+  return roundUpTo(expansion, sizeof(size_t));
+}
 
 inline __device__ void syncCTA()
 {
@@ -318,20 +311,35 @@ public:
         return m_compData[i];
       }
     }
-  
-  inline __device__ void loadAt(const position_type offset)
-  {
-    m_offset = (offset / sizeof(double_word_type)) * sizeof(double_word_type);
-  
-    if (m_offset + BUFFER_SIZE <= m_length) {
-      assert(m_offset % sizeof(double_word_type) == 0);
-      assert(BUFFER_SIZE == DECOMP_THREADS * sizeof(double_word_type));
-      const double_word_type* const word_data
-          = reinterpret_cast<const double_word_type*>(m_compData + m_offset);
-      double_word_type* const word_buffer
-          = reinterpret_cast<double_word_type*>(m_buffer);
-      word_buffer[threadIdx.x] = word_data[threadIdx.x];
-    } else {
+
+    inline __device__ void setAndAlignOffset(const position_type offset)
+    {
+      static_assert(sizeof(size_t) == sizeof(const uint8_t*));
+
+      const uint8_t* const alignedPtr = reinterpret_cast<const uint8_t*>(
+          (reinterpret_cast<size_t>(m_compData + offset)
+           / sizeof(double_word_type))
+          * sizeof(double_word_type));
+
+      m_offset = alignedPtr - m_compData;
+    }
+
+    inline __device__ void loadAt(const position_type offset)
+    {
+      setAndAlignOffset(offset);
+
+      if (m_offset + BUFFER_SIZE <= m_length) {
+        assert(
+            reinterpret_cast<size_t>(m_compData + m_offset)
+                % sizeof(double_word_type)
+            == 0);
+        assert(BUFFER_SIZE == DECOMP_THREADS * sizeof(double_word_type));
+        const double_word_type* const word_data
+            = reinterpret_cast<const double_word_type*>(m_compData + m_offset);
+        double_word_type* const word_buffer
+            = reinterpret_cast<double_word_type*>(m_buffer);
+        word_buffer[threadIdx.x] = word_data[threadIdx.x];
+      } else {
   #pragma unroll
       for (int i = threadIdx.x; i < BUFFER_SIZE; i += DECOMP_THREADS) {
         if (m_offset + i < m_length) {
@@ -605,24 +613,15 @@ inline __device__ void decompressStream(
     uint8_t* buffer,
     uint8_t* decompData,
     const uint8_t* compData,
-    const position_type comp_start,
-    position_type length,
-    block_stats_st* stats)
+    position_type length)
 {
-#ifdef LOG_CTA_CYCLES
-  uint64_t start_clock;
-  if (threadIdx.x == 0) {
-    start_clock = clock64();
-  }
-#endif
-
-  position_type comp_end = length + comp_start;
+  position_type comp_end = length;
 
   BufferControl ctrl(buffer, compData, comp_end);
-  ctrl.loadAt(comp_start);
+  ctrl.loadAt(0);
 
   position_type decomp_idx = 0;
-  position_type comp_idx = comp_start;
+  position_type comp_idx = 0;
   while (comp_idx < comp_end) {
     if (comp_idx + PREFETCH_DIST > ctrl.end()) {
       ctrl.loadAt(comp_idx);
@@ -637,19 +636,7 @@ inline __device__ void decompressStream(
     if (tok.num_literals == 15) {
       num_literals += ctrl.readLSIC(comp_idx);
     }
-#ifdef LOG_STATS
-    if (threadIdx.x == 0) {
-      atomicMin(&stats->copy_length_min, num_literals);
-      atomicMax(&stats->copy_length_max, num_literals);
-      atomicAdd(&stats->copy_length_sum, num_literals);
-      if (tok.num_literals == 15) {
-        atomicAdd(&stats->copy_lsic_count, 1);
-      }
-      atomicAdd(&stats->copy_length_count, 1);
-    }
-#endif
     const position_type literalStart = comp_idx;
-
 
     // copy the literals to the out stream
     if (num_literals + comp_idx > ctrl.end()) {
@@ -688,23 +675,6 @@ inline __device__ void decompressStream(
         match += ctrl.readLSIC(comp_idx);
       }
 
-#ifdef LOG_STATS
-      if (threadIdx.x == 0) {
-        atomicMin(&stats->match_length_min, match);
-        atomicMax(&stats->match_length_max, match);
-        atomicAdd(&stats->match_length_sum, match);
-        atomicAdd(&stats->match_length_count, 1);
-        if (tok.num_matches == 15) {
-          atomicAdd(&stats->match_lsic_count, 1);
-        }
-        if (offset < match)
-          atomicAdd(&stats->match_overlaps, 1);
-        atomicMin(&stats->offset_min, offset);
-        atomicMax(&stats->offset_max, offset);
-        atomicAdd(&stats->offset_sum, offset);
-      }
-#endif
-
       // copy match
       if (offset <= num_literals
           && (ctrl.begin() <= literalStart
@@ -731,37 +701,22 @@ inline __device__ void decompressStream(
       decomp_idx += match;
     }
   }
-#ifdef LOG_CTA_CYCLES
-  if (threadIdx.x == 0)
-    stats->cycles = clock64() - start_clock;
-#endif
   assert(comp_idx == comp_end);
 }
 
-
 __global__ void lz4CompressMultistreamKernel(
-    uint8_t* compData,
-    const uint8_t* decompData,
-    size_t chunk_size,
-    size_t stride,
-    size_t last_chunk_size,
-    size_t* comp_length,
-    size_t batch_bytes)
+    const chunk_header* const headers, size_t* const comp_length)
 {
-  const uint8_t* decomp_ptr = &decompData[blockIdx.x*chunk_size];
-  uint8_t* comp_ptr = &compData[blockIdx.x*(stride)];  
+  const uint8_t* decomp_ptr = headers[blockIdx.x].src;
+  uint8_t* comp_ptr = headers[blockIdx.x].dst;
 
-  size_t decomp_length = chunk_size;
-  if(blockIdx.x == gridDim.x-1 && last_chunk_size != 0) {
-    decomp_length = last_chunk_size;
-  }
+  const size_t decomp_length = headers[blockIdx.x].size;
 
   compressStream(
       comp_ptr,
       decomp_ptr,
       decomp_length,
       comp_length + blockIdx.x);
-
 }
 
 
@@ -776,41 +731,74 @@ __global__ void copyToContig(
     ((uint8_t*)compData)[prefix_output[blockIdx.x] + i] = ((uint8_t*)tempData)[blockIdx.x*stride + i];
   }
 
-__syncthreads();
-if(threadIdx.x==0) {
-  metadata_ptr[blockIdx.x] = prefix_output[blockIdx.x];
-  metadata_ptr[blockIdx.x+1] = prefix_output[blockIdx.x+1];
-}
-
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    metadata_ptr[blockIdx.x] = prefix_output[blockIdx.x];
+    metadata_ptr[blockIdx.x + 1] = prefix_output[blockIdx.x + 1];
+  }
 }
 
 __global__ void lz4DecompressMultistreamKernel(
-    uint8_t* decompData,
-    const uint8_t* compData,
-    size_t* offsets,
-    size_t decomp_chunk_size,
-    size_t last_decomp_chunk_size,
-    int num_chunks,
-    block_stats_st* stats)
+    const chunk_header* const headers, const int num_chunks)
 {
   const int bid = blockIdx.x * Y_DIM + threadIdx.y;
 
   __shared__ uint8_t buffer[BUFFER_SIZE * Y_DIM];
 
   if (bid < num_chunks) {
-    uint8_t* decomp_ptr = &(decompData[bid * decomp_chunk_size]);
-    size_t chunk_length = offsets[bid + 1] - offsets[bid];
-
-    if (bid == num_chunks - 1 && last_decomp_chunk_size != 0)
-      decomp_chunk_size = last_decomp_chunk_size;
+    uint8_t* const decomp_ptr = headers[bid].dst;
+    const uint8_t* const comp_ptr = headers[bid].src;
+    const size_t chunk_length = headers[bid].size;
 
     decompressStream(
-        buffer + threadIdx.y * BUFFER_SIZE,
-        decomp_ptr,
-        compData,
-        offsets[bid],
-        chunk_length,
-        stats + bid);
+        buffer + threadIdx.y * BUFFER_SIZE, decomp_ptr, comp_ptr, chunk_length);
+  }
+}
+
+__global__ void lz4CompressGenerateHeaders(
+    const uint8_t* const decomp_data,
+    uint8_t* const comp_data,
+    const size_t num,
+    const int max_chunk_size,
+    chunk_header* const headers)
+{
+  const int chunk = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const size_t chunk_offset = chunk * static_cast<size_t>(max_chunk_size);
+  const size_t chunk_end = chunk_offset + max_chunk_size;
+
+  const size_t comp_offset = maxSizeOfStream(max_chunk_size) * chunk;
+
+  chunk_header h;
+  h.src = decomp_data + chunk_offset;
+  h.dst = comp_data + comp_offset;
+  h.size = min(chunk_end, num) - chunk_offset;
+
+  if (chunk_offset < num) {
+    headers[chunk] = h;
+  }
+}
+
+__global__ void lz4DecompressGenerateHeaders(
+    uint8_t* const decomp_data,
+    const uint8_t* const comp_data,
+    const size_t* comp_chunk_prefix,
+    const size_t decomp_chunk_size,
+    const size_t num_chunks,
+    chunk_header* const headers)
+{
+  const int chunk = threadIdx.x + blockIdx.x * blockDim.x;
+
+  if (chunk < num_chunks) {
+    const size_t comp_chunk_offset = comp_chunk_prefix[chunk];
+    const size_t decomp_chunk_offset = chunk * decomp_chunk_size;
+
+    chunk_header h;
+    h.src = comp_data + comp_chunk_offset;
+    h.dst = decomp_data + decomp_chunk_offset;
+    h.size = comp_chunk_prefix[chunk + 1] - comp_chunk_prefix[chunk];
+
+    headers[chunk] = h;
   }
 }
 
@@ -837,14 +825,14 @@ void lz4CompressBatch(
   uint8_t* multiStreamTempSpace;
   broker.reserve(&multiStreamTempSpace, chunks_in_batch * stride);
 
+  chunk_header* headers;
+  broker.reserve(&headers, chunks_in_batch);
+
+  lz4CompressGenerateHeaders<<<blocks, 1, 0, stream>>>(
+      decomp_ptr, multiStreamTempSpace, batch_bytes, chunk_bytes, headers);
+
   lz4CompressMultistreamKernel<<<blocks, 1, 0, stream>>>(
-      multiStreamTempSpace,
-      decomp_ptr,
-      chunk_bytes,
-      stride,
-      batch_bytes % (chunk_bytes),
-      reinterpret_cast<size_t*>(metadata_ptr),
-      batch_bytes);
+      headers, reinterpret_cast<size_t*>(metadata_ptr));
 
   size_t prefix_temp_size=0;
 
@@ -889,33 +877,42 @@ void lz4CompressBatch(
       ((size_t*)metadata_ptr) - 1);
 }
 
-
-void lz4DecompressBatch( 
+void lz4DecompressBatch(
+    void* const temp_space,
+    const size_t temp_size,
     void* decompData,
     const void* compData,
     int headerOffset,
     int chunk_size,
-    int last_chunk_size,
     int chunks_in_batch,
     cudaStream_t stream)
 {
+  TempSpaceBroker broker(temp_space, temp_size);
+
+  chunk_header* headers;
+  broker.reserve(&headers, chunks_in_batch);
+
+  const dim3 header_block(128);
+  const dim3 header_grid(roundUpDiv(chunks_in_batch, header_block.x));
+
+  lz4DecompressGenerateHeaders<<<header_grid, header_block, 0, stream>>>(
+      static_cast<uint8_t*>(decompData),
+      static_cast<const uint8_t*>(compData),
+      reinterpret_cast<const size_t*>(
+          static_cast<const uint8_t*>(compData) + headerOffset),
+      chunk_size,
+      chunks_in_batch,
+      headers);
 
   lz4DecompressMultistreamKernel<<<
-      ((chunks_in_batch - 1) / Y_DIM)+1,
+      roundUpDiv(chunks_in_batch, Y_DIM),
       dim3(DECOMP_THREADS, Y_DIM, 1),
-      0, 
-      stream>>> 
-      ((uint8_t*)decompData, 
-      ((uint8_t*)compData),
-      (size_t*)(((uint8_t*)compData)+headerOffset), 
-      chunk_size, 
-      last_chunk_size,
-      chunks_in_batch,
-      NULL);
-
+      0,
+      stream>>>(headers, chunks_in_batch);
 }
 
-size_t lz4ComputeTempSize(const size_t maxChunksInBatch, const size_t chunkSize)
+size_t lz4CompressComputeTempSize(
+    const size_t maxChunksInBatch, const size_t chunkSize)
 {
   size_t prefix_temp_size;
   cudaError_t err = cub::DeviceScan::InclusiveSum(
@@ -931,14 +928,23 @@ size_t lz4ComputeTempSize(const size_t maxChunksInBatch, const size_t chunkSize)
 
   const size_t strideSize = lz4ComputeMaxSize(chunkSize);
   const size_t prefix_out_size = sizeof(size_t) * (maxChunksInBatch + 1);
+  const size_t header_size = sizeof(chunk_header) * maxChunksInBatch;
 
-  return prefix_temp_size + prefix_out_size + strideSize * maxChunksInBatch;
+  return prefix_temp_size + prefix_out_size + strideSize * maxChunksInBatch
+         + roundUpTo(header_size, sizeof(size_t));
+}
+
+size_t lz4DecompressComputeTempSize(
+    const size_t maxChunksInBatch, const size_t /* chunkSize */)
+{
+  const size_t header_size = sizeof(chunk_header) * maxChunksInBatch;
+
+  return roundUpTo(header_size, sizeof(size_t));
 }
 
 size_t lz4ComputeMaxSize(const size_t size)
 {
-  const size_t expansion = size + 1 + roundUpDiv(size, 255);
-  return roundUpTo(expansion, sizeof(size_t));
+  return maxSizeOfStream(size);
 }
 
 } // nvcomp namespace

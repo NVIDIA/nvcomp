@@ -45,16 +45,20 @@ void lz4CompressBatch(
 
 // Decompress a single batch of chunks, placing the result in decompData
 void lz4DecompressBatch(
+    void* tempData,
+    const size_t temp_bytes,
     void* decompData,
     const void* compData,
     int headerOffset,
     int chunk_size,
-    int last_chunk_size,
     int chunks_in_batch,
     cudaStream_t stream);
 
-size_t
-lz4ComputeTempSize(const size_t max_chunks_in_batch, const size_t chunk_size);
+size_t lz4CompressComputeTempSize(
+    const size_t max_chunks_in_batch, const size_t chunk_size);
+
+size_t lz4DecompressComputeTempSize(
+    const size_t max_chunks_in_batch, const size_t chunk_size);
 
 size_t lz4ComputeMaxSize(const size_t chunk_size);
 }
