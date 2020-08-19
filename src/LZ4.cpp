@@ -152,14 +152,18 @@ nvcompLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
   if (temp_bytes == NULL) {
     std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
-  }
-  // LZ4 decompression doesn't need any temp memory
-  *temp_bytes = 0;
-
-  if (metadata_ptr == NULL) {
+  } else if (metadata_ptr == NULL) {
     std::cerr << "Invalid, metadata ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
+
+  const LZ4Metadata* const metadata
+      = static_cast<const LZ4Metadata*>(metadata_ptr);
+
+  // LZ4 decompression doesn't need any temp memory
+  *temp_bytes = lz4DecompressComputeTempSize(
+      metadata->getNumChunks(), metadata->getUncompChunkSize());
+
   return nvcompSuccess;
 }
 
@@ -175,8 +179,8 @@ nvcompLZ4DecompressGetOutputSize(const void* metadata_ptr, size_t* output_bytes)
 nvcompError_t nvcompLZ4DecompressAsync(
     const void* const in_ptr,
     const size_t in_bytes,
-    void* const /*temp_ptr*/,
-    const size_t /*temp_bytes*/,
+    void* const temp_ptr,
+    const size_t temp_bytes,
     const void* const metadata_ptr,
     void* const out_ptr,
     const size_t /*out_bytes*/,
@@ -199,12 +203,13 @@ nvcompError_t nvcompLZ4DecompressAsync(
   }
 
   lz4DecompressBatch(
+      temp_ptr,
+      temp_bytes,
       out_ptr,
       in_ptr,
       4 * sizeof(size_t), // Header has metadata size, decomp_size, and
                           // chunk_size before offsets
       metadata->getUncompChunkSize(),
-      metadata->getUncompressedSize() % metadata->getUncompChunkSize(),
       metadata->getNumChunks(),
       stream);
 
@@ -229,7 +234,7 @@ nvcompError_t nvcompLZ4CompressGetTempSize(
     }
 
     const size_t num_chunks = roundUpDiv(in_bytes, format_opts->chunk_size);
-    const size_t req_temp_size = lz4ComputeTempSize(
+    const size_t req_temp_size = lz4CompressComputeTempSize(
         std::min(CHUNKS_PER_BATCH, num_chunks), format_opts->chunk_size);
 
     *temp_bytes = req_temp_size;

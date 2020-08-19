@@ -122,16 +122,16 @@ void test_lz4(const std::vector<T>& input)
 
   Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
 
+  size_t decomp_temp_bytes = decompressor.get_temp_size();
+  void* d_decomp_temp;
+  cudaMalloc(&d_decomp_temp, decomp_temp_bytes);
+
   size_t decomp_out_bytes = decompressor.get_output_size();
 
   cudaMalloc(&out_ptr, decomp_out_bytes);
 
   decompressor.decompress_async(
-      NULL, // LZ4 decompressor does not need a temp space
-      0,
-      out_ptr,
-      decomp_out_bytes,
-      stream);
+      d_decomp_temp, decomp_temp_bytes, out_ptr, decomp_out_bytes, stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -145,6 +145,7 @@ void test_lz4(const std::vector<T>& input)
 
   cudaFree(d_comp_out);
   cudaFree(out_ptr);
+  cudaFree(d_decomp_temp);
 }
 
 } // namespace
