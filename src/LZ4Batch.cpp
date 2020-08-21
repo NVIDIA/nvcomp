@@ -105,12 +105,35 @@ nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_byt
     std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
-  // LZ4 decompression doesn't need any temp memory
-  *temp_bytes = 0;
 
   if (metadata_ptr == NULL) {
     std::cerr << "Invalid, metadata ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
+  }
+
+  try {
+    std::vector<LZ4Metadata*>& metadata
+        = *static_cast<std::vector<LZ4Metadata*>*>((void*)metadata_ptr);
+
+    const size_t batch_size = metadata.size();
+
+    size_t max_temp_bytes = 0;
+    for (size_t b = 0; b < batch_size; ++b) {
+      const size_t chunk_size = metadata[b]->getUncompChunkSize();
+      const size_t num_chunks = metadata[b]->getNumChunks();
+
+      size_t this_temp_bytes
+          = lz4DecompressComputeTempSize(num_chunks, chunk_size);
+
+      if (this_temp_bytes > max_temp_bytes) {
+        max_temp_bytes = this_temp_bytes;
+      }
+    }
+
+    *temp_bytes = max_temp_bytes;
+  } catch (const std::exception& e) {
+    std::cerr << "Failed to get temp size for batch: " << e.what() << std::endl;
+    return nvcompErrorCudaError;
   }
 
   return nvcompSuccess;
