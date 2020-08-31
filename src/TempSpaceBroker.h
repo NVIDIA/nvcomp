@@ -57,7 +57,7 @@ public:
   template <typename T>
   void reserve(T** ptr, const size_t num)
   {
-    *ptr = reinterpret_cast<T*>(reserve(alignof(T), num));
+    *ptr = reinterpret_cast<T*>(reserve(alignof(T), num, sizeof(T)));
   }
 
   /**
@@ -83,7 +83,7 @@ private:
   size_t m_size;
   size_t m_offset;
 
-  void* reserve(const size_t alignment, const size_t num);
+  void* reserve(const size_t alignment, const size_t num, const size_t size);
 };
 
 } // namespace nvcomp
