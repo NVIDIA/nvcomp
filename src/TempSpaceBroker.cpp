@@ -61,9 +61,10 @@ size_t TempSpaceBroker::spaceLeft() const
  * PRIVATE METHODS ************************************************************
  *****************************************************************************/
 
-void* TempSpaceBroker::reserve(const size_t alignment, const size_t num)
+void* TempSpaceBroker::reserve(
+    const size_t alignment, const size_t num, const size_t size)
 {
-  const size_t requiredSize = alignment * num;
+  const size_t requiredSize = num * size;
 
   void* destPtr = next();
 
