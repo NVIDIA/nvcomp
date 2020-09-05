@@ -29,18 +29,32 @@
 
 namespace nvcomp {
 
-// TODO - document headers
-// Compress a single batch of chunks, placing result in contiguous space in compData
+/**
+ * @brief Compress a batch of memory locations.
+ *
+ * @param decomp_data The batch items to compress.
+ * @param decomp_sizes The size of each batch item to compress.
+ * @param batch_size The number of items in the batch.
+ * @param max_chunk_size The number of uncompressed bytes per LZ4 compressed
+ * chunk.
+ * @param temp_data The temporary memory to use.
+ * @param temp_bytes The size of the temporary memory.
+ * @param comp_data The output location of each batch item.
+ * @param comp_prefixes The size of each compressed chunk (output).
+ * @param comp_prefix_offset_host
+ * @param stream The stream to operate on.
+ */
 void lz4CompressBatch(
-    void* compData,
-    void* tempData,
-    const size_t temp_bytes,
-    const uint8_t* decomp_ptr,
-    uint8_t* metadata_ptr,
-    size_t batch_bytes,
-    int chunk_bytes,
-    int chunks_in_batch,
-    int blocks,
+    const uint8_t* const* decomp_data_device,
+    const size_t* decomp_sizes_device,
+    const size_t* decomp_sizes_host,
+    const size_t batch_size,
+    const size_t max_chunk_size,
+    uint8_t* temp_data,
+    size_t temp_bytes,
+    uint8_t* const* comp_data_device,
+    size_t* const* comp_prefixes_device,
+    const size_t* const comp_prefix_offset_device,
     cudaStream_t stream);
 
 // Decompress a single batch of chunks, placing the result in decompData
@@ -48,11 +62,16 @@ void lz4DecompressBatch(
     void* tempData,
     const size_t temp_bytes,
     void* decompData,
-    const void* compData,
-    int headerOffset,
+    const uint8_t* compData,
+    const size_t* compPrefix,
     int chunk_size,
     int chunks_in_batch,
     cudaStream_t stream);
+
+size_t lz4ComputeChunksInBatch(
+    const size_t* const decomp_data_size,
+    const size_t batch_size,
+    const size_t chunk_size);
 
 size_t lz4CompressComputeTempSize(
     const size_t max_chunks_in_batch, const size_t chunk_size);
