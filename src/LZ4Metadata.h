@@ -84,12 +84,6 @@ public:
    */
   LZ4Metadata(const void* const memPtr, size_t compressedBytes);
 
-  LZ4Metadata(const LZ4Metadata&);
-
-  LZ4Metadata& operator=(const LZ4Metadata&);
-
-  //  void setOffsetPtr(void* mem);
-
   /**
    * @brief Get number of bytes per chunk
    *

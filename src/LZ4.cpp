@@ -28,8 +28,12 @@
 
 #include "lz4.h"
 
+#include "CudaUtils.h"
+#include "LZ4BatchCompressor.h"
 #include "LZ4CompressionKernels.h"
 #include "LZ4Metadata.h"
+#include "LZ4MetadataOnGPU.h"
+#include "MutableLZ4MetadataOnGPU.h"
 #include "common.h"
 #include "nvcomp.h"
 #include "nvcomp.hpp"
@@ -46,10 +50,6 @@
 
 using namespace nvcomp;
 
-namespace
-{
-constexpr const size_t CHUNKS_PER_BATCH = 2048;
-}
 
 int LZ4IsData(const void* const in_ptr, size_t in_bytes)
 {
@@ -202,13 +202,16 @@ nvcompError_t nvcompLZ4DecompressAsync(
     return nvcompErrorInvalidValue;
   }
 
+  LZ4MetadataOnGPU metadataGPU(in_ptr, in_bytes);
+
+  const size_t* const comp_prefix = metadataGPU.compressed_prefix_ptr();
+
   lz4DecompressBatch(
       temp_ptr,
       temp_bytes,
       out_ptr,
-      in_ptr,
-      4 * sizeof(size_t), // Header has metadata size, decomp_size, and
-                          // chunk_size before offsets
+      static_cast<const uint8_t*>(in_ptr),
+      comp_prefix,
       metadata->getUncompChunkSize(),
       metadata->getNumChunks(),
       stream);
@@ -228,16 +231,8 @@ nvcompError_t nvcompLZ4CompressGetTempSize(
       throw std::runtime_error("Format opts must not be null.");
     }
 
-    size_t batch_size = format_opts->chunk_size * CHUNKS_PER_BATCH;
-    if (in_bytes < batch_size) {
-      batch_size = in_bytes;
-    }
-
-    const size_t num_chunks = roundUpDiv(in_bytes, format_opts->chunk_size);
-    const size_t req_temp_size = lz4CompressComputeTempSize(
-        std::min(CHUNKS_PER_BATCH, num_chunks), format_opts->chunk_size);
-
-    *temp_bytes = req_temp_size;
+    *temp_bytes = LZ4BatchCompressor::calculate_workspace_size(
+        &in_bytes, 1, format_opts->chunk_size);
   } catch (const std::exception& e) {
     std::cerr << "Failed to get temp size: " << e.what() << std::endl;
     return nvcompErrorCudaError;
@@ -247,46 +242,31 @@ nvcompError_t nvcompLZ4CompressGetTempSize(
 }
 
 nvcompError_t nvcompLZ4CompressGetOutputSize(
-    const void* /*in_ptr*/,
+    const void* const in_ptr,
     const size_t in_bytes,
     const nvcompType_t /*in_type*/,
     const nvcompLZ4FormatOpts* format_opts,
-    void* const /*temp_ptr*/,
-    const size_t /*temp_bytes*/,
+    void* const temp_ptr,
+    const size_t temp_bytes,
     size_t* const out_bytes,
     const int exact_out_bytes)
 {
-
-  try 
-  {
-    if (exact_out_bytes) {
-      throw std::runtime_error("Exact output bytes is unimplemented at "
-                               "this time.");
-    }
-
-    const size_t chunk_bytes = format_opts->chunk_size;
-    const int total_chunks = roundUpDiv(in_bytes, chunk_bytes);
-
-    const size_t metadata_bytes
-        = 4 * sizeof(size_t)
-          + (total_chunks + 1)
-                * sizeof(size_t); // 1 extra val to store total length
-
-    const size_t max_comp_bytes = lz4ComputeMaxSize(in_bytes);
-
-    *out_bytes = metadata_bytes + max_comp_bytes;
-  } catch (const std::exception& e) {
-    std::cerr << "LZ4CompressGetOutputSize() Exception: " << e.what()
-              << std::endl;
+  if (exact_out_bytes) {
+    std::cerr
+        << "LZ4CompressGetOutputSize(): Exact output bytes is unimplemented at "
+           "this time."
+        << std::endl;
     return nvcompErrorInvalidValue;
   }
-  return nvcompSuccess;
+
+  return nvcompBatchedLZ4CompressGetOutputSize(
+      &in_ptr, &in_bytes, 1, format_opts, temp_ptr, temp_bytes, out_bytes);
 }
 
 nvcompError_t nvcompLZ4CompressAsync(
     const void* in_ptr,
     const size_t in_bytes,
-    const nvcompType_t /*in_type*/,
+    const nvcompType_t /* in_type */,
     const nvcompLZ4FormatOpts* format_opts,
     void* const temp_ptr,
     const size_t temp_bytes,
@@ -294,75 +274,14 @@ nvcompError_t nvcompLZ4CompressAsync(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  const size_t chunk_bytes = format_opts->chunk_size;
-
-  const int total_chunks = roundUpDiv(in_bytes, chunk_bytes);
-  const int batch_chunks = CHUNKS_PER_BATCH;
-
-  const size_t metadata_bytes
-      = 4 * sizeof(size_t)
-        + (total_chunks + 1)
-              * sizeof(size_t); // 1 extra val to store total length
-
-  const size_t start_offset
-      = metadata_bytes; // Offset starts after metadata headers
-
-  const size_t LZ4_flag = LZ4_FLAG;
-  cudaMemcpyAsync((void*)out_ptr, &LZ4_flag, sizeof(size_t), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync(
-      (void*)(((size_t*)out_ptr) + LZ4Metadata::MetadataBytes),
-      &metadata_bytes,
-      sizeof(size_t),
-      cudaMemcpyHostToDevice,
-      stream);
-  cudaMemcpyAsync(
-      (void*)(((size_t*)out_ptr) + LZ4Metadata::UncompressedSize),
+  return nvcompBatchedLZ4CompressAsync(
+      &in_ptr,
       &in_bytes,
-      sizeof(size_t),
-      cudaMemcpyHostToDevice,
+      1,
+      format_opts,
+      temp_ptr,
+      temp_bytes,
+      &out_ptr,
+      out_bytes,
       stream);
-  cudaMemcpyAsync(
-      (void*)(((size_t*)out_ptr) + LZ4Metadata::ChunkSize),
-      &chunk_bytes,
-      sizeof(size_t),
-      cudaMemcpyHostToDevice,
-      stream);
-  cudaMemcpyAsync(
-      (void*)(((size_t*)out_ptr) + LZ4Metadata::OffsetAddr),
-      &start_offset,
-      sizeof(size_t),
-      cudaMemcpyHostToDevice,
-      stream);
-
-  const uint8_t* in_progress = static_cast<const uint8_t*>(in_ptr);
-  uint8_t* metadata_progress = (uint8_t*)out_ptr + (5*sizeof(size_t)); // Offsets stored after initial header info
-
-  size_t batch_bytes = batch_chunks * chunk_bytes;
-  for(size_t batch_offset=0; batch_offset < in_bytes; batch_offset += batch_bytes) {
-    if (in_bytes < batch_bytes + batch_offset) {
-      batch_bytes = in_bytes - batch_offset;
-    }
-    const int chunks = roundUpDiv(batch_bytes, chunk_bytes);
-
-    lz4CompressBatch(
-        ((uint8_t*)out_ptr),
-        temp_ptr,
-        temp_bytes,
-        in_progress,
-        metadata_progress,
-        batch_bytes,
-        (size_t)std::min(chunk_bytes, batch_bytes),
-        chunks,
-        chunks,
-        stream);
-
-    // Advance pointers
-    in_progress += batch_bytes;
-    metadata_progress = metadata_progress+(chunks*sizeof(size_t));
-  }
-
-// Copy the ending offset of the last chunk (final prefix sums value) out as the total compressed size
-  cudaMemcpyAsync(out_bytes, &(((uint8_t*)out_ptr)[4*sizeof(size_t)+total_chunks*sizeof(size_t)]), sizeof(size_t), cudaMemcpyDeviceToHost, stream);
-
-  return nvcompSuccess;
 }
