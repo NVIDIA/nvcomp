@@ -26,12 +26,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "PinnedMemory.h"
-
 #include "cuda_runtime.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace nvcomp
 {
@@ -83,11 +82,12 @@ public:
 private:
   size_t m_batch_size;
   size_t m_chunk_size;
-  PinnedMemory<size_t> m_pinned_input_sizes;
-  PinnedMemory<const uint8_t*> m_pinned_input_ptrs;
-  PinnedMemory<size_t*> m_pinned_output_sizes;
-  PinnedMemory<uint8_t*> m_pinned_output_ptrs;
-  PinnedMemory<size_t> m_pinned_output_offsets;
+  std::vector<uint8_t> m_buffer;
+  const uint8_t** m_input_ptrs;
+  size_t* m_input_sizes;
+  uint8_t** m_output_ptrs;
+  size_t** m_output_sizes;
+  size_t* m_output_offsets;
   void* m_workspace;
   size_t m_workspace_size;
   size_t* m_host_item_sizes;

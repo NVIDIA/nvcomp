@@ -1075,38 +1075,54 @@ void lz4CompressBatch(
   }
 }
 
-void lz4DecompressBatch(
+void lz4DecompressBatches(
     void* const temp_space,
     const size_t temp_size,
-    void* decompData,
-    const uint8_t* const compData,
-    const size_t* const compPrefix,
+    void* const* decompData,
+    const uint8_t* const* compData,
+    int batch_size,
+    const size_t** compPrefix,
     int chunk_size,
-    int chunks_in_batch,
+    int* chunks_in_item,
     cudaStream_t stream)
-{
+{   
   TempSpaceBroker broker(temp_space, temp_size);
 
+  int total_chunks=0;
+  for(int i=0; i<batch_size; i++) {
+    total_chunks += chunks_in_item[i];
+  }
+
   chunk_header* headers;
-  broker.reserve(&headers, chunks_in_batch);
+  broker.reserve(&headers, total_chunks);
 
-  const dim3 header_block(128);
-  const dim3 header_grid(roundUpDiv(chunks_in_batch, header_block.x));
+  int chunk_start=0;
 
-  lz4DecompressGenerateHeaders<<<header_grid, header_block, 0, stream>>>(
-      static_cast<uint8_t*>(decompData),
-      compData,
-      compPrefix,
-      chunk_size,
-      chunks_in_batch,
-      headers);
+  for(int i=0; i<batch_size; i++) {
+
+    const dim3 header_block(128);
+    const dim3 header_grid(roundUpDiv(chunks_in_item[i], header_block.x));
+
+    lz4DecompressGenerateHeaders<<<header_grid, header_block, 0, stream>>>(
+        static_cast<uint8_t*>(decompData[i]),
+        compData[i],
+        compPrefix[i],
+        chunk_size,
+        chunks_in_item[i],
+        &headers[chunk_start]);
+
+    chunk_start += chunks_in_item[i];
+  }
 
   lz4DecompressMultistreamKernel<<<
-      roundUpDiv(chunks_in_batch, Y_DIM),
+      roundUpDiv(total_chunks, Y_DIM),
       dim3(DECOMP_THREADS, Y_DIM, 1),
       0,
-      stream>>>(headers, chunks_in_batch);
+      stream>>>(headers, total_chunks);
+
+
 }
+
 
 size_t lz4ComputeChunksInBatch(
     const size_t* const decomp_data_size,

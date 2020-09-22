@@ -113,17 +113,40 @@ LZ4BatchCompressor::LZ4BatchCompressor(
     const size_t chunk_size) :
     m_batch_size(batch_size),
     m_chunk_size(chunk_size),
-    m_pinned_input_sizes(decomp_data_size, decomp_data_size + batch_size),
-    m_pinned_input_ptrs(decomp_data, decomp_data + batch_size),
-    m_pinned_output_sizes(batch_size),
-    m_pinned_output_ptrs(batch_size),
-    m_pinned_output_offsets(batch_size),
+    m_buffer(),
+    m_input_ptrs(nullptr),
+    m_input_sizes(nullptr),
+    m_output_ptrs(nullptr),
+    m_output_sizes(nullptr),
+    m_output_offsets(nullptr),
     m_workspace(nullptr),
     m_workspace_size(0),
     m_host_item_sizes(nullptr),
     m_output_configured(false)
 {
-  // do nothing
+  const size_t input_ptrs = batch_size * sizeof(*decomp_data);
+  const size_t input_sizes = batch_size * sizeof(*decomp_data_size);
+  const size_t output_ptrs = batch_size * sizeof(uint8_t*);
+  const size_t output_sizes = batch_size * sizeof(size_t*);
+  const size_t output_offsets = batch_size * sizeof(size_t);
+
+  const size_t buffer_size
+      = input_ptrs + input_sizes + output_sizes + output_ptrs + output_offsets;
+
+  m_buffer.resize(buffer_size);
+
+  m_input_ptrs = reinterpret_cast<const uint8_t**>(m_buffer.data());
+  m_input_sizes = reinterpret_cast<size_t*>(m_buffer.data() + input_ptrs);
+  m_output_ptrs
+      = reinterpret_cast<uint8_t**>(m_buffer.data() + input_ptrs + input_sizes);
+  m_output_sizes = reinterpret_cast<size_t**>(
+      m_buffer.data() + input_ptrs + input_sizes + output_ptrs);
+  m_output_offsets = reinterpret_cast<size_t*>(
+      m_buffer.data() + input_sizes + input_ptrs + output_sizes
+      + output_offsets);
+
+  std::copy(decomp_data_size, decomp_data_size + batch_size, m_input_sizes);
+  std::copy(decomp_data, decomp_data + batch_size, m_input_ptrs);
 }
 
 /******************************************************************************
@@ -132,8 +155,7 @@ LZ4BatchCompressor::LZ4BatchCompressor(
 
 size_t LZ4BatchCompressor::get_workspace_size() const
 {
-  return calculate_workspace_size(
-      m_pinned_input_sizes.data(), m_batch_size, m_chunk_size);
+  return calculate_workspace_size(m_input_sizes, m_batch_size, m_chunk_size);
 }
 
 void LZ4BatchCompressor::configure_workspace(
@@ -158,16 +180,9 @@ void LZ4BatchCompressor::configure_output(
     const size_t* const device_offsets,
     size_t* const host_item_sizes)
 {
-  std::copy(
-      device_sizes, device_sizes + m_batch_size, m_pinned_output_sizes.begin());
-  std::copy(
-      device_locations,
-      device_locations + m_batch_size,
-      m_pinned_output_ptrs.begin());
-  std::copy(
-      device_offsets,
-      device_offsets + m_batch_size,
-      m_pinned_output_offsets.begin());
+  std::copy(device_sizes, device_sizes + m_batch_size, m_output_sizes);
+  std::copy(device_locations, device_locations + m_batch_size, m_output_ptrs);
+  std::copy(device_offsets, device_offsets + m_batch_size, m_output_offsets);
   m_host_item_sizes = host_item_sizes;
   m_output_configured = true;
 }
@@ -184,42 +199,47 @@ void LZ4BatchCompressor::compress_async(cudaStream_t stream)
   TempSpaceBroker temp(m_workspace, m_workspace_size);
 
   uint8_t* workspace;
-  const size_t workspace_size = compute_staging_bytes(
-      m_pinned_input_sizes.data(), m_batch_size, m_chunk_size);
+  const size_t workspace_size
+      = compute_staging_bytes(m_input_sizes, m_batch_size, m_chunk_size);
   temp.reserve(&workspace, workspace_size);
 
-  // TODO: do this all in one copy
+  // these have all the same size, and generally should on all platforms as
+  // the definition of size_t should make it the same size
+  static_assert(
+      alignof(size_t) == alignof(uint8_t*),
+      "Pointers must have the same alignment as size_t");
+
   const uint8_t** in_ptrs_device;
   temp.reserve(&in_ptrs_device, m_batch_size);
-  CudaUtils::copy_async(
-      in_ptrs_device, m_pinned_input_ptrs.data(), m_batch_size,
-      HOST_TO_DEVICE,
-      stream);
 
   size_t* in_sizes_device;
   temp.reserve(&in_sizes_device, m_batch_size);
-  CudaUtils::copy_async(
-      in_sizes_device, m_pinned_input_sizes.data(), m_batch_size,
-      HOST_TO_DEVICE, stream);
 
   uint8_t** out_ptrs_device;
   temp.reserve(&out_ptrs_device, m_batch_size);
-  CudaUtils::copy_async(
-      out_ptrs_device, m_pinned_output_ptrs.data(), m_batch_size,
-      HOST_TO_DEVICE, stream);
 
   size_t** out_sizes_device;
   temp.reserve(&out_sizes_device, m_batch_size);
-  CudaUtils::copy_async(
-      out_sizes_device, m_pinned_output_sizes.data(), m_batch_size,
-      HOST_TO_DEVICE, stream);
 
   size_t* out_prefix_offsets_device;
   temp.reserve(&out_prefix_offsets_device, m_batch_size);
-  CudaUtils::copy_async(
-      out_prefix_offsets_device,
-      m_pinned_output_offsets.data(),
-      m_batch_size,
+
+  const size_t buffer_size = reinterpret_cast<const uint8_t*>(
+                                 out_prefix_offsets_device + m_batch_size)
+                             - reinterpret_cast<const uint8_t*>(in_ptrs_device);
+
+  if (buffer_size > m_buffer.size()) {
+    throw std::runtime_error(
+        "Internal error: mismatched buffer sizes: "
+        + std::to_string(buffer_size) + " / "
+        + std::to_string(m_buffer.size()));
+  }
+
+  // just cop from the first pointer to the end of the last
+  CudaUtils::copy_async<uint8_t>(
+      reinterpret_cast<uint8_t*>(in_ptrs_device),
+      m_buffer.data(),
+      buffer_size,
       HOST_TO_DEVICE,
       stream);
 
@@ -227,7 +247,7 @@ void LZ4BatchCompressor::compress_async(cudaStream_t stream)
   lz4CompressBatch(
       in_ptrs_device,
       in_sizes_device,
-      m_pinned_input_sizes.data(),
+      m_input_sizes,
       m_batch_size,
       m_chunk_size,
       workspace,

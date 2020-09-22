@@ -183,40 +183,28 @@ nvcompError_t nvcompLZ4DecompressAsync(
     const size_t temp_bytes,
     const void* const metadata_ptr,
     void* const out_ptr,
-    const size_t /*out_bytes*/,
+    const size_t out_bytes,
     cudaStream_t stream)
 {
-
   if (metadata_ptr == NULL) {
     std::cerr << "Invalid, metadata NULL." << std::endl;
     return nvcompErrorInvalidValue;
   }
 
-  const LZ4Metadata* const metadata
-      = static_cast<const LZ4Metadata*>(metadata_ptr);
+  std::vector<const LZ4Metadata*> metadata;
+  metadata.emplace_back(static_cast<const LZ4Metadata*>(metadata_ptr)); 
 
-  if (in_bytes < metadata->getCompressedSize()) {
-    std::cerr << "Input buffer is smaller than compressed data size: "
-              << in_bytes << " < " << metadata->getCompressedSize()
-              << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
-  LZ4MetadataOnGPU metadataGPU(in_ptr, in_bytes);
-
-  const size_t* const comp_prefix = metadataGPU.compressed_prefix_ptr();
-
-  lz4DecompressBatch(
+  // Perform non-batched decompression as a batch of 1 item
+  return nvcompBatchedLZ4DecompressAsync(
+      &in_ptr,
+      &in_bytes,
+      1,
       temp_ptr,
       temp_bytes,
-      out_ptr,
-      static_cast<const uint8_t*>(in_ptr),
-      comp_prefix,
-      metadata->getUncompChunkSize(),
-      metadata->getNumChunks(),
+      &metadata,
+      &out_ptr,
+      &out_bytes,
       stream);
-
-  return nvcompSuccess;
 }
 
 nvcompError_t nvcompLZ4CompressGetTempSize(

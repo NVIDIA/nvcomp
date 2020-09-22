@@ -120,20 +120,19 @@ nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_byt
 
     const size_t batch_size = metadata.size();
 
-    size_t max_temp_bytes = 0;
-    for (size_t b = 0; b < batch_size; ++b) {
+    size_t total_temp_bytes=0;
+    for(size_t b=0;  b<batch_size; b++) {
       const size_t chunk_size = metadata[b]->getUncompChunkSize();
+
       const size_t num_chunks = metadata[b]->getNumChunks();
 
       size_t this_temp_bytes
           = lz4DecompressComputeTempSize(num_chunks, chunk_size);
 
-      if (this_temp_bytes > max_temp_bytes) {
-        max_temp_bytes = this_temp_bytes;
-      }
+      total_temp_bytes += this_temp_bytes;
     }
-
-    *temp_bytes = max_temp_bytes;
+    *temp_bytes = total_temp_bytes;
+    
   } catch (const std::exception& e) {
     std::cerr << "Failed to get temp size for batch: " << e.what() << std::endl;
     return nvcompErrorCudaError;
@@ -172,7 +171,7 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
     const size_t temp_bytes,
     const void* metadata_ptr,
     void* const* out_ptr,
-    const size_t* out_bytes,
+    const size_t* /*out_bytes*/,
     cudaStream_t stream)
 {
 
@@ -182,23 +181,44 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
   }
 
   std::vector<LZ4Metadata*>& metadata = *static_cast<std::vector<LZ4Metadata*>*>((void*)metadata_ptr);
+  metadata.reserve(batch_size);
+  std::vector<const size_t*> comp_prefix;
+  comp_prefix.reserve(batch_size);
+  std::vector<int> chunks_in_item;
+  chunks_in_item.reserve(batch_size);
 
-  for(size_t i=0; i<batch_size; i++) {
-    nvcompError_t err;
-    err = nvcompLZ4DecompressAsync(
-        in_ptr[i],
-        in_bytes[i],
-        temp_ptr,
-        temp_bytes,
-        metadata[i],
-        out_ptr[i],
-        out_bytes[i],
-        stream);
-
-    if(err != nvcompSuccess) {
-      return err;
+  for (size_t i = 1; i < batch_size; ++i) {
+    if (metadata[i]->getUncompChunkSize() != metadata[i-1]->getUncompChunkSize()) {
+      std::cerr << "Cannot decompress items in the same batch with different chunk sizes." << std::endl;
+      return nvcompErrorNotSupported;
     }
   }
+
+  for(size_t i=0; i<batch_size; i++) {
+    if (in_bytes[i] < metadata[i]->getCompressedSize()) {
+      std::cerr << "Input buffer of input " << i 
+                << " is smaller than compressed data size: "
+                << in_bytes[i] << " < " << metadata[i]->getCompressedSize()
+                << std::endl;
+      return nvcompErrorInvalidValue;
+    }
+
+    LZ4MetadataOnGPU metadataGPU(in_ptr[i], in_bytes[i]);
+
+    comp_prefix.emplace_back(metadataGPU.compressed_prefix_ptr());
+    chunks_in_item.emplace_back(metadata[i]->getNumChunks());
+  }
+
+  lz4DecompressBatches(
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      reinterpret_cast<const uint8_t* const*>(in_ptr),
+      batch_size,
+      comp_prefix.data(),
+      metadata[0]->getUncompChunkSize(), // All batches have some chunk size
+      chunks_in_item.data(),
+      stream);
 
   return nvcompSuccess;
 }

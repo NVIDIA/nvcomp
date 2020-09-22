@@ -57,15 +57,15 @@ void lz4CompressBatch(
     const size_t* const comp_prefix_offset_device,
     cudaStream_t stream);
 
-// Decompress a single batch of chunks, placing the result in decompData
-void lz4DecompressBatch(
-    void* tempData,
-    const size_t temp_bytes,
-    void* decompData,
-    const uint8_t* compData,
-    const size_t* compPrefix,
+void lz4DecompressBatches(
+    void* const temp_space,
+    const size_t temp_size,
+    void* const* decompData,
+    const uint8_t* const* compData,
+    int batch_size,
+    const size_t** compPrefix,
     int chunk_size,
-    int chunks_in_batch,
+    int* chunks_in_item,
     cudaStream_t stream);
 
 size_t lz4ComputeChunksInBatch(
