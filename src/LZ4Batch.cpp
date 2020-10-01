@@ -239,6 +239,11 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
       throw std::runtime_error("temp_bytes must not be null.");
     }
 
+    if (format_opts->chunk_size < lz4MinChunkSize()) {
+      throw std::runtime_error(
+          "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
+    }
+
     *temp_bytes = LZ4BatchCompressor::calculate_workspace_size(
         in_bytes, batch_size, format_opts->chunk_size);
 
@@ -271,6 +276,11 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
       throw std::runtime_error("out_bytes must not be null.");
     }
 
+    if (format_opts->chunk_size < lz4MinChunkSize()) {
+      throw std::runtime_error(
+          "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
+    }
+
     for (size_t b = 0; b < batch_size; ++b) {
       if (in_ptr[b] == nullptr) {
         throw std::runtime_error(
@@ -285,7 +295,8 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
             + ((total_chunks + 1)
                * sizeof(size_t)); // 1 extra val to store total length
 
-      const size_t max_comp_bytes = lz4ComputeMaxSize(in_bytes[b]);
+      const size_t max_comp_bytes
+          = lz4ComputeMaxSize(chunk_bytes) * total_chunks;
 
       out_bytes[b] = metadata_bytes + max_comp_bytes;
     }
