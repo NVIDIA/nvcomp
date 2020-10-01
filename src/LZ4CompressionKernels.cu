@@ -56,6 +56,7 @@ using item_type = uint32_t;
 
 namespace nvcomp {
 
+constexpr const int COMP_THREADS = 32;
 constexpr const int DECOMP_THREADS = 32;
 constexpr const int Y_DIM = 2;
 constexpr const position_type BUFFER_SIZE
@@ -65,6 +66,8 @@ constexpr const position_type PREFETCH_DIST = BUFFER_SIZE / 2;
 constexpr const position_type HASH_TABLE_SIZE = 1U << 14;
 constexpr const offset_type NULL_OFFSET = static_cast<offset_type>(-1);
 constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
+
+constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
 
 // ideally this would fit in a quad-word -- right now though it spills into
 // 24-bytes (instead of 16-bytes).
@@ -79,6 +82,7 @@ struct compression_chunk_header
 {
   const uint8_t* src;
   uint8_t* dst;
+  offset_type* hash;
   size_t* comp_size;
   uint32_t size;
 };
@@ -102,6 +106,29 @@ inline __device__ void syncCTA()
   }
 }
 
+inline __device__ int warpBallot(int vote)
+{
+  return __ballot_sync(0xffffffff, vote);
+}
+
+template <typename T>
+inline __device__ int warpMatchAny(const int participants, T val)
+{
+#if __CUDA_ARCH__ >= 700
+  return __match_any_sync(participants, val);
+#else
+  int mask = 0;
+
+  // full search
+  for (int d = 1; d < 32; ++d) {
+    const int nbr_id = (threadIdx.x + d) & 31;
+    mask |= (val == __shfl_sync(participants, val, nbr_id)) << nbr_id;
+  }
+
+  return mask;
+#endif
+}
+
 template <typename T>
 inline __device__ void writeWord(uint8_t* const address, const T word)
 {
@@ -121,15 +148,18 @@ inline __device__ T readWord(const uint8_t* const address)
 
   return word;
 }
-inline __device__ void writeLSIC(uint8_t* const out, position_type number)
+
+template<int BLOCK_SIZE>
+inline __device__ void writeLSIC(uint8_t* const out, const position_type number)
 {
-  size_t i = 0;
-  while (number >= 0xff) {
-    out[i] = 0xff;
-    ++i;
-    number -= 0xff;
+  assert(BLOCK_SIZE == blockDim.x);
+
+  const position_type num = (number / 0xffu) + 1;
+  const uint8_t leftOver = number % 0xffu;
+  for (size_t i = threadIdx.x; i < num; i += BLOCK_SIZE) {
+    const uint8_t val = i + 1 < num ? 0xffu : leftOver;
+    out[i] = val;
   }
-  out[i] = number;
 }
 
 struct token_type
@@ -187,13 +217,8 @@ struct token_type
   __device__ position_type lengthOfLiteralEncoding() const
   {
     if (hasNumLiteralsOverflow()) {
-      position_type length = 1;
-      position_type num = numLiteralsOverflow();
-      while (num >= 0xff) {
-        num -= 0xff;
-        length += 1;
-      }
-
+      const position_type num = numLiteralsOverflow();
+      const position_type length = (num / 0xff) + 1;
       return length;
     }
     return 0;
@@ -202,13 +227,8 @@ struct token_type
   __device__ position_type lengthOfMatchEncoding() const
   {
     if (hasNumMatchesOverflow()) {
-      position_type length = 1;
-      position_type num = numMatchesOverflow();
-      while (num >= 0xff) {
-        num -= 0xff;
-        length += 1;
-      }
-
+      const position_type num = numMatchesOverflow();
+      const position_type length = (num / 0xff) + 1;
       return length;
     }
     return 0;
@@ -236,8 +256,8 @@ public:
     if (idx + DECOMP_THREADS <= end()) {
       // most likely case
       const uint8_t byte = rawAt(idx)[threadIdx.x];
-  
-      uint32_t mask = __ballot_sync(0xffffffff, byte != 0xff);
+
+      uint32_t mask = warpBallot(byte != 0xff);
       mask = __brev(mask);
   
       const position_type fullBytes = __clz(mask);
@@ -254,8 +274,8 @@ public:
       } else {
         byte = m_compData[idx + threadIdx.x];
       }
-  
-      uint32_t mask = __ballot_sync(0xffffffff, byte != 0xff);
+
+      uint32_t mask = warpBallot(byte != 0xff);
       mask = __brev(mask);
   
       const position_type fullBytes = __clz(mask);
@@ -417,7 +437,6 @@ inline __device__ void coopCopyOverlap(
 inline __device__ position_type hash(const word_type key)
 {
   // needs to be 12 bits
-//  return ((key >> 16) + key) & (HASH_TABLE_SIZE - 1);
   return (__brev(key) + (key^0xc375)) & (HASH_TABLE_SIZE - 1);
 }
 
@@ -432,10 +451,12 @@ inline __device__ token_type decodePair(const uint8_t num)
                     static_cast<uint8_t>(num & 0x0f)};
 }
 
+template<int BLOCK_SIZE>
 inline __device__ void copyLiterals(
     uint8_t* const dest, const uint8_t* const source, const size_t length)
 {
-  for (size_t i = 0; i < length; ++i) {
+  assert(BLOCK_SIZE == blockDim.x);
+  for (size_t i = threadIdx.x; i < length; i += BLOCK_SIZE) {
     dest[i] = source[i];
   }
 }
@@ -448,14 +469,20 @@ inline __device__ position_type lengthOfMatch(
 {
   assert(prev_location < next_location);
 
-
-  position_type i;
-  for (i = 0; i + next_location + 5 < length; ++i) {
-    if (data[prev_location + i] != data[next_location + i]) {
+  position_type match_length = length - next_location - 5;
+  for (position_type j = 0; j + next_location + 5 < length; j += blockDim.x) {
+    const position_type i = threadIdx.x + j;
+    int match = i + next_location + 5 < length
+                    ? (data[prev_location + i] != data[next_location + i])
+                    : 1;
+    match = warpBallot(match);
+    if (match) {
+      match_length = j + __clz(__brev(match));
       break;
     }
   }
-  return i;
+
+  return match_length;
 }
 
 inline __device__ position_type
@@ -481,15 +508,16 @@ inline __device__ bool isValidHash(
     const position_type hashPos,
     const position_type decomp_idx)
 {
-  if (hashTable[hashPos] == NULL_OFFSET) {
+  const position_type hashed_offset = hashTable[hashPos];
+
+  if (hashed_offset == NULL_OFFSET) {
     return false;
   }
 
-  const position_type offset = convertIdx(hashTable[hashPos], decomp_idx);
+  const position_type offset = convertIdx(hashed_offset, decomp_idx);
 
   if (decomp_idx - offset > MAX_OFFSET) {
-    // the offset can be up to 2^16-1, but the converted idx can be up to 2^16,
-    // so we need to eliminate this case.
+    // can't match current position, ahead, or NULL_OFFSET
     return false;
   }
 
@@ -502,6 +530,7 @@ inline __device__ bool isValidHash(
   return true;
 }
 
+template<int BLOCK_SIZE>
 inline __device__ void writeSequenceData(
     uint8_t* const compData,
     const uint8_t* const decompData,
@@ -513,19 +542,21 @@ inline __device__ void writeSequenceData(
   assert(token.num_matches == 0 || token.num_matches >= 4);
 
   // -> add token
-  compData[comp_idx]
-      = encodePair(token.numLiteralsForHeader(), token.numMatchesForHeader());
+  if (threadIdx.x == 0) {
+    compData[comp_idx]
+        = encodePair(token.numLiteralsForHeader(), token.numMatchesForHeader());
+  }
   ++comp_idx;
 
   // -> add literal length
   const position_type literalEncodingLength = token.lengthOfLiteralEncoding();
   if (literalEncodingLength) {
-    writeLSIC(compData + comp_idx, token.numLiteralsOverflow());
+    writeLSIC<BLOCK_SIZE>(compData + comp_idx, token.numLiteralsOverflow());
     comp_idx += literalEncodingLength;
   }
 
   // -> add literals
-  copyLiterals(
+  copyLiterals<BLOCK_SIZE>(
       compData + comp_idx, decompData + decomp_idx, token.num_literals);
   comp_idx += token.num_literals;
 
@@ -533,32 +564,63 @@ inline __device__ void writeSequenceData(
   if (token.num_matches > 0) {
     assert(offset > 0);
 
-    writeWord(compData + comp_idx, offset);
+    if (threadIdx.x == 0) {
+      writeWord(compData + comp_idx, offset);
+    }
     comp_idx += sizeof(offset);
 
     // -> add match length
     if (token.hasNumMatchesOverflow()) {
-      writeLSIC(compData + comp_idx, token.numMatchesOverflow());
+      writeLSIC<BLOCK_SIZE>(compData + comp_idx, token.numMatchesOverflow());
       comp_idx += token.lengthOfMatchEncoding();
     }
   }
 }
 
+inline __device__ int numValidThreadsToMask(
+    const int numValidThreads)
+{
+  return 0xffffffff >> (32-numValidThreads);
+}
+
+inline __device__ void insertHashTableWarp(
+    offset_type* hashTable,
+    const offset_type pos,
+    const word_type next,
+    const int numValidThreads)
+{
+  position_type hashPos = hash(next);
+
+  if (threadIdx.x < numValidThreads) {
+    const int match = warpMatchAny(numValidThreadsToMask(numValidThreads), hashPos);
+    if (!match || 31 - __clz(match) == threadIdx.x) {
+      // I'm the last match -- can insert
+      hashTable[hashPos] = pos & MAX_OFFSET;
+    }
+  }
+
+  __syncwarp();
+}
+
 __device__ void compressStream(
     uint8_t* compData,
     const uint8_t* decompData,
+    offset_type* const hashTable,
     const size_t length,
     size_t* comp_length)
 {
+  assert(blockDim.x == COMP_THREADS);
+  static_assert(COMP_THREADS <= 32, "Compression can be done with at "
+      "most one warp");
+
   position_type decomp_idx = 0;
   position_type comp_idx = 0;
 
-  __shared__ offset_type hashTable[HASH_TABLE_SIZE];
-
-  // fill hash-table with null-entries
-  for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE; i += blockDim.x) {
+  for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE; i += COMP_THREADS) {
     hashTable[i] = NULL_OFFSET;
   }
+
+  __syncwarp();
 
   while (decomp_idx < length) {
     const position_type tokenStart = decomp_idx;
@@ -571,54 +633,131 @@ __device__ void compressStream(
         token_type tok;
         tok.num_literals = length - tokenStart;
         tok.num_matches = 0;
-        writeSequenceData(compData, decompData, tok, 0, tokenStart, comp_idx);
+        writeSequenceData<COMP_THREADS>(compData, decompData, tok, 0, tokenStart, comp_idx);
         break;
       }
 
       // begin adding tokens to the hash table until we find a match
-      const word_type next = readWord<word_type>(decompData + decomp_idx);
-      const position_type pos = decomp_idx;
-      position_type hashPos = hash(next);
+      uint8_t byte = 0;
+      if (decomp_idx + 5 + threadIdx.x < length) {
+        byte = decompData[decomp_idx + threadIdx.x];
+      }
 
-      if (isValidHash(decompData, hashTable, next, hashPos, pos)) {
-        token_type tok;
-        const position_type match_location
-            = convertIdx(hashTable[hashPos], pos);
-        assert(match_location < decomp_idx);
-        assert(decomp_idx - match_location <= MAX_OFFSET);
+      // each thread needs a four byte word, but only separated by a byte e.g.:
+      // for two threads, the five bytes [ 0x12 0x34 0x56 0x78 0x9a ] would
+      // be assigned as [0x78563412 0x9a785634 ] to the two threads
+      // (little-endian). That means when reading 32 bytes, we can only fill
+      // the first 29 thread's 4-byte words.
+      word_type next = byte;
+      // collect second byte
+      next |= __shfl_down_sync(0xffffffff, byte, 1) << 8;
+      // collect third and fourth bytes
+      next |= __shfl_down_sync(0xffffffff, next, 2) << 16;
+
+      // since we do not have valid data for the last 3 threads (or more if
+      // we're at the end of the data), mark them as inactive.
+      const int numValidThreads
+          = min(static_cast<size_t>(COMP_THREADS - 3), length - decomp_idx - 9);
+
+      // first try to find a local match
+      position_type match_location = length;
+      int first_match_thread = -1;
+      int match_mask_self = 0;
+      if (threadIdx.x < numValidThreads) {
+        match_mask_self = warpMatchAny(numValidThreadsToMask(numValidThreads), next);
+      }
+
+      // each thread has a mask of other threads with matches, next we need
+      // to find the first thread with a match before it
+      const int match_mask_warp = warpBallot(
+          match_mask_self && __clz(__brev(match_mask_self)) != threadIdx.x);
+
+      if (match_mask_warp) {
+        // find the byte offset (thread id) within the warp where the first
+        // match is located
+        first_match_thread = __clz(__brev(match_mask_warp));
+
+        // determine the global position for the finding thread
+        match_location = __clz(__brev(match_mask_self)) + decomp_idx;
+
+        // comunicate the global position of the match to other threads
+        match_location = __shfl_sync(0xffffffff, match_location, first_match_thread);
+      }
+
+      // only go to the hash table, if there is a possibility of a finding an
+      // earlier match
+      if (first_match_thread > 0) {
+        // go to hash table for an earlier match
+        position_type hashPos = hash(next);
+        const int match_found = threadIdx.x < numValidThreads
+                                    ? isValidHash(
+                                          decompData,
+                                          hashTable,
+                                          next,
+                                          hashPos,
+                                          decomp_idx + threadIdx.x)
+                                    : 0;
+
+        // determine the first thread to find a match
+        const int match = warpBallot(match_found);
+        const int candidate_first_match_thread = __clz(__brev(match));
+
+        assert(candidate_first_match_thread != threadIdx.x || match_found);
+        assert(!match_found || candidate_first_match_thread <= threadIdx.x);
+
+        if (match_location == length || candidate_first_match_thread < first_match_thread) {
+          // if we found a valid match, and it occurs before a previously found
+          // match, use that
+          first_match_thread = candidate_first_match_thread;
+          hashPos = __shfl_sync(0xffffffff, hashPos, first_match_thread);
+          match_location = hashTable[hashPos];
+        }
+      }
+
+      if (match_location != length) {
+        // insert up to the match into the hash table
+        insertHashTableWarp(
+            hashTable, decomp_idx + threadIdx.x, next, first_match_thread);
+
+        const position_type pos = decomp_idx + first_match_thread;
+        assert(match_location < pos);
+        assert(pos - match_location <= MAX_OFFSET);
 
         // we found a match
-        const offset_type match_offset = decomp_idx - match_location;
+        const offset_type match_offset = pos - match_location;
         assert(match_offset > 0);
-        assert(match_offset <= decomp_idx);
+        assert(match_offset <= pos);
         const position_type num_literals = pos - tokenStart;
 
         // compute match length
         const position_type num_matches
             = lengthOfMatch(decompData, match_location, pos, length);
-        decomp_idx += num_matches;
 
         // -> write our token and literal length
+        token_type tok;
         tok.num_literals = num_literals;
         tok.num_matches = num_matches;
-        writeSequenceData(
+
+        // update our position
+        decomp_idx = tokenStart + num_matches + num_literals;
+
+        // insert only the literals into the hash table
+        writeSequenceData<COMP_THREADS>(
             compData, decompData, tok, match_offset, tokenStart, comp_idx);
-
         break;
-      } else if (decomp_idx + 12 < length) {
-        // last match cannot be within 12 bytes of the end
-
-        // TODO: we should overwrite matches in our hash table too, as they
-        // are more recent
-
-        // add it to our literals and dictionary
-        hashTable[hashPos] = pos & MAX_OFFSET;
       }
-      ++decomp_idx;
+
+      // insert everything into hash table
+      insertHashTableWarp(
+          hashTable, decomp_idx + threadIdx.x, next, numValidThreads);
+
+      decomp_idx += numValidThreads;
     }
   }
 
-  *comp_length = comp_idx;
+  if (threadIdx.x == 0) {
+    *comp_length = comp_idx;
+  }
 }
 
 inline __device__ void decompressStream(
@@ -817,6 +956,8 @@ __global__ void lz4CompressGenerateHeaders(
     const size_t batch_size,
     const int max_chunk_size,
     const size_t total_chunks,
+    const size_t* const scratch_space_offset,
+    uint8_t* const* const scratch_space,
     compression_chunk_header* const headers,
     size_t* const item_prefix,
     item_type* const item_map)
@@ -852,6 +993,9 @@ __global__ void lz4CompressGenerateHeaders(
     compression_chunk_header h;
     h.src = decomp_data[item] + chunk_offset;
     h.dst = comp_data + comp_offset;
+    h.hash = reinterpret_cast<offset_type*>(
+        scratch_space[item] + scratch_space_offset[item]
+        + (HASH_TABLE_SIZE * sizeof(offset_type)) * local_chunk);
     h.comp_size = comp_sizes[item] + local_chunk;
     h.size = min(chunk_end, decomp_sizes[item]) - chunk_offset;
 
@@ -862,13 +1006,16 @@ __global__ void lz4CompressGenerateHeaders(
 __global__ void
 lz4CompressMultistreamKernel(const compression_chunk_header* const headers)
 {
-  const uint8_t* decomp_ptr = headers[blockIdx.x].src;
-  const size_t decomp_length = headers[blockIdx.x].size;
+  const int bidx = blockIdx.x * blockDim.y + threadIdx.y;
 
-  uint8_t* comp_ptr = headers[blockIdx.x].dst;
-  size_t* const comp_length = headers[blockIdx.x].comp_size;
+  const uint8_t* decomp_ptr = headers[bidx].src;
+  const size_t decomp_length = headers[bidx].size;
 
-  compressStream(comp_ptr, decomp_ptr, decomp_length, comp_length);
+  uint8_t* comp_ptr = headers[bidx].dst;
+  size_t* const comp_length = headers[bidx].comp_size;
+
+  compressStream(
+      comp_ptr, decomp_ptr, headers[bidx].hash, decomp_length, comp_length);
 }
 
 template <int BLOCK_SIZE>
@@ -989,6 +1136,11 @@ void lz4CompressBatch(
     const size_t* const comp_prefix_offset_device,
     cudaStream_t stream)
 {
+  if (max_chunk_size < lz4MinChunkSize()) {
+    throw std::runtime_error(
+        "Minimum chunk size for LZ4 is " + std::to_string(MIN_CHUNK_SIZE));
+  }
+
   // most of the kernels take a negligible amount of time, so by default we
   // just use 128 threads. this value, however is choose arbitrarily, and
   // has not been tuned for any architecture or dataset size.
@@ -1028,6 +1180,8 @@ void lz4CompressBatch(
         batch_size,
         max_chunk_size,
         chunks_in_batch,
+        comp_prefix_offset_device,
+        comp_data_device,
         headers,
         item_prefix,
         item_map);
@@ -1037,7 +1191,7 @@ void lz4CompressBatch(
   // perform compression
   {
     const dim3 grid(chunks_in_batch);
-    const dim3 block(1);
+    const dim3 block(COMP_THREADS);
 
     lz4CompressMultistreamKernel<<<grid, block, 0, stream>>>(headers);
     CudaUtils::check_last_error();
@@ -1182,6 +1336,11 @@ size_t lz4DecompressComputeTempSize(
 size_t lz4ComputeMaxSize(const size_t size)
 {
   return maxSizeOfStream(size);
+}
+
+size_t lz4MinChunkSize()
+{
+  return MIN_CHUNK_SIZE;
 }
 
 } // nvcomp namespace

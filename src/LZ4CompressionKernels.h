@@ -80,5 +80,7 @@ size_t lz4DecompressComputeTempSize(
     const size_t max_chunks_in_batch, const size_t chunk_size);
 
 size_t lz4ComputeMaxSize(const size_t chunk_size);
+
+size_t lz4MinChunkSize();
 }
 

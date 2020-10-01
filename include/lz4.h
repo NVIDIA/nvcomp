@@ -46,7 +46,7 @@ typedef struct
   /**
    * @brief The size of each chunk of data to decompress indepentently with
    * LZ4. Larger sizes will result in higher compression, but with decreased
-   * parallelism. The recommended size is 65536.
+   * parallelism. The recommended size is 65536, and the minimum size is 32768.
    */
   size_t chunk_size;
 } nvcompLZ4FormatOpts;
