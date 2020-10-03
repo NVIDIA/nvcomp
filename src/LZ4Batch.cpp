@@ -32,7 +32,8 @@
 #include "LZ4BatchCompressor.h"
 #include "LZ4CompressionKernels.h"
 #include "LZ4Metadata.h"
-#include "MutableLZ4MetadataOnGPU.h"
+#include "LZ4MetadataOnGPU.h"
+#include "MutableBatchedLZ4MetadataOnGPU.h"
 #include "common.h"
 #include "nvcomp.h"
 #include "nvcomp.hpp"
@@ -341,14 +342,16 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
 
     // build the metadatas and configure pointers
     std::vector<LZ4Metadata> metadata;
-    std::vector<MutableLZ4MetadataOnGPU> metadataGPU;
     metadata.reserve(batch_size);
-    metadataGPU.reserve(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
       metadata.emplace_back(NVCOMP_TYPE_BITS, chunk_bytes, in_bytes[i], 0);
-      metadataGPU.emplace_back(out_ptr[i], out_bytes[i]);
-      metadataGPU.back().copyToGPU(metadata.back(), stream);
     }
+
+    MutableBatchedLZ4MetadataOnGPU metadataGPU(out_ptr, out_bytes, batch_size);
+
+    std::vector<size_t> out_data_start(batch_size);
+    metadataGPU.copyToGPU(
+        metadata, temp_ptr, temp_bytes, out_data_start.data(), stream);
 
     const uint8_t* const* const typed_in_ptr
         = reinterpret_cast<const uint8_t* const*>(in_ptr);
@@ -357,16 +360,10 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
 
     compressor.configure_workspace(temp_ptr, temp_bytes);
 
-    // the offset in each output item of the start of the compressed data 
-    std::vector<size_t> out_data_start(batch_size);
-    for (size_t i = 0; i < batch_size; ++i) {
-      out_data_start[i] = metadataGPU[i].getSerializedSize();
-    }
-
     // the location the prefix sum of the chunks of each item is stored
     std::vector<size_t*> out_prefix(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
-      out_prefix[i] = metadataGPU[i].compressed_prefix_ptr();
+      out_prefix[i] = metadataGPU.compressed_prefix_ptr(i);
     }
 
     uint8_t* const* const typed_out_ptr
