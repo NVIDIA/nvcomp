@@ -101,6 +101,7 @@ decompression throughput (GB/s): 26.16
 # How to use the library in your code
 
 * [C++ Quick Start Guide](doc/cpp_quickstart.md)
+* [Batched Compression/Decompression Guide](doc/batched-quickstart.md)
 
 # Further information about our compression algorithms
 
