@@ -120,6 +120,7 @@ inline __device__ int warpMatchAny(const int participants, T val)
   int mask = 0;
 
   // full search
+  assert(blockDim.x == 32);
   for (int d = 1; d < 32; ++d) {
     const int nbr_id = (threadIdx.x + d) & 31;
     mask |= (val == __shfl_sync(participants, val, nbr_id)) << nbr_id;
@@ -661,7 +662,6 @@ __device__ void compressStream(
 
       // first try to find a local match
       position_type match_location = length;
-      int first_match_thread = -1;
       int match_mask_self = 0;
       if (threadIdx.x < numValidThreads) {
         match_mask_self = warpMatchAny(numValidThreadsToMask(numValidThreads), next);
@@ -672,6 +672,7 @@ __device__ void compressStream(
       const int match_mask_warp = warpBallot(
           match_mask_self && __clz(__brev(match_mask_self)) != threadIdx.x);
 
+      int first_match_thread;
       if (match_mask_warp) {
         // find the byte offset (thread id) within the warp where the first
         // match is located
@@ -682,6 +683,8 @@ __device__ void compressStream(
 
         // comunicate the global position of the match to other threads
         match_location = __shfl_sync(0xffffffff, match_location, first_match_thread);
+      } else {
+        first_match_thread = COMP_THREADS;
       }
 
       // only go to the hash table, if there is a possibility of a finding an
@@ -705,12 +708,13 @@ __device__ void compressStream(
         assert(candidate_first_match_thread != threadIdx.x || match_found);
         assert(!match_found || candidate_first_match_thread <= threadIdx.x);
 
-        if (match_location == length || candidate_first_match_thread < first_match_thread) {
+        if (candidate_first_match_thread < first_match_thread) {
           // if we found a valid match, and it occurs before a previously found
           // match, use that
           first_match_thread = candidate_first_match_thread;
           hashPos = __shfl_sync(0xffffffff, hashPos, first_match_thread);
-          match_location = hashTable[hashPos];
+          match_location
+              = convertIdx(hashTable[hashPos], decomp_idx + first_match_thread);
         }
       }
 
