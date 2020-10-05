@@ -6,7 +6,6 @@ throwing exceptions and managing state inside of objects.
 * [Compressing the Data](#compressing-the-data)
 * [Transferring the Data (Optional)](#transferring-the-data-optional)
 * [Decompressing the Data](#decompressing-the-data)
-* [Re-using Buffers](#re-using-buffers)
 
 To use NVCOMP's C++ interface with the Cascaded compression scheme below,
 you will need to include `nvcomp.hpp` and `cascaded.hpp`.
@@ -126,5 +125,3 @@ decompressor.decompress_async(temp_space, temp_size, output_space, output_count,
 
 The variable `output_size` here is passed by value rather than reference, so
 decompression will be asynchronous without the need for pinned memory.
-
-
