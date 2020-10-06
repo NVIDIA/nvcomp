@@ -13,9 +13,9 @@ The library is designed to be modular with ability to add new implementations wi
 
 Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
 
-# Version 1.0 Release
+# Version 1.1 Release
 
-The initial public release of nvcomp. Full details in
+The first release of nvcomp to add the batched LZ4 interface. Full details in
 [CHANGELOG.md](CHANGELOG.md).
 
 ## Known issues
@@ -23,9 +23,6 @@ The initial public release of nvcomp. Full details in
 * Cascaded compression requires a large amount of temporary workspace to
 operate. Current workaround is to compress/decompress large datasets in pieces,
 re-using temporary workspace for each piece.
-
-* While the LZ4 decompression kernels are well-optimized, the compression
-implementation has not been tuned for performance yet (currently work-in-progress).
 
 # Building the library
 NVComp uses CMake for building. Generally, it is best to do an out of source build:
