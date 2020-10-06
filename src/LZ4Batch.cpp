@@ -373,12 +373,6 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
 
     compressor.compress_async(stream);
 
-    std::vector<size_t> total_chunks(batch_size);
-    for (size_t i = 0; i < batch_size; ++i) {
-      // get the chunks per batch item
-      total_chunks[i] = lz4ComputeChunksInBatch(in_bytes + i, 1, chunk_bytes);
-    }
-
     return nvcompSuccess;
   } catch (const std::exception& e) {
     std::cerr << "Failed launch compression for batch: " << e.what()
