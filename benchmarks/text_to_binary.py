@@ -71,6 +71,8 @@ elif datatype == "long":
     dtype = "int64"
 elif datatype == "float":
     dtype = "float32"
+elif datatype == "string":
+    dtype = "str"
 else:
     print("Please select datatype int or long")
     exit()
@@ -79,7 +81,7 @@ else:
 print("Reading column " + col_num + ", of type " + datatype + "...")
 
 chunk_size = 10000000
-
+iters=0
 finished = False
 offset = 0
 with open(str(in_fname), "r") as inFile:
@@ -88,6 +90,8 @@ with open(str(in_fname), "r") as inFile:
             while not finished:
                 in_data=numpy.genfromtxt(inFile, dtype=dtype,
                 max_rows=chunk_size, usecols=[int(col_num)], delimiter=delimiter, loose=False)
+
+		iters = iters+1
 
                 if offset == 0:
                     # don't warn about an empty file after we have read something
@@ -98,3 +102,4 @@ with open(str(in_fname), "r") as inFile:
                     offset += in_data.size;
                 else:
                     finished = True
+print iters
