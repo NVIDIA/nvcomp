@@ -1,3 +1,8 @@
+# nvcomp 1.1.1 (2020-12-02)
+
+- Add all-gather benchmark.
+- Add sm80 target if CUDA version is 11 or greater.
+
 # nvcomp 1.1.0 (2020-10-05)
 
 - Add batch C interface for LZ4, allowing compressing/decompressing multiple
