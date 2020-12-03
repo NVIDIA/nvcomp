@@ -32,22 +32,30 @@ spec:
         sh "git submodule update --init --recursive"
       }
       stage("build-debug") {
-        sh "mkdir build-debug && \
-          cd build-debug/ && \
-          cmake ../ -DDEVEL=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=1 && \
-          make -j\$(grep -c ^processor /proc/cpuinfo)"
+        gitlabCommitStatus(connection: gitLabConnection('nvidia-gitlab'), name: 'build-debug') {
+          sh "mkdir build-debug && \
+              cd build-debug/ && \
+              cmake ../ -DDEVEL=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=1 && \
+              make -j\$(grep -c ^processor /proc/cpuinfo)"
+        }
       }
       stage("build-release") {
-        sh "mkdir build-release && \
-              cd build-release/ && \
-              cmake ../ -DDEVEL=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_VERBOSE_MAKEFILE=1 && \
-              make -j\$(grep -c ^processor /proc/cpuinfo)"
+        gitlabCommitStatus(connection: gitLabConnection('nvidia-gitlab'), name: 'build-release') {
+          sh "mkdir build-release && \
+               cd build-release/ && \
+               cmake ../ -DDEVEL=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_VERBOSE_MAKEFILE=1 && \
+               make -j\$(grep -c ^processor /proc/cpuinfo)"
+        }
       }
       stage("unit-test-debug") {
-        sh "cd build-debug && CTEST_OUTPUT_ON_FAILURE=1 make test"
+        gitlabCommitStatus(connection: gitLabConnection('nvidia-gitlab'), name: 'unit-test-debug') {
+          sh "cd build-debug && CTEST_OUTPUT_ON_FAILURE=1 make test"
+        }
       }
       stage("unit-test-release") {
-        sh "cd build-release && CTEST_OUTPUT_ON_FAILURE=1 make test"
+        gitlabCommitStatus(connection: gitLabConnection('nvidia-gitlab'), name: 'unit-test-release') {
+          sh "cd build-release && CTEST_OUTPUT_ON_FAILURE=1 make test"
+        }
       }
     }
   }
