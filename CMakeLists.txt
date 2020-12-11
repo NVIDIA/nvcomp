@@ -8,11 +8,20 @@ find_package(CUDAToolkit REQUIRED)
 
 # Use ccache if possible.
 find_program(CCACHE_PROGRAM ccache)
-if (CCACHE_PROGRAM)
-  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-endif ()
+if(CCACHE_PROGRAM)
+  if(NOT DEFINED CMAKE_C_COMPILER_LAUNCHER)
+    message(STATUS "Using C compiler launcher: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  endif()
+  if(NOT DEFINED CMAKE_CXX_COMPILER_LAUNCHER)
+    message(STATUS "Using CXX compiler launcher: ${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  endif()
+  if(NOT DEFINED CMAKE_CUDA_COMPILER_LAUNCHER)
+    message(STATUS "Using CUDA compiler launcher: ${CCACHE_PROGRAM}")
+    set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  endif()
+endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
@@ -21,17 +30,17 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG};-G")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG};-g")
 
-if (CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Debug build.")
-else ()
+else()
   message("Release build.")
   # this is required, as CMake sends CMAKE_CXX_FLAGS_DEBUG to nvcc
   # if no build type is set (but not to g++ for some reason).
   set(CMAKE_BUILD_TYPE "Release")
-endif ()
+endif()
 
-if (DEFINED DEVEL AND NOT DEVEL EQUAL 0)
-  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
+  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     # g++ warnings
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
@@ -39,25 +48,25 @@ if (DEFINED DEVEL AND NOT DEVEL EQUAL 0)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
     # this doesn't work with old style CMakeLists and cuda
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
-  endif ()
+  endif()
 
   # TODO: add clang warnings
-endif ()
+endif()
 
 
-if (NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})
+if(NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})
   set(CUB_DIR ENV{CUB_DIR})
-endif ()
+endif()
 
 message(STATUS "Finding CUB")
-if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11" AND NOT DEFINED CUB_DIR)
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11" AND NOT DEFINED CUB_DIR)
   message(FATAL_ERROR "When using a CUDA prior to CUDA 11, you must specify "
     "the path of cub via the 'CUB_DIR' variable (e.g., "
     "'cmake -DCUB_DIR=...' or 'export CUB_DIR=...'). You can download cub "
     "from 'https://github.com/thrust/cub'.")
-endif ()
+endif()
 find_path(CUB_HEADER NAMES "cub/cub.cuh" PATHS "${CUB_DIR}" "${CUDAToolkit_INCLUDE_DIRS}")
-IF (NOT CUB_HEADER)
+IF(NOT CUB_HEADER)
   message(FATAL_ERROR "Unable to locate 'cub/cub.cuh'. Please specify a path "
     "to cub via 'CUB_DIR'")
 ENDIF()

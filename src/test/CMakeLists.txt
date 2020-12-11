@@ -13,14 +13,13 @@ function(add_unit_test test_file)
   add_executable(${test_name} ${test_file})
   target_include_directories(${test_name} PRIVATE ../)
   target_link_libraries(${test_name} PRIVATE nvcomp CUDA::cudart)
-  add_test(NAME ${test_name} 
-           COMMAND ${test_name})
+  add_test(NAME ${test_name} COMMAND ${test_name})
 endfunction()
 
 file(GLOB tests *_test.cpp)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
-foreach (file ${tests})
+foreach(file ${tests})
   add_unit_test(${file})
 endforeach()
