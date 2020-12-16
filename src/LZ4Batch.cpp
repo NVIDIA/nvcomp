@@ -50,6 +50,37 @@
 
 using namespace nvcomp;
 
+namespace
+{
+
+void check_format_opts(const nvcompLZ4FormatOpts* const format_opts)
+{
+  if (format_opts == nullptr) {
+    throw std::runtime_error("LZ4 format_opts must not be null.");
+  } else if (format_opts->chunk_size < lz4MinChunkSize()) {
+    throw std::runtime_error(
+        "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
+  } else if (format_opts->chunk_size > lz4MaxChunkSize()) {
+    throw std::runtime_error(
+        "LZ4 maximum chunk size is " + std::to_string(lz4MaxChunkSize()));
+  }
+}
+
+template <typename T>
+void check_not_null(const T* const ptr, const std::string& name)
+{
+  if (ptr == nullptr) {
+    throw std::runtime_error("'" + name + "' must not be null.");
+  }
+}
+
+#define CHECK_NOT_NULL(ptr)                                                    \
+  do {                                                                         \
+    check_not_null(ptr, #ptr);                                                 \
+  } while (false)
+
+} // namespace
+
 /******************************************************************************
  *     C-style API calls for BATCHED compression/decompress defined below.
  *****************************************************************************/
@@ -104,7 +135,6 @@ void nvcompBatchedLZ4DecompressDestroyMetadata(void* metadata_ptr)
 nvcompError_t
 nvcompBatchedLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
 {
-
   if (temp_bytes == NULL) {
     std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
     return nvcompErrorInvalidValue;
@@ -232,18 +262,9 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
     size_t* const temp_bytes)
 {
   try {
-    if (in_bytes == nullptr) {
-      throw std::runtime_error("in_bytes must not be null.");
-    } else if (format_opts == nullptr) {
-      throw std::runtime_error("format_opts must not be null.");
-    } else if (temp_bytes == nullptr) {
-      throw std::runtime_error("temp_bytes must not be null.");
-    }
-
-    if (format_opts->chunk_size < lz4MinChunkSize()) {
-      throw std::runtime_error(
-          "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
-    }
+    CHECK_NOT_NULL(in_bytes);
+    CHECK_NOT_NULL(temp_bytes);
+    check_format_opts(format_opts);
 
     *temp_bytes = LZ4BatchCompressor::calculate_workspace_size(
         in_bytes, batch_size, format_opts->chunk_size);
@@ -267,20 +288,10 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
 {
   try {
     // error check inputs
-    if (format_opts == nullptr) {
-      throw std::runtime_error("format_opts must not be null.");
-    } else if (in_ptr == nullptr) {
-      throw std::runtime_error("in_ptr must not be null.");
-    } else if (in_bytes == nullptr) {
-      throw std::runtime_error("in_bytes must not be null.");
-    } else if (out_bytes == nullptr) {
-      throw std::runtime_error("out_bytes must not be null.");
-    }
-
-    if (format_opts->chunk_size < lz4MinChunkSize()) {
-      throw std::runtime_error(
-          "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
-    }
+    CHECK_NOT_NULL(in_ptr);
+    CHECK_NOT_NULL(in_bytes);
+    CHECK_NOT_NULL(out_bytes);
+    check_format_opts(format_opts);
 
     for (size_t b = 0; b < batch_size; ++b) {
       if (in_ptr[b] == nullptr) {

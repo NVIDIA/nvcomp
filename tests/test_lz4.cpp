@@ -69,10 +69,8 @@ std::vector<T> buildRuns(const size_t numRuns, const size_t runSize)
 }
 
 template <typename T>
-void test_lz4(const std::vector<T>& input)
+void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
 {
-  size_t chunk_size = 1 << 16;
-
   // create GPU only input buffer
   T* d_in_data;
   const size_t in_bytes = sizeof(T) * input.size();
@@ -236,3 +234,17 @@ TEST_CASE("comp/decomp LZ4-small-uint64", "[nvcomp][small]")
   }
 }
 
+TEST_CASE("comp/decomp LZ4-chunksizes-uint64", "[nvcomp][small]")
+{
+  using T = uint64_t;
+
+  const size_t num = 2000000;
+
+  std::vector<size_t> chunk_sizes{
+      32768, 32769, 50000, 65535, 65536, 90103, 16777216};
+
+  for (const size_t chunk : chunk_sizes) {
+    std::vector<T> input = buildRuns<T>(num, 5);
+    test_lz4(input, chunk);
+  }
+}

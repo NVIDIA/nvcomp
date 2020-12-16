@@ -68,6 +68,7 @@ constexpr const offset_type NULL_OFFSET = static_cast<offset_type>(-1);
 constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
 
 constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
+constexpr const size_t MAX_CHUNK_SIZE = 1U << 24; // 16 MB
 
 // ideally this would fit in a quad-word -- right now though it spills into
 // 24-bytes (instead of 16-bytes).
@@ -1143,6 +1144,9 @@ void lz4CompressBatch(
   if (max_chunk_size < lz4MinChunkSize()) {
     throw std::runtime_error(
         "Minimum chunk size for LZ4 is " + std::to_string(MIN_CHUNK_SIZE));
+  } else if (max_chunk_size > lz4MaxChunkSize()) {
+    throw std::runtime_error(
+        "Maximum chunk size for LZ4 is " + std::to_string(MAX_CHUNK_SIZE));
   }
 
   // most of the kernels take a negligible amount of time, so by default we
@@ -1345,6 +1349,11 @@ size_t lz4ComputeMaxSize(const size_t size)
 size_t lz4MinChunkSize()
 {
   return MIN_CHUNK_SIZE;
+}
+
+size_t lz4MaxChunkSize()
+{
+  return MAX_CHUNK_SIZE;
 }
 
 } // nvcomp namespace
