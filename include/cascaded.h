@@ -213,6 +213,78 @@ nvcompError_t nvcompCascadedCompressAsync(
     size_t* out_bytes,
     cudaStream_t stream);
 
+
+
+/**************************************************************************
+ *  Cascaded Selector types and API calls 
+ *************************************************************************/
+
+/**
+ * @brief Structure that stores options to run Cascaded Selector
+ * NOTE: Minimum values for both parameters is 1, maximum for
+ * sample_size is 1024 and is allso limited by the input size:
+ *        (sample_size * num_samples) <= input_size
+ */
+typedef struct
+{
+  /**
+   * @brief The number of elements used in each sample 
+   * minimum value 1, maximum value 1024
+   */
+  size_t sample_size;
+
+  /**
+   * @brief The number of samples used by the selector
+   * minimum value 1
+   */
+  size_t num_samples;
+
+}nvcompCascadedSelectorOpts;
+
+/**
+ * @brief Get the required temporary workspace size needed to run the
+ * cascaded selector.
+ *
+ * @param in_bytes The size of the uncompressed data in bytes.
+ * @param in_type The data type of the uncompressed data.
+ * @param opts The configuration options for the selector.
+ * @param temp_bytes The size of the temporary workspace in bytes (output).
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedSelectorGetTempSize(
+    size_t in_bytes,
+    nvcompType_t in_type,
+    nvcompCascadedSelectorOpts opts,
+    size_t* temp_bytes);
+
+/**
+ * @brief Run the cascaded selector to determine the best cascaded compression
+ * configuration and estimated compression ratio.
+ *
+ * @param in_ptr The uncompressed data on the device.
+ * @param in_bytes The size of the uncompressed data in bytes.
+ * @param in_type The data type of the uncompressed data.
+ * @param opts The configuration options for the selector.
+ * @param temp_ptr The temporary workspace memory on the device
+ * @param temp_bytes The size of the temporary workspace in bytes 
+ * @param format_opts The best cascaded compression configuration (output)
+ * @param est_ratio The estimated compression ratio using the configuration (output)
+ * @param stream The cuda stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedSelectorSelectConfig(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    nvcompCascadedSelectorOpts opts,
+    void* temp_ptr,
+    size_t temp_bytes,
+    nvcompCascadedFormatOpts* format_opts,
+    double* est_ratio,
+    cudaStream_t stream);
+
 #ifdef __cplusplus
 }
 #endif
