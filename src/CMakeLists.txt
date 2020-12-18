@@ -1,21 +1,23 @@
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
-  -std=c++14
-  --expt-extended-lambda
-  -Xcompiler -pthread
-  -gencode arch=compute_60,code=sm_60
-)
+set(GPU_ARCHS "60")
 
-IF(CUDA_VERSION_MAJOR GREATER 8)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_70,code=sm_70)
-ENDIF(CUDA_VERSION_MAJOR GREATER 8)
-IF(CUDA_VERSION_MAJOR GREATER_EQUAL 11)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_80,code=sm_80)
-ENDIF(CUDA_VERSION_MAJOR GREATER_EQUAL 11)
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "8")
+  set(GPU_ARCHS ${GPU_ARCHS} "70")
+endif()
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11")
+  set(GPU_ARCHS ${GPU_ARCHS} "80")
+endif()
 
 file(GLOB CUDA_SOURCES *.cu)
 file(GLOB CPP_SOURCES *.cpp)
 
-cuda_add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
-target_link_libraries(nvcomp)
+add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
+set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
+target_compile_options(nvcomp PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda -Xcompiler -pthread>)
+target_include_directories(nvcomp PUBLIC "../include")
+if(DEFINED CUB_DIR)
+  target_include_directories(nvcomp PUBLIC "${CUB_DIR}")
+endif()
+target_include_directories(nvcomp PUBLIC "${CUDAToolkit_INCLUDE_DIRS}")
 
 add_subdirectory("test")
