@@ -94,8 +94,6 @@ TEST_CASE("comp/decomp RLE-Delta", "[nvcomp]")
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
-//  printf("%d, %d, %d, %d\n", ((int*)d_comp_out)[0],((int*)d_comp_out)[1],((int*)d_comp_out)[2],((int*)d_comp_out)[3]);
-
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 

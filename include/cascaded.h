@@ -214,6 +214,84 @@ nvcompError_t nvcompCascadedCompressAsync(
     cudaStream_t stream);
 
 
+/**************************************************************************
+ *  Automatically configured API calls
+ *************************************************************************/
+/**
+ * @brief Get the temporary workspace size required to perform compression
+ * (and the selector to determine the best configuration)..
+ *
+ * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
+ * compress larger data, break it up into chunks.
+ *
+ * @param in_ptr The uncompressed data on the device.
+ * @param in_bytes The size of the uncompressed data in bytes.
+ * @param in_type The type of the uncompressed data.
+ * @param temp_bytes The size of the required temporary workspace in bytes
+ * (output).
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedCompressAutoGetTempSize(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    size_t* temp_bytes);
+
+/**
+ * @brief Get the required output size to perform compression using the
+ * automatically selected best configuration..
+ *
+ * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
+ * compress larger data, break it up into chunks.
+ *
+ * @param in_ptr The uncompressed data on the device.
+ * @param in_bytes The size of the uncompressed data in bytes.
+ * @param in_type The type of the uncompressed data.
+ * @param temp_ptr The temporary workspace on the device.
+ * @param temp_bytes The size of the temporary workspace in bytes.
+ * @param out_bytes The required size of the output location in bytes (output).
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    void* temp_ptr,
+    size_t temp_bytes,
+    size_t* out_bytes);
+
+/**
+ * @brief Perform compression by first determining the best configuration for
+ * the input.  Runs synchronously because we first find the configuration to use.
+ *
+ * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
+ * compress larger data, break it up into chunks.
+ *
+ * @param in_ptr The uncompressed data on the device.
+ * @param in_bytes The size of the uncompressed data in bytes.
+ * @param in_type The data type of the uncompressed data.
+ * @param temp_ptr The temporary workspace on the device.
+ * @param temp_bytes The size of the temporary workspace in bytes.
+ * @param out_ptr The location to write compresesd data to on the device.
+ * @param out_bytes The size of the output location on input, and the size of
+ * the compressed data on output. If pinned memory, the stream must be
+ * synchronized with, before reading.
+ * @param stream The cuda stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedCompressAuto(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    void* temp_ptr,
+    size_t temp_bytes,
+    void* out_ptr,
+    size_t* out_bytes,
+    cudaStream_t stream);
+
 
 /**************************************************************************
  *  Cascaded Selector types and API calls 
