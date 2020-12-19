@@ -56,10 +56,19 @@ public:
    * @param msg The error message.
    */
   NVCompException(nvcompError_t err, const std::string& msg) :
-      std::runtime_error(msg + " : code=" + std::to_string(err) + ".")
+      std::runtime_error(msg + " : code=" + std::to_string(err) + "."),
+      m_err(err)
   {
     // do nothing
   }
+
+  nvcompError_t get_error() const
+  {
+    return m_err;
+  }
+
+private:
+  nvcompError_t m_err;
 };
 
 /**

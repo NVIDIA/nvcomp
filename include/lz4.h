@@ -237,7 +237,7 @@ nvcompError_t nvcompLZ4CompressAsync(
  */
 nvcompError_t nvcompBatchedLZ4DecompressGetMetadata(
     const void** in_ptr,
-    size_t* in_bytes,
+    const size_t* in_bytes,
     size_t batch_size,
     void** metadata_ptr,
     cudaStream_t stream);

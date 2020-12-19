@@ -88,6 +88,11 @@ public:
    */
   int getCompressionType() const;
 
+protected:
+  void setUncompressedSize(size_t bytes);
+
+  void setCompressedSize(size_t bytes);
+
 private:
   /**
    * @brief The datatype of decompressed elements.

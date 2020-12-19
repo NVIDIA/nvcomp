@@ -28,6 +28,7 @@
 
 #include "lz4.h"
 
+#include "Check.h"
 #include "CudaUtils.h"
 #include "LZ4BatchCompressor.h"
 #include "LZ4CompressionKernels.h"
@@ -50,7 +51,6 @@
 
 using namespace nvcomp;
 
-
 int LZ4IsData(const void* const in_ptr, size_t in_bytes)
 {
   // Need at least 2 size_t variables to be valid.
@@ -62,118 +62,37 @@ int LZ4IsData(const void* const in_ptr, size_t in_bytes)
   return (header_val == LZ4_FLAG); 
 }
 
-int LZ4IsMetadata(const void* const metadata_ptr)
-{
-  const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
-  return metadata->getCompressionType() == LZ4Metadata::COMPRESSION_ID;
-}
-
 nvcompError_t nvcompLZ4DecompressGetMetadata(
     const void* const in_ptr,
     const size_t in_bytes,
     void** const metadata_ptr,
     cudaStream_t stream)
 {
-  try {
-    size_t metadata_bytes;
-    cudaError_t err;
-
-    // Get size of metadata object
-    err = cudaMemcpyAsync(
-        &metadata_bytes,
-        ((size_t*)in_ptr) + 1,
-        sizeof(size_t),
-        cudaMemcpyDeviceToHost,
-        stream);
-    if(err != cudaSuccess) {
-      throw std::runtime_error(
-          "Failed to launch copy of metadata bytes "
-          "size from device to host."
-          + std::to_string(err));
-    }
-
-    err = cudaStreamSynchronize(stream);
-    if (err != cudaSuccess) {
-      throw std::runtime_error(
-          "Failed to sync after copy of metadata "
-          "bytes size from device to host: "
-          + std::to_string(err));
-    }
-
-    if (in_bytes < metadata_bytes) {
-      throw std::runtime_error(
-          "Compressed data is too small to contain "
-          "metadata of size "
-          + std::to_string(metadata_bytes) + " / " + std::to_string(in_bytes));
-    }
-
-    std::vector<char> metadata_buffer(metadata_bytes);
-    err = cudaMemcpyAsync(
-        metadata_buffer.data(),
-        in_ptr,
-        metadata_bytes,
-        cudaMemcpyDeviceToHost,
-        stream);
-    if(err != cudaSuccess) {
-      throw std::runtime_error(
-          "Failed to launch copy metadata from device "
-          " to host: "
-          + std::to_string(err));
-    }
-
-    *metadata_ptr
-        = new LZ4Metadata(metadata_buffer.data(), metadata_buffer.size());
-
-    err = cudaStreamSynchronize(stream);
-    if (err != cudaSuccess) {
-      throw std::runtime_error(
-          "Failed to sync after copy of metadata "
-          "from device to host: "
-          + std::to_string(err));
-    }
-  } catch (const std::exception& e) {
-    std::cerr << "Exception in nvcompLZ4DecompressGetMetadata: " << e.what()
-              << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
-  return nvcompSuccess;
+  return API_WRAPPER(
+      nvcompBatchedLZ4DecompressGetMetadata(
+          (const void**)&in_ptr, &in_bytes, 1, metadata_ptr, stream),
+      "nvcompLZ4DecompressGetMetadata()");
 }
 
 void nvcompLZ4DecompressDestroyMetadata(void* const metadata_ptr)
 {
-  LZ4Metadata* metadata = static_cast<LZ4Metadata*>(metadata_ptr);
-  ::operator delete(metadata);
+  nvcompBatchedLZ4DecompressDestroyMetadata(metadata_ptr);
 }
 
 nvcompError_t
 nvcompLZ4DecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
 {
-  if (temp_bytes == NULL) {
-    std::cerr << "Invalid, temp_bytes ptr NULL." << std::endl;
-    return nvcompErrorInvalidValue;
-  } else if (metadata_ptr == NULL) {
-    std::cerr << "Invalid, metadata ptr NULL." << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
-  const LZ4Metadata* const metadata
-      = static_cast<const LZ4Metadata*>(metadata_ptr);
-
-  // LZ4 decompression doesn't need any temp memory
-  *temp_bytes = lz4DecompressComputeTempSize(
-      metadata->getNumChunks(), metadata->getUncompChunkSize());
-
-  return nvcompSuccess;
+  return API_WRAPPER(
+      nvcompBatchedLZ4DecompressGetTempSize(metadata_ptr, temp_bytes),
+      "nvcompLZ4DecompressGetTempSize()");
 }
 
 nvcompError_t
 nvcompLZ4DecompressGetOutputSize(const void* metadata_ptr, size_t* output_bytes)
 {
-  *output_bytes = static_cast<const LZ4Metadata*>(metadata_ptr)
-                      ->getUncompressedSize();
-
-  return nvcompSuccess;
+  return API_WRAPPER(
+      nvcompBatchedLZ4DecompressGetOutputSize(metadata_ptr, 1, output_bytes),
+      "nvcompLZ4DecompressGetOutputSize()");
 }
 
 nvcompError_t nvcompLZ4DecompressAsync(
@@ -186,47 +105,31 @@ nvcompError_t nvcompLZ4DecompressAsync(
     const size_t out_bytes,
     cudaStream_t stream)
 {
-  if (metadata_ptr == NULL) {
-    std::cerr << "Invalid, metadata NULL." << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
-  std::vector<const LZ4Metadata*> metadata;
-  metadata.emplace_back(static_cast<const LZ4Metadata*>(metadata_ptr)); 
-
-  // Perform non-batched decompression as a batch of 1 item
-  return nvcompBatchedLZ4DecompressAsync(
-      &in_ptr,
-      &in_bytes,
-      1,
-      temp_ptr,
-      temp_bytes,
-      &metadata,
-      &out_ptr,
-      &out_bytes,
-      stream);
+  return API_WRAPPER(
+      nvcompBatchedLZ4DecompressAsync(
+          &in_ptr,
+          &in_bytes,
+          1,
+          temp_ptr,
+          temp_bytes,
+          (const void* const*)metadata_ptr,
+          &out_ptr,
+          &out_bytes,
+          stream),
+      "nvcompLZ4DecompressAsync()");
 }
 
 nvcompError_t nvcompLZ4CompressGetTempSize(
-    const void* /*in_ptr*/,
+    const void* in_ptr,
     const size_t in_bytes,
     nvcompType_t /*in_type*/,
     const nvcompLZ4FormatOpts* const format_opts,
     size_t* const temp_bytes)
 {
-  try {
-    if (format_opts == nullptr) {
-      throw std::runtime_error("Format opts must not be null.");
-    }
-
-    *temp_bytes = LZ4BatchCompressor::calculate_workspace_size(
-        &in_bytes, 1, format_opts->chunk_size);
-  } catch (const std::exception& e) {
-    std::cerr << "Failed to get temp size: " << e.what() << std::endl;
-    return nvcompErrorCudaError;
-  }
-
-  return nvcompSuccess;
+  return API_WRAPPER(
+      nvcompBatchedLZ4CompressGetTempSize(
+          &in_ptr, &in_bytes, 1, format_opts, temp_bytes),
+      "nvcompLZ4CompressGetTempSize()");
 }
 
 nvcompError_t nvcompLZ4CompressGetOutputSize(
@@ -247,8 +150,10 @@ nvcompError_t nvcompLZ4CompressGetOutputSize(
     return nvcompErrorInvalidValue;
   }
 
-  return nvcompBatchedLZ4CompressGetOutputSize(
-      &in_ptr, &in_bytes, 1, format_opts, temp_ptr, temp_bytes, out_bytes);
+  return API_WRAPPER(
+      nvcompBatchedLZ4CompressGetOutputSize(
+          &in_ptr, &in_bytes, 1, format_opts, temp_ptr, temp_bytes, out_bytes),
+      "LZ4CompressGetOutputSize()");
 }
 
 nvcompError_t nvcompLZ4CompressAsync(
@@ -262,14 +167,16 @@ nvcompError_t nvcompLZ4CompressAsync(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  return nvcompBatchedLZ4CompressAsync(
-      &in_ptr,
-      &in_bytes,
-      1,
-      format_opts,
-      temp_ptr,
-      temp_bytes,
-      &out_ptr,
-      out_bytes,
-      stream);
+  return API_WRAPPER(
+      nvcompBatchedLZ4CompressAsync(
+          &in_ptr,
+          &in_bytes,
+          1,
+          format_opts,
+          temp_ptr,
+          temp_bytes,
+          &out_ptr,
+          out_bytes,
+          stream),
+      "nvcompLZ4CompressAsync");
 }

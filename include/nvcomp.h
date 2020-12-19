@@ -48,7 +48,8 @@ typedef enum nvcompError_t
   nvcompSuccess = 0,
   nvcompErrorInvalidValue = 10,
   nvcompErrorNotSupported = 11,
-  nvcompErrorCudaError = 1000
+  nvcompErrorCudaError = 1000,
+  nvcompErrorInternal = 10000
 } nvcompError_t;
 
 /* Supported datatypes */

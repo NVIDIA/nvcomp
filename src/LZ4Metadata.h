@@ -26,8 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LZ4METADATA_H
-#define LZ4METADATA_H
+#ifndef NVCOMP_LZ4METADATA_H
+#define NVCOMP_LZ4METADATA_H
 
 #include "Metadata.h"
 #include "lz4.h"

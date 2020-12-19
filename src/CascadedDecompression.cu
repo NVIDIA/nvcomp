@@ -30,12 +30,14 @@
 #include "CascadedMetadata.h"
 #include "CascadedMetadataOnGPU.h"
 
-#include "cascaded.h"
 #include "CascadedDecompressionKernels.cuh"
+#include "Check.h"
+#include "CudaUtils.h"
+#include "cascaded.h"
 #include "nvcomp.h"
-#include "unpack.h"
 #include "nvcomp.hpp"
 #include "type_macros.h"
+#include "unpack.h"
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -1284,26 +1286,21 @@ using namespace nvcomp;
 
 nvcompError_t nvcompCascadedDecompressGetMetadata(
     const void* in_ptr,
-    size_t in_bytes,
+    const size_t in_bytes,
     void** metadata_ptr,
     cudaStream_t stream)
 {
   try {
-    if (metadata_ptr == nullptr) {
-      throw std::runtime_error("'metadata_ptr' must not be null.");
-    }
+    CHECK_NOT_NULL(in_ptr);
+    CHECK_NOT_NULL(metadata_ptr);
 
     CascadedMetadataOnGPU gpuMetadata((void*)in_ptr, in_bytes);
     *metadata_ptr = new CascadedMetadata(gpuMetadata.copyToHost());
 
-    cudaError_t err = cudaStreamSynchronize(stream);
-    if (err != cudaSuccess) {
-      throw std::runtime_error("Cuda error: " + std::to_string(err));
-    }
+    CudaUtils::sync(stream);
   } catch (const std::exception& e) {
-    std::cerr << "Exception in nvcompCascadedDecompressGetMetadata: "
-              << e.what() << std::endl;
-    return nvcompErrorInvalidValue;
+    return Check::exception_to_error(
+        e, "nvcompCascadedDecompressGetMetadata()");
   }
 
   return nvcompSuccess;
@@ -1319,13 +1316,10 @@ void nvcompCascadedDecompressDestroyMetadata(void* const metadata_ptr)
 nvcompError_t nvcompCascadedDecompressGetTempSize(
     const void* metadata_ptr, size_t* temp_bytes)
 {
-
-  if (metadata_ptr == NULL) {
-    std::cerr << "Invalid, metadata ptr NULL." << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
   try {
+    CHECK_NOT_NULL(metadata_ptr);
+    CHECK_NOT_NULL(temp_bytes);
+
     CascadedMetadata* metadata = (CascadedMetadata*)metadata_ptr;
 
     nvcompIntConfig_t c = generateConfig(metadata);
@@ -1344,9 +1338,8 @@ nvcompError_t nvcompCascadedDecompressGetTempSize(
     // Return the required temp storage size
     *temp_bytes = c.getWorkspaceBytes();
   } catch (const std::exception& e) {
-    std::cerr << "Exception in nvcompCascadedDecompressGetTempSize(): "
-              << e.what() << std::endl;
-    return nvcompErrorInvalidValue;
+    return Check::exception_to_error(
+        e, "nvcompCascadedDecompressGetTempSize()");
   }
 
   return nvcompSuccess;
@@ -1355,8 +1348,13 @@ nvcompError_t nvcompCascadedDecompressGetTempSize(
 nvcompError_t nvcompCascadedDecompressGetOutputSize(
     const void* metadata_ptr, size_t* output_bytes)
 {
-  *output_bytes = static_cast<const CascadedMetadata*>(metadata_ptr)
-                      ->getUncompressedSize();
+  try {
+    *output_bytes = static_cast<const CascadedMetadata*>(metadata_ptr)
+                        ->getUncompressedSize();
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(
+        e, "nvcompCascadedDecompressionGetOutputSize()");
+  }
 
   return nvcompSuccess;
 }
@@ -1371,67 +1369,66 @@ nvcompError_t nvcompCascadedDecompressAsync(
     const size_t out_bytes,
     cudaStream_t stream)
 {
+  nvcompHandle_t handle = -1;
+  try {
+    CHECK_NOT_NULL(metadata_ptr);
 
-  if (metadata_ptr == NULL) {
-    std::cerr << "Invalid, metadata NULL." << std::endl;
-    return nvcompErrorInvalidValue;
-  }
+    const CascadedMetadata* const metadata
+        = static_cast<const CascadedMetadata*>(metadata_ptr);
 
-  const CascadedMetadata* const metadata
-      = static_cast<const CascadedMetadata*>(metadata_ptr);
-
-  if (in_bytes < metadata->getCompressedSize()) {
-    std::cerr << "Input buffer is smaller than compressed data size: "
-              << in_bytes << " < " << metadata->getCompressedSize()
-              << std::endl;
-    return nvcompErrorInvalidValue;
-  }
-
-  nvcompIntConfig_t c = generateConfig(metadata);
-
-  // first - optimize the plan
-  c.optimizeLayers();
-  // assign pointers - at this point the nodes map is set
-  for (auto it = c.layers.begin(); it != c.layers.end(); it++) {
-    it->vals = &c.nodes[it->valId];
-    it->output = &c.nodes[it->outputId];
-    if (it->runId >= 0) {
-      it->runs = &c.nodes[it->runId];
+    if (in_bytes < metadata->getCompressedSize()) {
+      throw NVCompException(
+          nvcompErrorInvalidValue,
+          "in_bytes is smaller than compressed data size: "
+              + std::to_string(in_bytes) + " < "
+              + std::to_string(metadata->getCompressedSize()));
     }
+
+    nvcompIntConfig_t c = generateConfig(metadata);
+
+    // first - optimize the plan
+    c.optimizeLayers();
+    // assign pointers - at this point the nodes map is set
+    for (auto it = c.layers.begin(); it != c.layers.end(); it++) {
+      it->vals = &c.nodes[it->valId];
+      it->output = &c.nodes[it->outputId];
+      if (it->runId >= 0) {
+        it->runs = &c.nodes[it->runId];
+      }
+    }
+
+    CHECK_API_CALL(
+        nvcompCreateHandleAsync(&handle, &c, temp_ptr, temp_bytes, stream));
+    assert(handle >= 0);
+
+    // Pointers to different portions of compressed data
+    std::vector<void*> inputData(metadata->getNumInputs(), nullptr);
+
+    std::vector<CascadedMetadata::Header> inputHdrs;
+    std::vector<CascadedMetadata::Header*> cpuHdrs;
+    for (size_t i = 0; i < metadata->getNumInputs(); i++) {
+      inputHdrs.emplace_back(metadata->getHeader(i));
+      inputData[i] = &((char*)in_ptr)[metadata->getDataOffset(i)];
+    }
+
+    for (CascadedMetadata::Header& hdr : inputHdrs) {
+      cpuHdrs.emplace_back(&hdr);
+    }
+
+    nvcompDecompressLaunch(
+        handle,
+        metadata->getNumUncompressedElements(),
+        out_ptr,
+        out_bytes,
+        (const void**)inputData.data(),
+        (const void**)cpuHdrs.data());
+    nvcompDestroyHandle(handle);
+  } catch (const std::exception& e) {
+    if (handle >= 0) {
+      nvcompDestroyHandle(handle);
+    }
+    return Check::exception_to_error(e, "nvcompCascadedDecompressAsync()");
   }
-
-  // TODO: it appears we have a memory leak with this handle...
-  nvcompHandle_t handle;
-  nvcompError_t err
-      = nvcompCreateHandleAsync(&handle, &c, temp_ptr, temp_bytes, stream);
-  if (err != nvcompSuccess) {
-    // pass error through
-    return err;
-  }
-
-  // Pointers to different portions of compressed data
-  void** inputData = new void*[metadata->getNumInputs()];
-
-  std::vector<CascadedMetadata::Header> inputHdrs;
-  std::vector<CascadedMetadata::Header*> cpuHdrs;
-  for (size_t i = 0; i < metadata->getNumInputs(); i++) {
-    inputHdrs.emplace_back(metadata->getHeader(i));
-    inputData[i] = &((char*)in_ptr)[metadata->getDataOffset(i)];
-  }
-
-  for (CascadedMetadata::Header& hdr : inputHdrs) {
-    cpuHdrs.emplace_back(&hdr);
-  }
-
-  nvcompDecompressLaunch(
-      handle,
-      metadata->getNumUncompressedElements(),
-      out_ptr,
-      out_bytes,
-      (const void**)inputData,
-      (const void**)cpuHdrs.data());
-
-  delete[] inputData;
 
   return nvcompSuccess;
 }
@@ -1449,9 +1446,7 @@ nvcompError_t nvcompCascadedCompressGetTempSize(
     nvcompCascadedCompressionGPU::computeWorkspaceSize(
         in_ptr, in_bytes, in_type, format_opts, temp_bytes);
   } catch (const std::exception& e) {
-    std::cerr << "nvcompCascadedCompressGetTempSize() Exception: " << e.what()
-              << std::endl;
-    return nvcompErrorInvalidValue;
+    return Check::exception_to_error(e, "nvcompCascadedCompressGetTempSize()");
   }
 
   return nvcompSuccess;
@@ -1484,9 +1479,8 @@ nvcompError_t nvcompCascadedCompressGetOutputSize(
         temp_bytes,
         out_bytes);
   } catch (const std::exception& e) {
-    std::cerr << "nvcompCascadedCompressGetOutputSize() Exception: " << e.what()
-              << std::endl;
-    return nvcompErrorInvalidValue;
+    return Check::exception_to_error(
+        e, "nvcompCascadedCompressGetOutputSize()");
   }
 
   return nvcompSuccess;
@@ -1506,6 +1500,16 @@ nvcompError_t nvcompCascadedCompressAsync(
   try {
     checkCompressSize(in_bytes);
 
+    CHECK_NOT_NULL(out_bytes);
+
+    if (*out_bytes == 0) {
+      throw NVCompException(
+          nvcompErrorInvalidValue,
+          "Output size cannot be zero. Make sure "
+          "to set the size of out_bytes to size of output space allocated "
+          "for compressed output.");
+    }
+
     nvcompCascadedCompressionGPU::compressAsync(
         in_ptr,
         in_bytes,
@@ -1517,9 +1521,114 @@ nvcompError_t nvcompCascadedCompressAsync(
         out_bytes,
         stream);
   } catch (const std::exception& e) {
-    std::cerr << "nvcompCascadedCompressAsync() Exception: " << e.what()
-              << std::endl;
-    return nvcompErrorInvalidValue;
+    return Check::exception_to_error(e, "nvcompCascadedCompressAsync()");
+  }
+
+  return nvcompSuccess;
+}
+
+
+/*****************************************************************************
+ * Definitions of API calls for automatically selected compression
+ ****************************************************************************/
+nvcompError_t nvcompCascadedCompressAutoGetTempSize(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    const nvcompType_t in_type,
+    size_t* const temp_bytes) 
+{
+
+  // Assume the scheme that requires the most temp space
+  nvcompCascadedFormatOpts biggest_opts;
+  biggest_opts.num_RLEs = 2;
+  biggest_opts.num_deltas = 2;
+  biggest_opts.use_bp = 1;
+
+  return API_WRAPPER(nvcompCascadedCompressGetTempSize(
+             in_ptr,
+             in_bytes,
+             in_type,
+             &biggest_opts,
+             temp_bytes), "nvcompCascadedCompressAutoGetTempSize()");
+}
+
+nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    void* temp_ptr,
+    size_t temp_bytes,
+    size_t* out_bytes)
+{
+  // Assume the scheme that can result in the largest output
+  nvcompCascadedFormatOpts biggest_opts;
+  biggest_opts.num_RLEs = 2;
+  biggest_opts.num_deltas = 2;
+  biggest_opts.use_bp = 1;
+
+  return API_WRAPPER(nvcompCascadedCompressGetOutputSize(
+             in_ptr,
+             in_bytes,
+             in_type,
+             &biggest_opts,
+             temp_ptr,
+             temp_bytes,
+             out_bytes,
+             0), "nvcompCascadedCompressAutoGetOutputSize()");
+}
+
+nvcompError_t nvcompCascadedCompressAuto(
+    const void* in_ptr,
+    size_t in_bytes,
+    nvcompType_t in_type,
+    void* temp_ptr,
+    size_t temp_bytes,
+    void* out_ptr,
+    size_t* out_bytes,
+    cudaStream_t stream)
+{
+  try {
+    nvcompCascadedSelectorOpts selector_opts;
+    selector_opts.sample_size = 1024;
+    selector_opts.num_samples = 100;
+
+    size_t type_bytes = sizeOfnvcompType(in_type);
+
+    // Adjust sample size if input is too small
+    if(in_bytes < (selector_opts.sample_size * selector_opts.num_samples * type_bytes)) {
+      selector_opts.sample_size = in_bytes / (10*type_bytes);
+      selector_opts.num_samples = 10;
+    }
+    
+    nvcompCascadedFormatOpts format_opts;
+    double est_ratio;
+
+    // Run selector to get format opts for compression
+    CHECK_API_CALL(nvcompCascadedSelectorSelectConfig(
+             in_ptr,
+             in_bytes,
+             in_type,
+             selector_opts,
+             temp_ptr,
+             temp_bytes,
+             &format_opts,
+             &est_ratio,
+             stream));
+    CudaUtils::sync(stream);
+
+    // Run compression
+    CHECK_API_CALL(nvcompCascadedCompressAsync(
+             in_ptr,
+             in_bytes,
+             in_type,
+             &format_opts,
+             temp_ptr,
+             temp_bytes,
+             out_ptr,
+             out_bytes,
+             stream));
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(e, "nvcompCascadedCompressAuto()");
   }
 
   return nvcompSuccess;

@@ -44,16 +44,6 @@ enum CopyDirection {
 class CudaUtils
 {
 public:
-  static void sync(cudaStream_t stream)
-  {
-    check(cudaStreamSynchronize(stream), "Failed to sync with stream");
-  }
-
-  static void check_last_error()
-  {
-    check(cudaGetLastError());
-  }
-
   /**
    * @brief Convert cuda errors into exceptions. Will throw an exception
    * unless `err == cudaSuccess`.
@@ -61,7 +51,7 @@ public:
    * @param err The error.
    * @param msg The message to attach to the exception.
    */
-  static void check(const cudaError_t err, const std::string& msg = "")
+  static void check(const cudaError_t err, const std::string& msg)
   {
     if (err != cudaSuccess) {
       std::string errorStr(
@@ -74,6 +64,16 @@ public:
 
       throw std::runtime_error(errorStr);
     }
+  }
+
+  static void sync(cudaStream_t stream)
+  {
+    check(cudaStreamSynchronize(stream), "Failed to sync with stream");
+  }
+
+  static void check_last_error(const std::string& msg = "")
+  {
+    check(cudaGetLastError(), msg);
   }
 
   /**

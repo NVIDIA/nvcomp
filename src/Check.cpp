@@ -26,78 +26,60 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "Metadata.h"
-#include "common.h"
-
-#include <cstddef>
+#include "Check.h"
 
 namespace nvcomp
 {
 
 /******************************************************************************
- * CONSTRUCTORS / DESTRUCTOR **************************************************
+ * PUBLIC STATIC METHODS ******************************************************
  *****************************************************************************/
 
-Metadata::Metadata(
-    const nvcompType_t type,
-    const size_t uncompressedBytes,
-    const size_t compressedBytes,
-    const int compressionType) :
-    m_type(type),
-    m_uncompressedBytes(uncompressedBytes),
-    m_compressedBytes(compressedBytes),
-    m_compressionType(compressionType)
+void Check::not_null(
+    const void* const ptr,
+    const std::string& name,
+    const std::string& filename,
+    const int line)
 {
-  if (m_uncompressedBytes % sizeOfnvcompType(m_type) != 0) {
-    throw std::runtime_error(
-        "Number of uncompressed bytes is not a multiple "
-        " of the size of the type: "
-        + std::to_string(m_uncompressedBytes) + " % "
-        + std::to_string(sizeOfnvcompType(m_type)));
+  if (ptr == nullptr) {
+    print_fail_position(filename, line);
+    throw std::runtime_error("'" + name + "' must not be null.");
   }
 }
 
-/******************************************************************************
- * PUBLIC METHODS *************************************************************
- *****************************************************************************/
-
-nvcompType_t Metadata::getValueType() const
+void Check::api_call(
+    const nvcompError_t err, const std::string& filename, const int line)
 {
-  return m_type;
+  if (err != nvcompSuccess) {
+    print_fail_position(filename, line);
+    throw NVCompException(err, "API CALL FAILED");
+  }
 }
 
-size_t Metadata::getUncompressedSize() const
+nvcompError_t Check::exception_to_error(
+    const std::exception& e, const std::string& function_name)
 {
-  return m_uncompressedBytes;
+  std::string context;
+  if (!function_name.empty()) {
+    context = "In " + function_name + ": ";
+  }
+
+  // generic error
+  nvcompError_t err = nvcompErrorInvalidValue;
+
+  // NOTE: this depends on RTTI being enabled.
+  if (dynamic_cast<const NVCompException*>(&e)) {
+    const NVCompException& nve = dynamic_cast<const NVCompException&>(e);
+    err = nve.get_error();
+  }
+
+  std::cerr << "ERROR: " << context << e.what() << std::endl;
+  return err;
 }
 
-size_t Metadata::getCompressedSize() const
+void Check::print_fail_position(const std::string& filename, const int line)
 {
-  return m_compressedBytes;
+  std::cerr << "CHECK FAILED: " << filename << ":" << line << std::endl;
 }
-
-size_t Metadata::getNumUncompressedElements() const
-{
-  return getUncompressedSize() / sizeOfnvcompType(m_type);
-}
-
-int Metadata::getCompressionType() const
-{
-  return m_compressionType;
-}
-
-void Metadata::setUncompressedSize(const size_t bytes)
-{
-  m_uncompressedBytes = bytes;
-}
-
-void Metadata::setCompressedSize(const size_t bytes)
-{
-  m_compressedBytes = bytes;
-}
-
-/******************************************************************************
- * PROTECTED METHODS **********************************************************
- *****************************************************************************/
 
 } // namespace nvcomp

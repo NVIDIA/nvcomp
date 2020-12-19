@@ -26,9 +26,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "CascadedMetadataOnGPU.h"
-#include "common.h"
 #include "CascadedCommon.h"
+#include "CascadedMetadataOnGPU.h"
+#include "CudaUtils.h"
+#include "common.h"
 
 #include <cassert>
 #include <stdexcept>
@@ -255,15 +256,11 @@ CascadedMetadata deserializeMetadataFromGPUVersion1(
     const void* const devicePtr, const size_t size)
 {
   NUM_INPUTS_TYPE numInputs;
-  cudaError_t err = cudaMemcpy(
+  CudaUtils::copy(
       &numInputs,
-      static_cast<const uint8_t*>(devicePtr) + OFFSET_NUM_INPUTS,
-      sizeof(numInputs),
-      cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    throw std::runtime_error(
-        "Failed to get number of inputs due to: " + std::to_string(err));
-  }
+      (const NUM_INPUTS_TYPE*)(static_cast<const uint8_t*>(devicePtr) + OFFSET_NUM_INPUTS),
+      1,
+      DEVICE_TO_HOST);
 
   std::vector<uint8_t> localBuffer(serializedMetadataSize(numInputs));
   if (size < localBuffer.size()) {
@@ -274,15 +271,11 @@ CascadedMetadata deserializeMetadataFromGPUVersion1(
         + std::to_string(localBuffer.size()));
   }
 
-  err = cudaMemcpy(
-      localBuffer.data(),
-      devicePtr,
+  CudaUtils::copy(
+      (uint8_t*)localBuffer.data(),
+      (const uint8_t*)devicePtr,
       localBuffer.size(),
-      cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    throw std::runtime_error(
-        "Failed to copy metadata off device due to: " + std::to_string(err));
-  }
+      DEVICE_TO_HOST);
 
   // here we convert to types of fixed width by the C++ standard rather than
   // just doing a memcpy of the struct, to ensure portability.
@@ -410,32 +403,24 @@ void CascadedMetadataOnGPU::copyToGPU(
 
     for (size_t i = 0; i < metadata.getNumInputs(); ++i) {
       const HEADER_TYPE header = metadata.getHeader(i);
-      err = cudaMemcpyAsync(
-          static_cast<uint8_t*>(m_ptr) + OFFSET_HEADERS + i * sizeof(header),
+      CudaUtils::copy_async(
+          (HEADER_TYPE*)(static_cast<uint8_t*>(m_ptr) + OFFSET_HEADERS + i * sizeof(header)),
           &header,
-          sizeof(HEADER_TYPE),
-          cudaMemcpyHostToDevice,
+          1,
+          HOST_TO_DEVICE,
           stream);
-      if (err != cudaSuccess) {
-        throw std::runtime_error(
-            "Failed to copy header offset to device: " + std::to_string(err));
-      }
     }
 
     for (size_t i = 0; i < metadata.getNumInputs(); ++i) {
       const OFFSET_TYPE offset = metadata.getDataOffset(i);
-      err = cudaMemcpyAsync(
-          static_cast<uint8_t*>(m_ptr)
+      CudaUtils::copy_async(
+          (OFFSET_TYPE*)(static_cast<uint8_t*>(m_ptr)
               + getOffsetsOffset(metadata.getNumInputs())
-              + sizeof(OFFSET_TYPE) * i,
+              + sizeof(OFFSET_TYPE) * i),
           &offset,
-          sizeof(offset),
-          cudaMemcpyHostToDevice,
+          1,
+          HOST_TO_DEVICE,
           stream);
-      if (err != cudaSuccess) {
-        throw std::runtime_error(
-            "Failed to copy data offset to device: " + std::to_string(err));
-      }
     }
   }
 

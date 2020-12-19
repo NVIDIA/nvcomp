@@ -31,6 +31,8 @@
 #include "BitPackGPU.h"
 #include "CascadedMetadata.h"
 #include "CascadedMetadataOnGPU.h"
+#include "Check.h"
+#include "CudaUtils.h"
 #include "DeltaGPU.h"
 #include "RunLengthEncodeGPU.h"
 #include "TempSpaceBroker.h"
@@ -265,20 +267,6 @@ void asyncPODCopy(const T& value, T* const destination, cudaStream_t stream)
 }
 
 /**
- * @brief Check if a CUDA API call finished successfully.
- *
- * @param error The error code.
- *
- * @throw An exception if an error occured.
- */
-void check(cudaError_t error)
-{
-  if (error != cudaSuccess) {
-    throw std::runtime_error("Cuda call failed with: " + std::to_string(error));
-  }
-}
-
-/**
  * @brief Bit pack or copy the elements to an output address.
  *
  * @tparam T The type of element to pack/copy.
@@ -309,12 +297,8 @@ void packToOutput(
     const bool bitPacking,
     cudaStream_t stream)
 {
-  check(cudaMemcpyAsync(
-      &(headerDPtr->length),
-      numElementsDPtr,
-      sizeof(*numElementsDPtr),
-      cudaMemcpyDeviceToDevice,
-      stream));
+  CudaUtils::copy_async(
+      &(headerDPtr->length), numElementsDPtr, 1, DEVICE_TO_DEVICE, stream);
 
   if (bitPacking) {
     TempSpaceBroker tempSpace(temp_ptr, temp_bytes);
@@ -370,6 +354,8 @@ void generateTypedOutputUpperBound(
     size_t* const out_bytes)
 {
   if (temp_bytes > 0) {
+    CHECK_NOT_NULL(temp_ptr);
+
     // only check if its non-null
     checkAlignmentOf(temp_ptr, sizeof(size_t));
   }
@@ -587,21 +573,13 @@ void compressTypedAsync(
 
       CascadedMetadata::Header* const valHdr
           = metadataOnGPU.getHeaderLocation(valId);
-      check(cudaMemcpyAsync(
-          &(valHdr->length),
-          numRunsDevice,
-          sizeof(*numRunsDevice),
-          cudaMemcpyDeviceToDevice,
-          stream));
+      CudaUtils::copy_async(
+          &(valHdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
 
       CascadedMetadata::Header* const runHdr
           = metadataOnGPU.getHeaderLocation(runId);
-      check(cudaMemcpyAsync(
-          &(runHdr->length),
-          numRunsDevice,
-          sizeof(*numRunsDevice),
-          cudaMemcpyDeviceToDevice,
-          stream));
+      CudaUtils::copy_async(
+          &(runHdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
 
       // store vals (apply delta if necessary)
       if (numRLEs - 1 - r < numDeltas) {
@@ -620,12 +598,8 @@ void compressTypedAsync(
 
         CascadedMetadata::Header* const hdr
             = metadataOnGPU.getHeaderLocation(id);
-        check(cudaMemcpyAsync(
-            &(hdr->length),
-            numRunsDevice,
-            sizeof(*numRunsDevice),
-            cudaMemcpyDeviceToDevice,
-            stream));
+        CudaUtils::copy_async(
+            &(hdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
       } else {
         constexpr const int COPY_BLOCK_SIZE = 512;
         const dim3 grid(std::min(
@@ -657,19 +631,11 @@ void compressTypedAsync(
           stream);
     } else {
       if (!firstLayer) {
-        check(cudaMemcpyAsync(
-            numRunsDevice,
-            outputSizePtr,
-            sizeof(*numRunsDevice),
-            cudaMemcpyDeviceToDevice,
-            stream));
+        CudaUtils::copy_async(
+            numRunsDevice, outputSizePtr, 1, DEVICE_TO_DEVICE, stream);
       } else {
-        check(cudaMemcpyAsync(
-            numRunsDevice,
-            &maxNum,
-            sizeof(*numRunsDevice),
-            cudaMemcpyHostToDevice,
-            stream));
+        CudaUtils::copy_async(
+            numRunsDevice, &maxNum, 1, HOST_TO_DEVICE, stream);
       }
 
       // No RLE
@@ -698,12 +664,8 @@ void compressTypedAsync(
       nextValId = id;
 
       CascadedMetadata::Header* const hdr = metadataOnGPU.getHeaderLocation(id);
-      check(cudaMemcpyAsync(
-          &(hdr->length),
-          numRunsDevice,
-          sizeof(*numRunsDevice),
-          cudaMemcpyDeviceToDevice,
-          stream));
+      CudaUtils::copy_async(
+          &(hdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
     }
     if (r == 0) {
       offsetAndAlignPointerAsync<<<1, 1, 0, stream>>>(
@@ -725,12 +687,8 @@ void compressTypedAsync(
           stream);
     } else {
       // update current RLE size
-      check(cudaMemcpyAsync(
-          outputSizePtr,
-          numRunsDevice,
-          sizeof(*outputSizePtr),
-          cudaMemcpyDeviceToDevice,
-          stream));
+      CudaUtils::copy_async(
+          outputSizePtr, numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
     }
   }
 
@@ -739,12 +697,7 @@ void compressTypedAsync(
     const int nextValId = ++vals_id;
     const valT* const vals_input = static_cast<const valT*>(in_ptr);
 
-    check(cudaMemcpyAsync(
-        numRunsDevice,
-        &maxNum,
-        sizeof(*numRunsDevice),
-        cudaMemcpyHostToDevice,
-        stream));
+    CudaUtils::copy_async(numRunsDevice, &maxNum, 1, HOST_TO_DEVICE, stream);
 
     offsetAndAlignPointerAsync<<<1, 1, 0, stream>>>(
         out_ptr, bit_out_ptr, offsetDevice);
@@ -767,12 +720,7 @@ void compressTypedAsync(
 
   // async copy output
   metadataOnGPU.setCompressedSizeFromGPU(offsetDevice, stream);
-  check(cudaMemcpyAsync(
-      out_bytes,
-      offsetDevice,
-      sizeof(out_bytes),
-      cudaMemcpyDeviceToHost,
-      stream));
+  CudaUtils::copy_async(out_bytes, offsetDevice, 1, DEVICE_TO_HOST, stream);
 }
 
 } // namespace
@@ -831,6 +779,13 @@ void nvcompCascadedCompressionGPU::generateOutputUpperBound(
     const size_t temp_bytes,
     size_t* const out_bytes)
 {
+  CHECK_NOT_NULL(in_ptr);
+  CHECK_NOT_NULL(opts);
+  if (temp_bytes > 0) {
+    CHECK_NOT_NULL(temp_ptr);
+  }
+  CHECK_NOT_NULL(out_bytes);
+
   const nvcompType_t countType
       = selectRunsType(in_bytes / sizeOfnvcompType(in_type));
 
@@ -857,6 +812,12 @@ void nvcompCascadedCompressionGPU::compressAsync(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
+  CHECK_NOT_NULL(in_ptr);
+  CHECK_NOT_NULL(cascadedOpts);
+  CHECK_NOT_NULL(temp_ptr);
+  CHECK_NOT_NULL(out_ptr);
+  CHECK_NOT_NULL(out_bytes);
+
   checkAlignmentOf(out_ptr, sizeof(size_t));
   checkAlignmentOf(temp_ptr, sizeof(size_t));
 
