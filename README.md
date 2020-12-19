@@ -1,7 +1,7 @@
 # What is nvcomp?
 nvcomp is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors in their applications.
 
-nvcomp 1.1 includes Cascaded and LZ4 compression methods. Cascaded compression methods demonstrate high performance with up to 500GB/s throughput and a high compression ratio of up to 80x on numerical data from analytical workloads. LZ4 methods feature up to 60 GB/s decompression throughput and good compression ratios for arbitrary byte streams.
+nvcomp 1.2 includes Cascaded and LZ4 compression methods. Cascaded compression methods demonstrate high performance with up to 500GB/s throughput and a high compression ratio of up to 80x on numerical data from analytical workloads. LZ4 methods feature up to 60 GB/s decompression throughput and good compression ratios for arbitrary byte streams.
 
 Below are performance vs. compression ratio scatter plots for a few numerical columns from TPC-H and Fanny Mae’s Mortgage datasets for Cascaded compression (R1D1B1), and string columns from TPC-H for LZ4 compression. For the TPC-H dataset we used SF10 lineitem table, and the following columns: column 0 (L_ORDERKEY) as 8B integers, and columns 8, 9, 13, 14, 15 as byte streams. From the Mortgage dataset we used 2009 Q2 performance table: column 0 (LOAN_ID) as 8B integers and column 10 (CURRENT_LOAN_DELINQUENCY_STATUS) as 4B integers. The numbers were collected on a Tesla V100 PCIe card (with ECC on). Note that you can tune the Cascaded format settings (e.g. the number of RLE layers) for even better compression ratio for some of these datasets.  We also provide a fast auto-selector that can be used to quickly determine the best Cascaded format settings to use for your dataset (details are in the [Cascaded Selector Guide](doc/selector-quickstart.md)).
 
@@ -13,10 +13,13 @@ The library is designed to be modular with ability to add new implementations wi
 
 Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
 
-# Version 1.1 Release
+# Version 1.2 Release
 
-The first release of nvcomp to add the batched LZ4 interface. Full details in
-[CHANGELOG.md](CHANGELOG.md).
+This version of nvcomp adds the
+[Cascaded Selector](/dec/selector-quickstart) set of interfaces,
+for automating the process of configuring Cascaded compression as well as other
+improvements.
+Full details in [CHANGELOG.md](CHANGELOG.md).
 
 ## Known issues
 
@@ -33,7 +36,9 @@ cmake ..
 make
 ```
 
-If you're building using CUDA 10 or less, you will need to specify a path to [CUB](https://github.com/thrust/cub) on your system.
+If you're building using CUDA 10 or less, you will need to specify a path to
+[CUB](https://github.com/thrust/cub) on your system, of at least version
+1.9.10.
 
 ```
 cmake -DCUB_DIR=<path to cub repository>
