@@ -67,6 +67,20 @@ public:
       int num_deltas,
       bool use_bp);
 
+  /**
+   * @brief Create a new CascadedCompressor without defining the configuration (RLE, delta, bp).
+   * Runs the cascaded selector before compression to determine the configuration.
+   *
+   * NOTE: This the do_compress call synchronous on the CUDA stream.  For Asynchronous execution,
+   * you must select the configuration manually.
+   *
+   * @param in_ptr The input data on the GPU to compress.
+   * @param num_elements The number of elements to compress.
+   */
+  CascadedCompressor(
+      const T* in_ptr,
+      const size_t num_elements);
+
   // disable copying
   CascadedCompressor(const CascadedCompressor&) = delete;
   CascadedCompressor& operator=(const CascadedCompressor&) = delete;
@@ -152,16 +166,36 @@ inline CascadedCompressor<T>::CascadedCompressor(
 }
 
 template <typename T>
+inline CascadedCompressor<T>::CascadedCompressor(
+    const T* const in_ptr,
+    const size_t num_elements) :
+    Compressor<T>(in_ptr, num_elements),
+    m_opts{-1,-1,-1} // Use -1 as a special maker to run selector
+{
+  // do nothing
+}
+
+template <typename T>
 inline size_t CascadedCompressor<T>::get_temp_size()
 {
   size_t comp_temp_bytes;
-  nvcompError_t status = nvcompCascadedCompressGetTempSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
-      &comp_temp_bytes);
-  throwExceptionIfError(status, "GetTempSize failed");
+  if(m_opts.num_RLEs == -1) { // If we need to run the selector
+    nvcompError_t status = nvcompCascadedCompressAutoGetTempSize(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        &comp_temp_bytes);
+    throwExceptionIfError(status, "GetTempSize failed");
+  }
+  else {
+    nvcompError_t status = nvcompCascadedCompressGetTempSize(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        &m_opts,
+        &comp_temp_bytes);
+    throwExceptionIfError(status, "GetTempSize failed");
+  }
 
   return comp_temp_bytes;
 }
@@ -171,6 +205,10 @@ inline size_t CascadedCompressor<T>::get_exact_output_size(
     void* const comp_temp, const size_t comp_temp_bytes)
 {
   size_t comp_out_bytes;
+  if(m_opts.num_RLEs == -1) { // If we need to run the selector
+    throw "Exact output size not supported when using Auto Selector";
+    return 0;
+  }
   nvcompError_t status = nvcompCascadedCompressGetOutputSize(
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
@@ -191,17 +229,30 @@ inline size_t CascadedCompressor<T>::get_max_output_size(
     void* comp_temp, size_t comp_temp_bytes)
 {
   size_t comp_out_bytes;
-  nvcompError_t status = nvcompCascadedCompressGetOutputSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
-      comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      false);
-  throwExceptionIfError(
-      status, "nvcompCascadedCompressGetOutputSize() for in exact failed");
+  if(m_opts.num_RLEs == -1) { // If we need to run the selector
+    nvcompError_t status = nvcompCascadedCompressAutoGetOutputSize(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        comp_temp,
+        comp_temp_bytes,
+        &comp_out_bytes);
+    throwExceptionIfError(
+        status, "nvcompCascadedCompressGetOutputSize() for in exact failed");
+  }
+  else {
+    nvcompError_t status = nvcompCascadedCompressGetOutputSize(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        &m_opts,
+        comp_temp,
+        comp_temp_bytes,
+        &comp_out_bytes,
+        false);
+    throwExceptionIfError(
+        status, "nvcompCascadedCompressGetOutputSize() for in exact failed");
+  }
 
   return comp_out_bytes;
 }
@@ -214,23 +265,37 @@ inline void CascadedCompressor<T>::do_compress(
     size_t* out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = nvcompCascadedCompressAsync(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
-      temp_ptr,
-      temp_bytes,
-      out_ptr,
-      out_bytes,
-      stream);
-  throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
+  if(m_opts.num_RLEs == -1) { // If we need to run the selector
+    nvcompError_t status = nvcompCascadedCompressAuto(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        temp_ptr,
+        temp_bytes,
+        out_ptr,
+        out_bytes,
+        stream);
+    throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
+  }
+  else {
+    nvcompError_t status = nvcompCascadedCompressAsync(
+        this->get_uncompressed_data(),
+        this->get_uncompressed_size(),
+        this->get_type(),
+        &m_opts,
+        temp_ptr,
+        temp_bytes,
+        out_ptr,
+        out_bytes,
+        stream);
+    throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
+  }
 }
 
 
 
 /******************************************************************************
- * METHOD IMPLEMENTATIONS *****************************************************
+ * Cascaded Selector *****************************************************
  *****************************************************************************/
   /**
    *@brief Primary class for the Cascaded Selector used to determine the
