@@ -1,3 +1,10 @@
+# nvcomp 1.2.0 (2020-12-19)
+
+- Add the Cascaded Selector and Cascaded Auto set of interfaces for
+automatically configuring cascaded compression.
+- Generally improve error handling and messaging.
+- Update CMake configuration to support CCache.
+
 # nvcomp 1.1.1 (2020-12-02)
 
 - Add all-gather benchmark.
