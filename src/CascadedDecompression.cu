@@ -1633,28 +1633,3 @@ nvcompError_t nvcompCascadedCompressAuto(
 
   return nvcompSuccess;
 }
-
-
-/*****************************************************************************
- * Definitions of API calls for automatically selected compression
- ****************************************************************************/
-nvcompError_t nvcompCascadedCompressAutoGetTempSize(
-    const void* const in_ptr,
-    const size_t in_bytes,
-    const nvcompType_t in_type,
-    size_t* const temp_bytes) 
-{
-
-  // Assume the scheme that requires the most temp space
-  nvcompCascadedFormatOpts biggest_opts;
-  biggest_opts.num_RLEs = 2;
-  biggest_opts.num_deltas = 2;
-  biggest_opts.use_bp = 1;
-
-  return nvcompCascadedCompressGetTempSize(
-             in_ptr,
-             in_bytes,
-             in_type,
-             &biggest_opts,
-             temp_bytes);
-}
