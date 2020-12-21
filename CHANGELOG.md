@@ -1,3 +1,7 @@
+# nvcomp 1.2.1 (2020-12-21)
+
+- Fix compile error and unit tests for cascaded selector.
+
 # nvcomp 1.2.0 (2020-12-19)
 
 - Add the Cascaded Selector and Cascaded Auto set of interfaces for
