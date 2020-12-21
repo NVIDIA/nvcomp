@@ -1658,28 +1658,3 @@ nvcompError_t nvcompCascadedCompressAutoGetTempSize(
              &biggest_opts,
              temp_bytes);
 }
-
-nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    void* temp_ptr,
-    size_t temp_bytes,
-    size_t* out_bytes)
-{
-  // Assume the scheme that can result in the largest output
-  nvcompCascadedFormatOpts biggest_opts;
-  biggest_opts.num_RLEs = 2;
-  biggest_opts.num_deltas = 2;
-  biggest_opts.use_bp = 1;
-
-  return nvcompCascadedCompressGetOutputSize(
-             in_ptr,
-             in_bytes,
-             in_type,
-             &biggest_opts,
-             temp_ptr,
-             temp_bytes,
-             out_bytes,
-             0);
-}
