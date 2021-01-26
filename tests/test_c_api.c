@@ -162,8 +162,8 @@ int test_rle_delta(void)
       stream);
   REQUIRE(status == cudaSuccess);
 
-  status = cudaDeviceSynchronize();
-  REQUIRE(status == cudaSuccess);
+  cudaError_t err = cudaDeviceSynchronize();
+  REQUIRE(err == cudaSuccess);
 
   nvcompDecompressDestroyMetadata(metadata_ptr);
 
@@ -284,10 +284,10 @@ int test_rle_delta_bp(void)
       out_ptr,
       output_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
-  status = cudaStreamSynchronize(stream);
-  REQUIRE(status == cudaSuccess);
+  cudaError_t err = cudaStreamSynchronize(stream);
+  REQUIRE(err == cudaSuccess);
 
   // Destory the metadata object and free memory
   nvcompDecompressDestroyMetadata(metadata_ptr);

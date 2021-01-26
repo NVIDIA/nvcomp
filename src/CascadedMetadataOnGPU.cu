@@ -488,11 +488,8 @@ CascadedMetadata CascadedMetadataOnGPU::copyToHost()
   // read the version of the serialized metadata.
   VERSION_TYPE version;
 
-  cudaError_t err = cudaMemcpyAsync(
-      &version, m_ptr, sizeof(version), cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to copy down version.");
-  }
+  CudaUtils::copy(
+      &version, static_cast<const VERSION_TYPE*>(m_ptr), 1, DEVICE_TO_HOST);
 
   if (version == 1) {
     CascadedMetadata metadata
