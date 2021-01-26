@@ -3,6 +3,7 @@ project(nvcomp LANGUAGES C CUDA CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
 
@@ -30,7 +31,7 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weffc++")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
     # this doesn't work with old style CMakeLists and cuda
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
   endif()
 
   # TODO: add clang warnings

@@ -95,7 +95,7 @@ nvcompCascadedFormatOpts internal_select(
 
   size_t num_chunks = in_bytes / sample_bytes;
   size_t bracket_size = num_chunks / num_samples;
-  size_t sample_offsets[num_samples] = {0};
+  std::vector<size_t> sample_offsets(num_samples);
 
   // TODO: The last chunk of the input data is discarded. Change it so that the
   // last chunk can be also incuded during the sampling process.
@@ -109,7 +109,7 @@ nvcompCascadedFormatOpts internal_select(
   }
 
   size_t out_sizes[NUM_SCHEMES];
-  size_t sample_ptrs[num_samples];
+  std::vector<size_t> sample_ptrs(num_samples);
 
   for (size_t i = 0; i < num_samples; i++) {
 
@@ -123,7 +123,7 @@ nvcompCascadedFormatOpts internal_select(
 
   cudaMemcpyAsync(
       d_sample_ptrs,
-      sample_ptrs,
+      sample_ptrs.data(),
       sizeof(size_t) * num_samples,
       cudaMemcpyHostToDevice,
       stream);
