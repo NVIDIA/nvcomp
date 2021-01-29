@@ -142,7 +142,7 @@ struct nvcompIntTask_t
 
 struct nvcompIntHandle_t
 {
-  nvcompIntConfig_t* config = nullptr;
+  std::unique_ptr<nvcompIntConfig_t> config = nullptr;
   cudaStream_t stream = 0;
 
   // main decomp functions
@@ -258,7 +258,7 @@ void checkCompressSize(const size_t numBytes)
   }
 }
 
-nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
+std::unique_ptr<nvcompIntConfig_t> generateConfig(const CascadedMetadata* const metadata)
 {
   const int numRLEs = metadata->getNumRLEs();
   const int numDeltas = metadata->getNumDeltas();
@@ -269,17 +269,17 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
   // initialize config
   const nvcompType_t type = metadata->getValueType();
 
-  nvcompIntConfig_t config;
-  config.outputId = vals_id;
-  config.outputType = type;
-  config.maxOutputSize = metadata->getUncompressedSize();
+  std::unique_ptr<nvcompIntConfig_t> config(new nvcompIntConfig_t);
+  config->outputId = vals_id;
+  config->outputType = type;
+  config->maxOutputSize = metadata->getUncompressedSize();
 
   const nvcompType_t runType
       = selectRunsType(metadata->getNumUncompressedElements());
 
   const size_t maxSegmentSize = metadata->getUncompressedSize();
 
-  config.nodes[0].length = metadata->getNumUncompressedElements();
+  config->nodes[0].length = metadata->getNumUncompressedElements();
 
   // A step can be RLE+Delta, RLE, or Delta, with final outputs conditionally
   // having bit packing applied
@@ -293,7 +293,7 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
 
       // add to config
       nvcompConfigAddRLE_BP(
-          &config,
+          config.get(),
           inputId,
           maxSegmentSize,
           valId,
@@ -302,8 +302,8 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
           runId,
           runType,
           bitPacking);
-      config.nodes[valId].length = metadata->getNumElementsOf(valId);
-      config.nodes[runId].length = metadata->getNumElementsOf(runId);
+      config->nodes[valId].length = metadata->getNumElementsOf(valId);
+      config->nodes[runId].length = metadata->getNumElementsOf(runId);
 
       // store vals (apply delta if necessary)
       if (numRLEs - 1 - r < numDeltas) {
@@ -311,17 +311,17 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
 
         if (r == 0) {
           nvcompConfigAddDelta_BP(
-              &config, valId, maxSegmentSize, deltaId, type, bitPacking);
+              config.get(), valId, maxSegmentSize, deltaId, type, bitPacking);
         } else {
           nvcompConfigAddDelta_BP(
-              &config,
+              config.get(),
               valId,
               maxSegmentSize,
               deltaId,
               type,
               0); // no bitpacking when delta is used as an intermediate step
         }
-        config.nodes[deltaId].length = metadata->getNumElementsOf(deltaId);
+        config->nodes[deltaId].length = metadata->getNumElementsOf(deltaId);
       }
     } else {
       // RLE-less step
@@ -329,17 +329,17 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
 
       if (r == 0) {
         nvcompConfigAddDelta_BP(
-            &config, inputId, maxSegmentSize, deltaId, type, bitPacking);
+            config.get(), inputId, maxSegmentSize, deltaId, type, bitPacking);
       } else {
         nvcompConfigAddDelta_BP(
-            &config,
+            config.get(),
             inputId,
             maxSegmentSize,
             deltaId,
             type,
             0); // no bitpacking when delta is used as an intermediate step
       }
-      config.nodes[deltaId].length = metadata->getNumElementsOf(deltaId);
+      config->nodes[deltaId].length = metadata->getNumElementsOf(deltaId);
     }
   }
 
@@ -347,9 +347,9 @@ nvcompIntConfig_t generateConfig(const CascadedMetadata* const metadata)
   if (numRLEs == 0 && numDeltas == 0) {
     const int inputId = vals_id;
     const int bpId = ++vals_id;
-    nvcompConfigAddBP(&config, inputId, maxSegmentSize, bpId, type);
+    nvcompConfigAddBP(config.get(), inputId, maxSegmentSize, bpId, type);
 
-    config.nodes[bpId].length = metadata->getNumElementsOf(bpId);
+    config->nodes[bpId].length = metadata->getNumElementsOf(bpId);
   }
 
   return config;
@@ -423,12 +423,9 @@ size_t writeData(
  *            Older API definitions below.  New API calls rely on them.
  **************************************************************************************/
 
-nvcompIntConfig_t* createConfig(const CascadedMetadata* const metadata)
+nvcompIntConfig_t * createConfig(const CascadedMetadata* metadata)
 {
-  nvcompIntConfig_t* config = new nvcompIntConfig_t();
-  *config = generateConfig(metadata);
-
-  return config;
+  return generateConfig(metadata).release();
 }
 
 void destroyConfig(nvcompIntConfig_t* config)
@@ -1238,7 +1235,7 @@ nvcompError_t nvcompDestroyHandle(nvcompHandle_t handle)
 // asynchronous Assumes workspaceStorage is already allocated.
 nvcompError_t nvcompCreateHandleAsync(
     nvcompHandle_t* handle,
-    nvcompIntConfig_t* const config,
+    std::unique_ptr<nvcompIntConfig_t> config,
     void* workspaceStorage,
     const size_t workspaceBytes,
     cudaStream_t stream)
@@ -1269,7 +1266,7 @@ nvcompError_t nvcompCreateHandleAsync(
   *handle = id;
   nvcompIntHandle_t& h = handles[id];
 
-  h.config = config;
+  h.config = std::move(config);
   h.stream = stream;
 
   h.workspaceBytes = workspaceBytes;
@@ -1322,21 +1319,21 @@ nvcompError_t nvcompCascadedDecompressGetTempSize(
 
     CascadedMetadata* metadata = (CascadedMetadata*)metadata_ptr;
 
-    nvcompIntConfig_t c = generateConfig(metadata);
+    std::unique_ptr<nvcompIntConfig_t> c = generateConfig(metadata);
 
     // first - optimize the plan
-    c.optimizeLayers();
+    c->optimizeLayers();
     // assign pointers - at this point the nodes map is set
-    for (auto it = c.layers.begin(); it != c.layers.end(); it++) {
-      it->vals = &c.nodes[it->valId];
-      it->output = &c.nodes[it->outputId];
-      if (it->runId >= 0) {
-        it->runs = &c.nodes[it->runId];
+    for (auto& layer : c->layers) {
+      layer.vals = &c->nodes[layer.valId];
+      layer.output = &c->nodes[layer.outputId];
+      if (layer.runId >= 0) {
+        layer.runs = &c->nodes[layer.runId];
       }
     }
 
     // Return the required temp storage size
-    *temp_bytes = c.getWorkspaceBytes();
+    *temp_bytes = c->getWorkspaceBytes();
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompCascadedDecompressGetTempSize()");
@@ -1384,21 +1381,21 @@ nvcompError_t nvcompCascadedDecompressAsync(
               + std::to_string(metadata->getCompressedSize()));
     }
 
-    nvcompIntConfig_t c = generateConfig(metadata);
+    std::unique_ptr<nvcompIntConfig_t> c = generateConfig(metadata);
 
     // first - optimize the plan
-    c.optimizeLayers();
+    c->optimizeLayers();
     // assign pointers - at this point the nodes map is set
-    for (auto it = c.layers.begin(); it != c.layers.end(); it++) {
-      it->vals = &c.nodes[it->valId];
-      it->output = &c.nodes[it->outputId];
-      if (it->runId >= 0) {
-        it->runs = &c.nodes[it->runId];
+    for (auto& layer : c->layers) {
+      layer.vals = &c->nodes[layer.valId];
+      layer.output = &c->nodes[layer.outputId];
+      if (layer.runId >= 0) {
+        layer.runs = &c->nodes[layer.runId];
       }
     }
 
     CHECK_API_CALL(
-        nvcompCreateHandleAsync(&handle, &c, temp_ptr, temp_bytes, stream));
+        nvcompCreateHandleAsync(&handle, std::move(c), temp_ptr, temp_bytes, stream));
     assert(handle >= 0);
 
     // Pointers to different portions of compressed data
