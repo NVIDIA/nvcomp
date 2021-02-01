@@ -40,7 +40,7 @@ using namespace nvcomp;
 
 static void print_usage()
 {
-  printf("Usage: benchmark_binary [OPTIONS]\n");
+  printf("Usage: benchmark_lz4 [OPTIONS]\n");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
   printf(
@@ -50,17 +50,13 @@ static void print_usage()
 }
 
 // Benchmark performance from the binary data file fname
-static void run_benchmark(char* fname, int binary_file, int verbose_memory)
+static void run_benchmark(char* fname, int verbose_memory)
 {
   using T = uint8_t;
 
   size_t input_elts = 0;
   std::vector<T> data;
-  if (binary_file == 0) {
-    data = load_dataset_from_txt<T>(fname, &input_elts);
-  } else {
-    data = load_dataset_from_binary<T>(fname, &input_elts);
-  }
+  data = load_dataset_from_binary<T>(fname, &input_elts);
 
   // Make sure dataset fits on GPU to benchmark total compression
   size_t freeMem;
@@ -204,7 +200,6 @@ int main(int argc, char* argv[])
   int gpu_num = 0;
   int verbose_memory = 0;
   std::string dtype = "int";
-  int binary_file = 0;
 
   // Parse command-line arguments
   while (1) {
@@ -221,10 +216,6 @@ int main(int argc, char* argv[])
 
     switch (c) {
     case 'f':
-      if (startsWith(optarg, "BIN:")) {
-        binary_file = 1;
-        optarg = optarg + 4;
-      }
       fname = optarg;
       break;
     case 'g':
@@ -245,7 +236,7 @@ int main(int argc, char* argv[])
 
   cudaSetDevice(gpu_num);
 
-  run_benchmark(fname, binary_file, verbose_memory);
+  run_benchmark(fname, verbose_memory);
 
   return 0;
 }
