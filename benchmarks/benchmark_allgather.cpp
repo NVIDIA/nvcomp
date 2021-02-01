@@ -98,7 +98,6 @@ check_output(T*** outputs, T* h_data, int gpus, int chunks, size_t* chunk_sizes)
 template <typename T>
 static void load_chunks_to_devices(
     char* fname,
-    int binary_file,
     int gpus,
     int chunks,
     T** dev_ptrs,
@@ -107,11 +106,7 @@ static void load_chunks_to_devices(
 {
 
   size_t input_elts = 0;
-  if (binary_file == 0) {
-    *h_data = load_dataset_from_txt<T>(fname, &input_elts);
-  } else {
-    *h_data = load_dataset_from_binary<T>(fname, &input_elts);
-  }
+  *h_data = load_dataset_from_binary<T>(fname, &input_elts);
 
   int chunks_per_gpu = chunks / gpus;
   if (chunks_per_gpu * gpus != chunks) {
@@ -779,7 +774,6 @@ int main(int argc, char* argv[])
   int deltas = 0;
   int bitPacking = 1;
   std::string dtype = "int";
-  int binary_file = 1;
 
   // Parse command-line arguments
   while (1) {
@@ -801,10 +795,6 @@ int main(int argc, char* argv[])
       break;
     switch (c) {
     case 'f':
-      if (startsWith(optarg, "TXT:")) {
-        binary_file = 0;
-        optarg = optarg + 4;
-      }
       fname = optarg;
       break;
     case 'g':
@@ -857,7 +847,6 @@ int main(int argc, char* argv[])
     std::vector<int32_t> h_data;
     load_chunks_to_devices<int32_t>(
         fname,
-        binary_file,
         gpu_num,
         chunks,
         data_ptrs.data(),
@@ -881,7 +870,6 @@ int main(int argc, char* argv[])
     std::vector<int64_t> h_data;
     load_chunks_to_devices<int64_t>(
         fname,
-        binary_file,
         gpu_num,
         chunks,
         data_ptrs.data(),
@@ -905,7 +893,6 @@ int main(int argc, char* argv[])
     std::vector<int8_t> h_data;
     load_chunks_to_devices<int8_t>(
         fname,
-        binary_file,
         gpu_num,
         chunks,
         data_ptrs.data(),
@@ -929,7 +916,6 @@ int main(int argc, char* argv[])
     std::vector<uint8_t> h_data;
     load_chunks_to_devices<uint8_t>(
         fname,
-        binary_file,
         gpu_num,
         chunks,
         data_ptrs.data(),

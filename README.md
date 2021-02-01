@@ -62,14 +62,14 @@ Convert CSV files to binary files:
 - *Note*: make sure that the delimiter is set correctly, default is `,`
 
 Run tests:
-- Run `./bin/benchmark_cascaded` or `./bin/benchmark_lz4` with `-f BIN:column_data.bin <options>` to measure throughput.
+- Run `./bin/benchmark_cascaded` or `./bin/benchmark_lz4` with `-f column_data.bin <options>` to measure throughput.
 
 Below are some reference benchmark results on a Tesla V100 for TPC-H.
 
 Example of compressing and decompressing TPC-H SF10 lineitem column 0 (L_ORDERKEY) using Cascaded with RLE + Delta + Bit-packing (input stream is treated as 8-byte integers):
 
 ```
-$ ./bin/benchmark_cascaded -f BIN:/tmp/lineitem-col0-long.bin -t long -r 1 -d 1 -b 1 -m
+$ ./bin/benchmark_cascaded -f /tmp/lineitem-col0-long.bin -t long -r 1 -d 1 -b 1 -m
 ----------
 uncompressed (B): 479888416
 compression memory (input+output+temp) (B): 2400694079
@@ -85,7 +85,7 @@ decompression throughput (GB/s): 228.53
 Example of compressing and decompressing TPC-H SF10 lineitem column 15 (L_COMMENT) using LZ4:
 
 ```
-$ ./bin/benchmark_lz4 -f BIN:lineitem-col15-string.bin -m
+$ ./bin/benchmark_lz4 -f lineitem-col15-string.bin -m
 ----------
 uncompressed (B): 2579400236
 compression memory (input+output+temp) (B): 7761407820
