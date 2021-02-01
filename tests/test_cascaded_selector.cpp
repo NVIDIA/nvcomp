@@ -82,6 +82,7 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   nvcompCascadedSelectorOpts selector_opts;
   selector_opts.sample_size = sample_size;
   selector_opts.num_samples = num_samples;
+  selector_opts.seed = 1;
 
   nvcompError_t err = nvcompCascadedSelectorGetTempSize(in_bytes, getnvcompType<T>(), selector_opts, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
@@ -131,6 +132,8 @@ nvcompCascadedFormatOpts* opts)
   nvcompCascadedSelectorOpts selector_opts;
   selector_opts.sample_size = sample_size;
   selector_opts.num_samples = num_samples;
+  selector_opts.seed = 1;
+
   // Create the selector
   CascadedSelector<T> selector((const void*)d_in_data, in_bytes, selector_opts);
 

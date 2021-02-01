@@ -1582,12 +1582,14 @@ nvcompError_t nvcompCascadedCompressAuto(
     size_t temp_bytes,
     void* out_ptr,
     size_t* out_bytes,
+    unsigned seed,
     cudaStream_t stream)
 {
   try {
     nvcompCascadedSelectorOpts selector_opts;
     selector_opts.sample_size = 1024;
     selector_opts.num_samples = 100;
+    selector_opts.seed = seed;
 
     size_t type_bytes = sizeOfnvcompType(in_type);
 

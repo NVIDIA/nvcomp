@@ -77,6 +77,7 @@ nvcompCascadedFormatOpts internal_select(
     void* d_temp_comp,
     const size_t workspace_size,
     const size_t max_size,
+    unsigned seed,
     cudaStream_t stream)
 {
 
@@ -100,8 +101,7 @@ nvcompCascadedFormatOpts internal_select(
   // TODO: The last chunk of the input data is discarded. Change it so that the
   // last chunk can be also incuded during the sampling process.
 
-  unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
-  std::minstd_rand0 g1(seed1);
+  std::minstd_rand0 g1(seed);
 
   for (size_t i = 0; i < num_samples; i++) {
     int idx = g1() % bracket_size;
@@ -221,6 +221,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
       d_workspace,
       workspace_size,
       max_temp_size,
+      opts.seed,
       stream);
 }
 
@@ -243,6 +244,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
       d_workspace,
       workspace_size,
       max_temp_size,
+      opts.seed,
       stream);
 }
 
@@ -293,6 +295,7 @@ nvcompCascadedFormatOpts callSelectorSelectConfig(
       temp_ptr,
       temp_bytes,
       required_bytes,
+      opts.seed,
       stream);
 }
   

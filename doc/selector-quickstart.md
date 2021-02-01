@@ -23,6 +23,7 @@ the `nvcompCascadedFormatOpts` that can be used to call Cascaded compression.
 nvcompCascadedSelectorOpts selector_opts;
 selector_opts.sample_size = 1024;
 selector_opts.num_samples = 100;
+selector_opts.seed = 1; // seed used for random sampling.
 
 // Get size and allocate temp space needed to run selector.
 size_t selector_temp_bytes;
@@ -46,6 +47,7 @@ Below is the same example code using the C++interface:
 nvcompCascadedSelectorOpts selector_opts;
 selector_opts.sample_size = 1024;
 selector_opts.num_samples = 100;
+selector_opts.seed = 1;
 
 CascadedSelector<int> selector(in_data, in_bytes, selector_opts);
 
@@ -84,8 +86,13 @@ void* d_out;
 cudaMalloc(&d_out, out_bytes);
 
 // Run both the selector and compression, putting the compressed output in d_out
-nvcompCascadedCompressAuto(in_data, in_bytes, getnvcompType<T>(), d_temp, temp_bytes, d_out, out_bytes, stream);
+nvcompCascadedCompressAuto(in_data, in_bytes, getnvcompType<T>(), d_temp, temp_bytes, d_out, out_bytes, seed, stream);
 ```
+Note that the 8th input parameter to the above function is a seed used for random sampling.  Giving a simple unsigned
+integer provides deterministic results..  For non-deterministic random sampling, use a time-based seed such as:
+```c++
+unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+````
 
 As mentioned above, using the C++ interface to auto-run the selector during compression is very simple. You can use all 
 of the CascadedCompressor methods as normal (detailed in the [C++ Quick Start Guide](cpp_quickstart.md)), and just 
@@ -96,5 +103,6 @@ CascadedCompressor compressor(in_data, in_bytes);
 ```
 
 The compressor can then be used to `get_temp_size()`, `get_output_size()`, and `compress_async()`.  
-No changes to decompression code are required when using the selector for compression.
+No changes to decompression code are required when using the selector for compression.  When used in this
+way, a time-based random seed is used automatically.
 

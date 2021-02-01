@@ -89,6 +89,7 @@ TEST_CASE("Selector_CPP_constructor_getSize", "[small]")
   nvcompCascadedSelectorOpts selector_opts;
   selector_opts.sample_size=1024;
   selector_opts.num_samples=10;
+  selector_opts.seed=1;
 
   CUDA_RT_CALL( cudaMalloc(&d_input, numBytes) );
 
@@ -115,6 +116,7 @@ TEST_CASE("SelectorGetTempSize_C", "[small]")
   nvcompCascadedSelectorOpts selector_opts;
   selector_opts.sample_size = 1024;
   selector_opts.num_samples = 10;
+  selector_opts.seed = 1;
 
   nvcompError_t err = nvcompCascadedSelectorGetTempSize(numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
@@ -165,6 +167,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
   nvcompCascadedSelectorOpts selector_opts;
   selector_opts.sample_size = 1024;
   selector_opts.num_samples = 1000;
+  selector_opts.seed = 1;
 
   // Should throw exception if not enough temp workspace
 
