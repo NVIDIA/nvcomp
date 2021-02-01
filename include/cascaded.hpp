@@ -31,6 +31,7 @@
 
 #include "cascaded.h"
 #include "nvcomp.hpp"
+#include <chrono>
 
 namespace nvcomp
 {
@@ -265,6 +266,9 @@ inline void CascadedCompressor<T>::do_compress(
     size_t* out_bytes,
     cudaStream_t stream)
 {
+
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
   if(m_opts.num_RLEs == -1) { // If we need to run the selector
     nvcompError_t status = nvcompCascadedCompressAuto(
         this->get_uncompressed_data(),
@@ -274,6 +278,7 @@ inline void CascadedCompressor<T>::do_compress(
         temp_bytes,
         out_ptr,
         out_bytes,
+        seed,
         stream);
     throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
   }

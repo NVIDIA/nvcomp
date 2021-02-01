@@ -265,6 +265,8 @@ nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
 /**
  * @brief Perform compression by first determining the best configuration for
  * the input.  Runs synchronously because we first find the configuration to use.
+ * Random sampling is performed and selected using random numbers generated using
+ * the seed provided.
  *
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
@@ -278,6 +280,7 @@ nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
  * @param out_bytes The size of the output location on input, and the size of
  * the compressed data on output. If pinned memory, the stream must be
  * synchronized with, before reading.
+ * @param seed The seed used for the random generator used in sampling
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -290,6 +293,7 @@ nvcompError_t nvcompCascadedCompressAuto(
     size_t temp_bytes,
     void* out_ptr,
     size_t* out_bytes,
+    unsigned seed,
     cudaStream_t stream);
 
 
@@ -316,6 +320,11 @@ typedef struct
    * minimum value 1
    */
   size_t num_samples;
+
+  /**
+   * @brief The seed used for the random sampling
+   */
+  unsigned seed;
 
 }nvcompCascadedSelectorOpts;
 

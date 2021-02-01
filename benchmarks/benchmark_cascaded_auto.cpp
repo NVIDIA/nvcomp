@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <getopt.h>
+#include <chrono>
 
 using namespace nvcomp;
 
@@ -120,6 +121,10 @@ static void run_benchmark(
               << std::endl;
   }
 
+  
+  // Random time-based seed
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
 
@@ -132,6 +137,7 @@ static void run_benchmark(
       comp_temp_bytes,
       d_comp_out,
       &comp_out_bytes,
+      seed,
       stream);
 
   benchmark_assert(
