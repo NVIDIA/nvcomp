@@ -1292,9 +1292,7 @@ nvcompError_t nvcompCascadedDecompressGetMetadata(
     CHECK_NOT_NULL(metadata_ptr);
 
     CascadedMetadataOnGPU gpuMetadata((void*)in_ptr, in_bytes);
-    *metadata_ptr = new CascadedMetadata(gpuMetadata.copyToHost());
-
-    CudaUtils::sync(stream);
+    *metadata_ptr = new CascadedMetadata(gpuMetadata.copyToHost(stream));
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompCascadedDecompressGetMetadata()");

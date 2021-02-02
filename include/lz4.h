@@ -53,14 +53,15 @@ typedef struct
 } nvcompLZ4FormatOpts;
 
 /**
- * @brief Check if a given chunk of compressed data is LZ4.
+ * @brief Check if a given chunk of compressed data on the GPU is LZ4.
  *
  * @param in_ptr The compressed data.
  * @param in_bytes The size of the compressed data.
+ * @param stream The stream to fetch data from the GPU on.
  *
  * @return 1 If the data is compressed via LZ4.
  */
-int LZ4IsData(const void* const in_ptr, size_t in_bytes);
+int LZ4IsData(const void* const in_ptr, size_t in_bytes, cudaStream_t stream);
 
 /**
  * @brief Check if the given CPU-accessible metadata is for LZ4.
