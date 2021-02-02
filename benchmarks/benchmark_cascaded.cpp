@@ -271,7 +271,6 @@ int main(int argc, char* argv[])
   int gpu_num = 0;
   int verbose_memory = 0;
   std::string dtype = "int";
-  int binary_file = 0;
   size_t size = 0;
 
   // Parse command-line arguments

@@ -94,11 +94,14 @@ public:
   size_t getSerializedSize() const;
 
   /**
-   * @brief Get a copy of the metadata on the CPU.
+   * @brief Get a copy of the metadata on the CPU. This will synchronize with
+   * the stream.
+   *
+   * @stream The stream to transfer on.
    *
    * @return The metadata on the CPU.
    */
-  CascadedMetadata copyToHost();
+  CascadedMetadata copyToHost(cudaStream_t stream);
 
   /**
    * @brief Save the offset scalar stored on the device to the serialized
