@@ -305,6 +305,142 @@ int test_rle_delta_bp(void)
   }
 }
 
+int test_ones_init_data(void)
+{
+  typedef int T;
+  const nvcompType_t type = NVCOMP_TYPE_INT;
+
+  int packing = 1;
+  int RLE = 1;
+  int Delta = 1;
+
+  const size_t inputSize = 12;
+  const int input[12] = {0, 2, 2, 3, 0, 0, 3, 1, 1, 1, 1, 1};
+
+  for (int packing = 0; packing <= 1; ++packing) {
+    for (int Delta = 0; Delta <= 5; ++Delta) {
+      for (int RLE = 0; RLE <= 5; ++RLE) {
+        if (RLE + Delta + packing == 0) {
+          // don't bother if there is no compression
+          continue;
+        }
+
+        // create GPU only input buffer
+        void* d_in_data;
+        const size_t in_bytes = sizeof(T) * inputSize;
+        CUDA_CHECK(cudaMalloc(&d_in_data, in_bytes));
+        CUDA_CHECK(
+            cudaMemcpy(d_in_data, input, in_bytes, cudaMemcpyHostToDevice));
+
+        nvcompCascadedFormatOpts comp_opts;
+        comp_opts.num_RLEs = RLE;
+        comp_opts.num_deltas = Delta;
+        comp_opts.use_bp = packing;
+
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+
+        nvcompError_t status;
+
+        // Compress on the GPU
+        size_t comp_temp_bytes;
+        status = nvcompCascadedCompressGetTempSize(
+            d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
+        REQUIRE(status == cudaSuccess);
+
+        void* d_comp_temp;
+        CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
+
+        size_t comp_out_bytes;
+        status = nvcompCascadedCompressGetOutputSize(
+            d_in_data,
+            in_bytes,
+            type,
+            &comp_opts,
+            d_comp_temp,
+            comp_temp_bytes,
+            &comp_out_bytes,
+            0);
+        REQUIRE(status == cudaSuccess);
+
+        void* d_comp_out;
+        CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
+        CUDA_CHECK(cudaMemset(d_comp_out, -1, comp_out_bytes));
+
+        status = nvcompCascadedCompressAsync(
+            d_in_data,
+            in_bytes,
+            type,
+            &comp_opts,
+            d_comp_temp,
+            comp_temp_bytes,
+            d_comp_out,
+            &comp_out_bytes,
+            stream);
+        REQUIRE(status == cudaSuccess);
+        CUDA_CHECK(cudaStreamSynchronize(stream));
+
+        cudaFree(d_comp_temp);
+        cudaFree(d_in_data);
+
+        // Get metadata
+        void* metadata_ptr;
+        status = nvcompDecompressGetMetadata(
+            d_comp_out, comp_out_bytes, &metadata_ptr, stream);
+        REQUIRE(status == cudaSuccess);
+
+        // get temp size
+        size_t temp_bytes;
+        status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
+        REQUIRE(status == cudaSuccess);
+
+        // allocate temp buffer
+        void* temp_ptr;
+        cudaMalloc(&temp_ptr, temp_bytes); // also can use RMM_ALLOC instead
+
+        // get output size
+        size_t output_bytes;
+        status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
+        REQUIRE(status == cudaSuccess);
+
+        // allocate output buffer
+        void* out_ptr;
+        cudaMalloc(&out_ptr, output_bytes); // also can use RMM_ALLOC instead
+
+        // execute decompression (asynchronous)
+        status = nvcompDecompressAsync(
+            d_comp_out,
+            comp_out_bytes,
+            temp_ptr,
+            temp_bytes,
+            metadata_ptr,
+            out_ptr,
+            output_bytes,
+            stream);
+        REQUIRE(status == nvcompSuccess);
+
+        cudaError_t err = cudaStreamSynchronize(stream);
+        REQUIRE(err == cudaSuccess);
+
+        // Destory the metadata object and free memory
+        nvcompDecompressDestroyMetadata(metadata_ptr);
+
+        // Copy result back to host
+        int res[12];
+        cudaMemcpy(res, out_ptr, output_bytes, cudaMemcpyDeviceToHost);
+
+        cudaFree(temp_ptr);
+        cudaFree(d_comp_out);
+
+        // Verify result
+        for (size_t i = 0; i < inputSize; ++i) {
+          REQUIRE(res[i] == input[i]);
+        }
+      }
+    }
+  }
+}
+
 int main(int argc, char** argv)
 {
   int num_tests = 2;
@@ -317,6 +453,11 @@ int main(int argc, char** argv)
 
   if (!test_rle_delta_bp()) {
     printf("rle_delta_bp test failed.");
+    rv += 1;
+  }
+
+  if (!test_ones_init_data()) {
+    printf("test_ones_init_data test failed.");
     rv += 1;
   }
 
