@@ -26,13 +26,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cascaded.hpp"
-#include "cascaded.h"
+#include "CascadedSelector.h"
+#include "CascadedSelectorKernels.h"
+#include "TempSpaceBroker.h"
 #include "common.h"
 #include "nvcomp.hpp"
-#include "CascadedSelectorKernels.h"
 #include "type_macros.h"
-#include "TempSpaceBroker.h"
 
 #include <algorithm>
 #include <chrono>
@@ -47,16 +46,12 @@
 using namespace std;
 using namespace nvcomp;
 
-namespace nvcomp
-{
-
 namespace
 {
 // Number of compression schemes to try to determine best configuration
 constexpr int const NUM_SCHEMES = 5; 
 // Maximum value allowed for sample_size
 constexpr int const MAX_SAMPLE_SIZE = 1024;
-}
 
 template <typename T>
 void get_workspace_size_internal(const size_t num_samples, size_t* temp_size)
@@ -165,6 +160,13 @@ nvcompCascadedFormatOpts internal_select(
 
   return opts;
 }
+} // namespace
+
+namespace nvcomp
+{
+
+namespace internal
+{
 
 // Define types that are acceptable for Cascaded Compression
 template class CascadedSelector<int8_t>;
@@ -249,7 +251,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
 }
 
 } // namespace nvcomp
-
+} // namespace nvcomp
 
 nvcompError_t nvcompCascadedSelectorGetTempSize(
     size_t in_bytes,
@@ -315,5 +317,4 @@ nvcompError_t nvcompCascadedSelectorSelectConfig(
   *format_opts = callSelectorSelectConfig(in_ptr, in_bytes, in_type, selector_opts, temp_ptr, temp_bytes, est_ratio, stream);
       
   return nvcompSuccess;
-
 }
