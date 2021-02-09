@@ -1,3 +1,12 @@
+# nvcomp 1.2.2 (2021-02-08)
+
+- Fix linking errors in Clang++.
+- Fix error being incorrectly returned by Cascaded compression when output memory was initialized to
+all `-1`'s.
+- Fix C++17 style static assert.
+- Fix prematurely freeing memory in Cascaded compression.
+- Fix input format and usage messaging for benchmarks.
+
 # nvcomp 1.2.1 (2020-12-21)
 
 - Fix compile error and unit tests for cascaded selector.
