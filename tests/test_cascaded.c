@@ -89,7 +89,7 @@ int test_rle_delta(void)
   size_t comp_temp_bytes;
   status = nvcompCascadedCompressGetTempSize(
       d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -104,7 +104,7 @@ int test_rle_delta(void)
       comp_temp_bytes,
       &comp_out_bytes,
       0);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
@@ -119,7 +119,7 @@ int test_rle_delta(void)
       d_comp_out,
       &comp_out_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   cudaFree(d_comp_temp);
@@ -130,12 +130,12 @@ int test_rle_delta(void)
   void* metadata_ptr;
   status = nvcompDecompressGetMetadata(
       d_comp_out, comp_out_bytes, &metadata_ptr, stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // get temp size
   size_t temp_bytes;
   status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate temp buffer
   void* temp_ptr;
@@ -144,7 +144,7 @@ int test_rle_delta(void)
   // get output size
   size_t output_bytes;
   status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate output buffer
   void* out_ptr;
@@ -160,10 +160,9 @@ int test_rle_delta(void)
       out_ptr,
       output_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
-  cudaError_t err = cudaDeviceSynchronize();
-  REQUIRE(err == cudaSuccess);
+  CUDA_CHECK(cudaDeviceSynchronize());
 
   nvcompDecompressDestroyMetadata(metadata_ptr);
 
@@ -214,7 +213,7 @@ int test_rle_delta_bp(void)
   size_t comp_temp_bytes;
   status = nvcompCascadedCompressGetTempSize(
       d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -229,7 +228,7 @@ int test_rle_delta_bp(void)
       comp_temp_bytes,
       &comp_out_bytes,
       0);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
@@ -244,7 +243,7 @@ int test_rle_delta_bp(void)
       d_comp_out,
       &comp_out_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   cudaFree(d_comp_temp);
@@ -254,12 +253,12 @@ int test_rle_delta_bp(void)
   void* metadata_ptr;
   status = nvcompDecompressGetMetadata(
       d_comp_out, comp_out_bytes, &metadata_ptr, stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // get temp size
   size_t temp_bytes;
   status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate temp buffer
   void* temp_ptr;
@@ -268,7 +267,7 @@ int test_rle_delta_bp(void)
   // get output size
   size_t output_bytes;
   status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate output buffer
   void* out_ptr;
@@ -286,8 +285,7 @@ int test_rle_delta_bp(void)
       stream);
   REQUIRE(status == nvcompSuccess);
 
-  cudaError_t err = cudaStreamSynchronize(stream);
-  REQUIRE(err == cudaSuccess);
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // Destory the metadata object and free memory
   nvcompDecompressDestroyMetadata(metadata_ptr);
@@ -303,16 +301,14 @@ int test_rle_delta_bp(void)
   for (size_t i = 0; i < inputSize; ++i) {
     REQUIRE(res[i] == input[i]);
   }
+
+  return 1;
 }
 
 int test_ones_init_data(void)
 {
   typedef int T;
   const nvcompType_t type = NVCOMP_TYPE_INT;
-
-  int packing = 1;
-  int RLE = 1;
-  int Delta = 1;
 
   const size_t inputSize = 12;
   const int input[12] = {0, 2, 2, 3, 0, 0, 3, 1, 1, 1, 1, 1};
@@ -346,7 +342,7 @@ int test_ones_init_data(void)
         size_t comp_temp_bytes;
         status = nvcompCascadedCompressGetTempSize(
             d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
 
         void* d_comp_temp;
         CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -361,7 +357,7 @@ int test_ones_init_data(void)
             comp_temp_bytes,
             &comp_out_bytes,
             0);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
 
         void* d_comp_out;
         CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
@@ -377,7 +373,7 @@ int test_ones_init_data(void)
             d_comp_out,
             &comp_out_bytes,
             stream);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
         CUDA_CHECK(cudaStreamSynchronize(stream));
 
         cudaFree(d_comp_temp);
@@ -387,12 +383,12 @@ int test_ones_init_data(void)
         void* metadata_ptr;
         status = nvcompDecompressGetMetadata(
             d_comp_out, comp_out_bytes, &metadata_ptr, stream);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
 
         // get temp size
         size_t temp_bytes;
         status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
 
         // allocate temp buffer
         void* temp_ptr;
@@ -401,7 +397,7 @@ int test_ones_init_data(void)
         // get output size
         size_t output_bytes;
         status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-        REQUIRE(status == cudaSuccess);
+        REQUIRE(status == nvcompSuccess);
 
         // allocate output buffer
         void* out_ptr;
@@ -419,8 +415,7 @@ int test_ones_init_data(void)
             stream);
         REQUIRE(status == nvcompSuccess);
 
-        cudaError_t err = cudaStreamSynchronize(stream);
-        REQUIRE(err == cudaSuccess);
+        CUDA_CHECK(cudaStreamSynchronize(stream));
 
         // Destory the metadata object and free memory
         nvcompDecompressDestroyMetadata(metadata_ptr);
@@ -439,25 +434,32 @@ int test_ones_init_data(void)
       }
     }
   }
+
+  return 1;
 }
 
 int main(int argc, char** argv)
 {
+  if (argc != 1) {
+    printf("ERROR: %s accepts no arguments.\n", argv[0]);
+    return 1;
+  }
+
   int num_tests = 2;
   int rv = 0;
 
   if (!test_rle_delta()) {
-    printf("rle_delta test failed.");
+    printf("rle_delta test failed.\n");
     rv += 1;
   }
 
   if (!test_rle_delta_bp()) {
-    printf("rle_delta_bp test failed.");
+    printf("rle_delta_bp test failed.\n");
     rv += 1;
   }
 
   if (!test_ones_init_data()) {
-    printf("test_ones_init_data test failed.");
+    printf("test_ones_init_data test failed.\n");
     rv += 1;
   }
 

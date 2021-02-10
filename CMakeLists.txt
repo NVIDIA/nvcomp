@@ -32,6 +32,13 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
     # this doesn't work with old style CMakeLists and cuda
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
+
+    # g++ warnings
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra")
+    # this doesn't work with old style CMakeLists and cuda
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
   endif()
 
   # TODO: add clang warnings
