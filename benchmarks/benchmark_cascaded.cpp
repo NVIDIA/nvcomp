@@ -39,7 +39,7 @@ using namespace nvcomp;
 
 static void print_usage()
 {
-  printf("Usage: benchmark_binary [OPTIONS]\n");
+  printf("Usage: benchmark_cascaded [OPTIONS]\n");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
   printf("  %-35s Number lf RLEs (default 1)\n", "-r, --rles");
   printf("  %-35s Number of Deltas (default 0)\n", "-d, --deltas");
@@ -64,16 +64,11 @@ static void run_benchmark(
     int bitPacking,
     int sort,
     size_t input_elts,
-    int binary_file,
     int verbose_memory)
 {
 
   std::vector<T> data;
-  if (binary_file == 0) {
-    data = load_dataset_from_txt<T>(fname, &input_elts);
-  } else {
-    data = load_dataset_from_binary<T>(fname, &input_elts);
-  }
+  data = load_dataset_from_binary<T>(fname, &input_elts);
 
   // Make sure dataset fits on GPU to benchmark total compression
   size_t freeMem;
@@ -276,7 +271,6 @@ int main(int argc, char* argv[])
   int gpu_num = 0;
   int verbose_memory = 0;
   std::string dtype = "int";
-  int binary_file = 0;
   size_t size = 0;
 
   // Parse command-line arguments
@@ -301,10 +295,6 @@ int main(int argc, char* argv[])
 
     switch (c) {
     case 'f':
-      if (startsWith(optarg, "BIN:")) {
-        binary_file = 1;
-        optarg = optarg + 4;
-      }
       fname = optarg;
       break;
     case 'r':
@@ -352,7 +342,6 @@ int main(int argc, char* argv[])
         bitPacking,
         sort,
         size,
-        binary_file,
         verbose_memory);
   } else if (dtype == "long") {
     run_benchmark<int64_t>(
@@ -362,7 +351,6 @@ int main(int argc, char* argv[])
         bitPacking,
         sort,
         size,
-        binary_file,
         verbose_memory);
   } else if (dtype == "short") {
     run_benchmark<int16_t>(
@@ -372,7 +360,6 @@ int main(int argc, char* argv[])
         bitPacking,
         sort,
         size,
-        binary_file,
         verbose_memory);
   } else if (dtype == "int8") {
     run_benchmark<int8_t>(
@@ -382,7 +369,6 @@ int main(int argc, char* argv[])
         bitPacking,
         sort,
         size,
-        binary_file,
         verbose_memory);
   } else {
     print_usage();

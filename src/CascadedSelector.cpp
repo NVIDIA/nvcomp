@@ -26,13 +26,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cascaded.hpp"
-#include "cascaded.h"
+#include "CascadedSelector.h"
+#include "CascadedSelectorKernels.h"
+#include "TempSpaceBroker.h"
 #include "common.h"
 #include "nvcomp.hpp"
-#include "CascadedSelectorKernels.h"
 #include "type_macros.h"
-#include "TempSpaceBroker.h"
 
 #include <algorithm>
 #include <chrono>
@@ -47,16 +46,12 @@
 using namespace std;
 using namespace nvcomp;
 
-namespace nvcomp
-{
-
 namespace
 {
 // Number of compression schemes to try to determine best configuration
 constexpr int const NUM_SCHEMES = 5; 
 // Maximum value allowed for sample_size
 constexpr int const MAX_SAMPLE_SIZE = 1024;
-}
 
 template <typename T>
 void get_workspace_size_internal(const size_t num_samples, size_t* temp_size)
@@ -77,6 +72,7 @@ nvcompCascadedFormatOpts internal_select(
     void* d_temp_comp,
     const size_t workspace_size,
     const size_t max_size,
+    unsigned seed,
     cudaStream_t stream)
 {
 
@@ -95,13 +91,12 @@ nvcompCascadedFormatOpts internal_select(
 
   size_t num_chunks = in_bytes / sample_bytes;
   size_t bracket_size = num_chunks / num_samples;
-  size_t sample_offsets[num_samples] = {0};
+  std::vector<size_t> sample_offsets(num_samples);
 
   // TODO: The last chunk of the input data is discarded. Change it so that the
   // last chunk can be also incuded during the sampling process.
 
-  unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
-  std::minstd_rand0 g1(seed1);
+  std::minstd_rand0 g1(seed);
 
   for (size_t i = 0; i < num_samples; i++) {
     int idx = g1() % bracket_size;
@@ -109,7 +104,7 @@ nvcompCascadedFormatOpts internal_select(
   }
 
   size_t out_sizes[NUM_SCHEMES];
-  size_t sample_ptrs[num_samples];
+  std::vector<size_t> sample_ptrs(num_samples);
 
   for (size_t i = 0; i < num_samples; i++) {
 
@@ -123,7 +118,7 @@ nvcompCascadedFormatOpts internal_select(
 
   cudaMemcpyAsync(
       d_sample_ptrs,
-      sample_ptrs,
+      sample_ptrs.data(),
       sizeof(size_t) * num_samples,
       cudaMemcpyHostToDevice,
       stream);
@@ -165,6 +160,13 @@ nvcompCascadedFormatOpts internal_select(
 
   return opts;
 }
+} // namespace
+
+namespace nvcomp
+{
+
+namespace internal
+{
 
 // Define types that are acceptable for Cascaded Compression
 template class CascadedSelector<int8_t>;
@@ -221,6 +223,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
       d_workspace,
       workspace_size,
       max_temp_size,
+      opts.seed,
       stream);
 }
 
@@ -243,11 +246,12 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
       d_workspace,
       workspace_size,
       max_temp_size,
+      opts.seed,
       stream);
 }
 
 } // namespace nvcomp
-
+} // namespace nvcomp
 
 nvcompError_t nvcompCascadedSelectorGetTempSize(
     size_t in_bytes,
@@ -293,6 +297,7 @@ nvcompCascadedFormatOpts callSelectorSelectConfig(
       temp_ptr,
       temp_bytes,
       required_bytes,
+      opts.seed,
       stream);
 }
   
@@ -312,5 +317,4 @@ nvcompError_t nvcompCascadedSelectorSelectConfig(
   *format_opts = callSelectorSelectConfig(in_ptr, in_bytes, in_type, selector_opts, temp_ptr, temp_bytes, est_ratio, stream);
       
   return nvcompSuccess;
-
 }

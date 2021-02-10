@@ -82,11 +82,13 @@ public:
   const size_t* compressed_prefix_ptr() const;
 
   /**
-   * @brief Get a copy of the metadata on the CPU.
+   * @brief Get a copy of the metadata on the CPU. This syncs with this stream.
+   *
+   * @param stream The stream to copy on.
    *
    * @return The metadata on the CPU.
    */
-  LZ4Metadata copyToHost();
+  LZ4Metadata copyToHost(cudaStream_t stream);
 
 protected:
   size_t max_size() const;

@@ -102,12 +102,16 @@ const size_t* LZ4MetadataOnGPU::compressed_prefix_ptr() const
   return static_cast<const size_t*>(m_ptr) + LZ4Metadata::OffsetAddr;
 }
 
-LZ4Metadata LZ4MetadataOnGPU::copyToHost()
+LZ4Metadata LZ4MetadataOnGPU::copyToHost(cudaStream_t stream)
 {
   size_t metadata_bytes;
-  CudaUtils::copy(
-      &metadata_bytes, ((size_t*)m_ptr) + LZ4Metadata::MetadataBytes, 1,
-      DEVICE_TO_HOST);
+  CudaUtils::copy_async(
+      &metadata_bytes,
+      ((size_t*)m_ptr) + LZ4Metadata::MetadataBytes,
+      1,
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
 
   if (metadata_bytes > m_maxSize) {
     throw std::runtime_error(
@@ -117,11 +121,13 @@ LZ4Metadata LZ4MetadataOnGPU::copyToHost()
   }
 
   std::vector<uint8_t> metadata_buffer(metadata_bytes);
-  CudaUtils::copy(
+  CudaUtils::copy_async(
       metadata_buffer.data(),
       static_cast<const uint8_t*>(m_ptr),
       metadata_bytes,
-      DEVICE_TO_HOST);
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
 
   set_serialized_size(metadata_bytes);
 

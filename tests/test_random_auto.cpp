@@ -113,6 +113,7 @@ void test_auto_c(const std::vector<T>& data)
         comp_temp_bytes,
         d_comp_out,
         &comp_out_bytes,
+        1,
         stream);
     REQUIRE(status == nvcompSuccess);
     CUDA_CHECK(cudaStreamSynchronize(stream));

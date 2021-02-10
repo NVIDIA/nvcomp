@@ -31,6 +31,7 @@
 
 #include "cascaded.h"
 #include "nvcomp.hpp"
+#include <chrono>
 
 namespace nvcomp
 {
@@ -146,6 +147,76 @@ private:
       cudaStream_t stream) override;
 
   nvcompCascadedFormatOpts m_opts;
+};
+
+/******************************************************************************
+ * Cascaded Selector **********************************************************
+ *****************************************************************************/
+/**
+ *@brief Primary class for the Cascaded Selector used to determine the
+ * best configuration to run cascaded compression on a given input.
+ *
+ *@param T the datatype of the input
+ */
+template <typename T>
+class CascadedSelector
+{
+private:
+  const void* input_data;
+  size_t input_byte_len;
+  size_t max_temp_size; // Internal variable used to store the temp buffer size
+  nvcompCascadedSelectorOpts opts; // Sampling options
+
+public:
+  /**
+   *@brief Create a new CascadedSelector for the given input data
+   *
+   *@param input The input data device pointer to select a cheme for
+   *@param byte_len The number of bytes of input data
+   *@param num_sample_ele The number of elements in a sample
+   *@param num_sample The number of samples
+   *@param type The type of input data
+   */
+  CascadedSelector(
+      const void* input, size_t byte_len, nvcompCascadedSelectorOpts opts);
+
+  // disable copying
+  CascadedSelector(const CascadedSelector&) = delete;
+  CascadedSelector& operator=(const CascadedSelector&) = delete;
+
+  /*
+   *@brief return the required size of workspace buffer in bytes
+   */
+  size_t get_temp_size() const;
+
+  /*
+   *@brief Select a CascadedSelector compression scheme that can provide the
+   *best compression ratio and reports estimated compression ratio.
+   *
+   *@param d_worksapce The device potiner for the workspace
+   *@param workspace_len The size of workspace buffer in bytes
+   *@param comp_ratio The estimated compssion ratio using the bbest scheme
+   *(output)
+   *@param stream The input stream to run the select function
+   *@return Selected Cascaded options (RLE, Delta encoding, bit packing)
+   */
+  nvcompCascadedFormatOpts select_config(
+      void* d_workspace,
+      size_t workspace_len,
+      double* comp_ratio,
+      cudaStream_t stream);
+
+  /*
+   *@brief Select a CascadedSelector compression scheme that can provide the
+   *best compression ratio - does NOT return estimated compression ratio.
+   *
+   *@param d_worksapce The device potiner for the workspace
+   *@param workspace_len The size of workspace buffer in bytes
+   *@param stream The input stream to run the select function
+   *@return Selected Cascaded options (RLE, Delta encoding, bit packing)
+   */
+  nvcompCascadedFormatOpts
+  select_config(void* d_workspace, size_t workspace_len, cudaStream_t stream);
 };
 
 /******************************************************************************
@@ -265,6 +336,9 @@ inline void CascadedCompressor<T>::do_compress(
     size_t* out_bytes,
     cudaStream_t stream)
 {
+
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
   if(m_opts.num_RLEs == -1) { // If we need to run the selector
     nvcompError_t status = nvcompCascadedCompressAuto(
         this->get_uncompressed_data(),
@@ -274,6 +348,7 @@ inline void CascadedCompressor<T>::do_compress(
         temp_bytes,
         out_ptr,
         out_bytes,
+        seed,
         stream);
     throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
   }
@@ -292,82 +367,61 @@ inline void CascadedCompressor<T>::do_compress(
   }
 }
 
-
-
-/******************************************************************************
- * Cascaded Selector *****************************************************
- *****************************************************************************/
-  /**
-   *@brief Primary class for the Cascaded Selector used to determine the
-   * best configuration to run cascaded compression on a given input.
-   *
-   *@param T the datatype of the input
-   */
 template <typename T>
-class CascadedSelector
+inline CascadedSelector<T>::CascadedSelector(
+    const void* input,
+    const size_t byte_len,
+    nvcompCascadedSelectorOpts selector_opts) :
+    input_data(input),
+    input_byte_len(byte_len),
+    max_temp_size(0),
+    opts(selector_opts)
 {
-private:
-  const void* input_data;
-  size_t input_byte_len;
-  size_t max_temp_size; // Internal variable used to store the temp buffer size
-  nvcompCascadedSelectorOpts opts; // Sampling options
+  size_t temp;
+  nvcompError_t status = nvcompCascadedSelectorGetTempSize(
+      input_byte_len, getnvcompType<T>(), opts, &temp);
+  throwExceptionIfError(status, "SelectorGetTempSize failed");
 
-public:
-  /**
-   *@brief Create a new CascadedSelector for the given input data
-   *
-   *@param input The input data device pointer to select a cheme for
-   *@param byte_len The number of bytes of input data
-   *@param num_sample_ele The number of elements in a sample
-   *@param num_sample The number of samples
-   *@param type The type of input data
-   */
-  CascadedSelector(
-      const void* input,
-      size_t byte_len,
-      nvcompCascadedSelectorOpts opts);
+  this->max_temp_size = temp;
+}
 
-  // disable copying
-  CascadedSelector(const CascadedSelector&) = delete;
-  CascadedSelector& operator=(const CascadedSelector&) = delete;
+template <typename T>
+inline size_t CascadedSelector<T>::get_temp_size() const
 
-  /*
-   *@brief return the required size of workspace buffer in bytes
-   */
-  size_t get_temp_size() const;
+{
+  return max_temp_size;
+}
 
-  /*
-   *@brief Select a CascadedSelector compression scheme that can provide the
-   *best compression ratio and reports estimated compression ratio.
-   *
-   *@param d_worksapce The device potiner for the workspace
-   *@param workspace_len The size of workspace buffer in bytes
-   *@param comp_ratio The estimated compssion ratio using the bbest scheme (output)
-   *@param stream The input stream to run the select function
-   *@return Selected Cascaded options (RLE, Delta encoding, bit packing)
-   */
-  nvcompCascadedFormatOpts select_config(
-      void* d_workspace,
-      size_t workspace_len,
-      double* comp_ratio,
-      cudaStream_t stream);
+template <typename T>
+inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
+    void* d_workspace,
+    size_t workspace_size,
+    double* comp_ratio,
+    cudaStream_t stream)
+{
+  nvcompCascadedFormatOpts cascadedOpts;
+  nvcompError_t status = nvcompCascadedSelectorSelectConfig(
+      input_data,
+      input_byte_len,
+      getnvcompType<T>(),
+      opts,
+      d_workspace,
+      workspace_size,
+      &cascadedOpts,
+      comp_ratio,
+      stream);
+  throwExceptionIfError(status, "SelectorSelectConfig failed");
 
-  /*
-   *@brief Select a CascadedSelector compression scheme that can provide the
-   *best compression ratio - does NOT return estimated compression ratio.
-   *
-   *@param d_worksapce The device potiner for the workspace
-   *@param workspace_len The size of workspace buffer in bytes
-   *@param stream The input stream to run the select function
-   *@return Selected Cascaded options (RLE, Delta encoding, bit packing)
-   */
-  nvcompCascadedFormatOpts select_config(
-      void* d_workspace,
-      size_t workspace_len,
-      cudaStream_t stream);
+  return cascadedOpts;
+}
 
-};
-
+template <typename T>
+inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
+    void* d_workspace, size_t workspace_size, cudaStream_t stream)
+{
+  double comp_ratio;
+  return select_config(d_workspace, workspace_size, &comp_ratio, stream);
+}
 
 } // namespace nvcomp
 #endif

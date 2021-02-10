@@ -253,14 +253,16 @@ size_t readFixedWidthData(
 }
 
 CascadedMetadata deserializeMetadataFromGPUVersion1(
-    const void* const devicePtr, const size_t size)
+    const void* const devicePtr, const size_t size, cudaStream_t stream)
 {
   NUM_INPUTS_TYPE numInputs;
-  CudaUtils::copy(
+  CudaUtils::copy_async(
       &numInputs,
       (const NUM_INPUTS_TYPE*)(static_cast<const uint8_t*>(devicePtr) + OFFSET_NUM_INPUTS),
       1,
-      DEVICE_TO_HOST);
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
 
   std::vector<uint8_t> localBuffer(serializedMetadataSize(numInputs));
   if (size < localBuffer.size()) {
@@ -271,11 +273,13 @@ CascadedMetadata deserializeMetadataFromGPUVersion1(
         + std::to_string(localBuffer.size()));
   }
 
-  CudaUtils::copy(
+  CudaUtils::copy_async(
       (uint8_t*)localBuffer.data(),
       (const uint8_t*)devicePtr,
       localBuffer.size(),
-      DEVICE_TO_HOST);
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
 
   // here we convert to types of fixed width by the C++ standard rather than
   // just doing a memcpy of the struct, to ensure portability.
@@ -483,20 +487,22 @@ void CascadedMetadataOnGPU::setCompressedSizeFromGPU(
   }
 }
 
-CascadedMetadata CascadedMetadataOnGPU::copyToHost()
+CascadedMetadata CascadedMetadataOnGPU::copyToHost(cudaStream_t stream)
 {
   // read the version of the serialized metadata.
   VERSION_TYPE version;
 
-  cudaError_t err = cudaMemcpyAsync(
-      &version, m_ptr, sizeof(version), cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to copy down version.");
-  }
+  CudaUtils::copy_async(
+      &version,
+      static_cast<const VERSION_TYPE*>(m_ptr),
+      1,
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
 
   if (version == 1) {
     CascadedMetadata metadata
-        = deserializeMetadataFromGPUVersion1(m_ptr, m_maxSize);
+        = deserializeMetadataFromGPUVersion1(m_ptr, m_maxSize, stream);
     m_numInputs = metadata.getNumInputs();
 
     return metadata;

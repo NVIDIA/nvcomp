@@ -43,7 +43,7 @@ nvcompError_t nvcompDecompressGetMetadata(
     void** const metadata_ptr,
     cudaStream_t stream)
 {
-  if (LZ4IsData(in_ptr, in_bytes)) {
+  if (LZ4IsData(in_ptr, in_bytes, stream)) {
     return nvcompLZ4DecompressGetMetadata(
         in_ptr, in_bytes, metadata_ptr, stream);
   }

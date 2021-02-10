@@ -528,6 +528,9 @@ void compressTypedAsync(
       vals_delta,
       vals_delta_ptr);
 
+  // Set first offset to end of metadata
+  metadataOnGPU.saveOffset(vals_id, offsetDevice, stream);
+
   // Second pass - perform compression and store in the memory allocated above.
 
   // A step can be RLE+Delta, RLE, or Delta, with final outputs conditionally
@@ -571,10 +574,13 @@ void compressTypedAsync(
             stream);
       }
 
+      // save initial offset
       CascadedMetadata::Header* const valHdr
           = metadataOnGPU.getHeaderLocation(valId);
       CudaUtils::copy_async(
           &(valHdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
+
+      metadataOnGPU.saveOffset(valId, offsetDevice, stream);
 
       CascadedMetadata::Header* const runHdr
           = metadataOnGPU.getHeaderLocation(runId);
@@ -600,6 +606,8 @@ void compressTypedAsync(
             = metadataOnGPU.getHeaderLocation(id);
         CudaUtils::copy_async(
             &(hdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
+
+        metadataOnGPU.saveOffset(id, offsetDevice, stream);
       } else {
         constexpr const int COPY_BLOCK_SIZE = 512;
         const dim3 grid(std::min(
@@ -666,6 +674,7 @@ void compressTypedAsync(
       CascadedMetadata::Header* const hdr = metadataOnGPU.getHeaderLocation(id);
       CudaUtils::copy_async(
           &(hdr->length), numRunsDevice, 1, DEVICE_TO_DEVICE, stream);
+      metadataOnGPU.saveOffset(id, offsetDevice, stream);
     }
     if (r == 0) {
       offsetAndAlignPointerAsync<<<1, 1, 0, stream>>>(

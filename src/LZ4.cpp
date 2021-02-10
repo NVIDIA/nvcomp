@@ -51,14 +51,20 @@
 
 using namespace nvcomp;
 
-int LZ4IsData(const void* const in_ptr, size_t in_bytes)
+int LZ4IsData(const void* const in_ptr, size_t in_bytes, cudaStream_t stream)
 {
   // Need at least 2 size_t variables to be valid.
   if(in_ptr == NULL || in_bytes < sizeof(size_t)) {
     return false;
   }
   size_t header_val;
-  cudaMemcpy(&header_val, in_ptr, sizeof(size_t), cudaMemcpyDeviceToHost);
+  CudaUtils::copy_async(
+      &header_val,
+      static_cast<const size_t*>(in_ptr),
+      1,
+      DEVICE_TO_HOST,
+      stream);
+  CudaUtils::sync(stream);
   return (header_val == LZ4_FLAG); 
 }
 
