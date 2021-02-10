@@ -60,7 +60,6 @@
 int test_batch_compression(void)
 {
   typedef int T;
-  const nvcompType_t type = NVCOMP_TYPE_INT;
 
   nvcompLZ4FormatOpts comp_opts = {1 << 16};
 
@@ -87,7 +86,6 @@ int test_batch_compression(void)
     }
   }
 
-  size_t outputBytesHost[BATCH_SIZE];
   T* output_host[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     output_host[i] = malloc(batch_bytes_host[i]);
@@ -121,7 +119,7 @@ int test_batch_compression(void)
       BATCH_SIZE,
       &comp_opts,
       &comp_temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -135,7 +133,7 @@ int test_batch_compression(void)
       d_comp_temp,
       comp_temp_bytes,
       comp_out_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_out[11];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
@@ -152,7 +150,7 @@ int test_batch_compression(void)
       d_comp_out,
       comp_out_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   cudaFree(d_comp_temp);
@@ -167,12 +165,12 @@ int test_batch_compression(void)
     void* metadata_ptr;
     status = nvcompDecompressGetMetadata(
         d_comp_out[i], comp_out_bytes[i], &metadata_ptr, stream);
-    REQUIRE(status == cudaSuccess);
+    REQUIRE(status == nvcompSuccess);
 
     // get temp size
     size_t temp_bytes;
     status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-    REQUIRE(status == cudaSuccess);
+    REQUIRE(status == nvcompSuccess);
 
     // allocate temp buffer
     void* temp_ptr;
@@ -181,7 +179,7 @@ int test_batch_compression(void)
     // get output size
     size_t output_bytes;
     status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-    REQUIRE(status == cudaSuccess);
+    REQUIRE(status == nvcompSuccess);
 
     // allocate output buffer
     void* out_ptr;
@@ -197,9 +195,9 @@ int test_batch_compression(void)
         out_ptr,
         output_bytes,
         stream);
-    REQUIRE(status == cudaSuccess);
+    REQUIRE(status == nvcompSuccess);
 
-    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     nvcompDecompressDestroyMetadata(metadata_ptr);
 
@@ -369,8 +367,7 @@ int test_batch_decompression(void)
 
     REQUIRE(status == nvcompSuccess);
 
-    cudaError_t err = cudaDeviceSynchronize();
-    REQUIRE(err == cudaSuccess);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     nvcompBatchedLZ4DecompressDestroyMetadata(metadata_ptr);
     cudaFree(temp_ptr);
@@ -405,7 +402,6 @@ int test_batch_decompression(void)
 int test_batch_compression_and_decompression(void)
 {
   typedef int T;
-  const nvcompType_t type = NVCOMP_TYPE_INT;
 
   nvcompLZ4FormatOpts comp_opts = {1 << 16};
 
@@ -434,7 +430,6 @@ int test_batch_compression_and_decompression(void)
     }
   }
 
-  size_t outputBytesHost[BATCH_SIZE];
   T* output_host[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     output_host[i] = malloc(batch_bytes_host[i]);
@@ -468,7 +463,7 @@ int test_batch_compression_and_decompression(void)
       BATCH_SIZE,
       &comp_opts,
       &comp_temp_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -482,7 +477,7 @@ int test_batch_compression_and_decompression(void)
       d_comp_temp,
       comp_temp_bytes,
       comp_out_bytes);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
 
   void* d_comp_out[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
@@ -499,7 +494,7 @@ int test_batch_compression_and_decompression(void)
       d_comp_out,
       comp_out_bytes,
       stream);
-  REQUIRE(status == cudaSuccess);
+  REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   cudaFree(d_comp_temp);
@@ -546,8 +541,7 @@ int test_batch_compression_and_decompression(void)
 
   REQUIRE(status == nvcompSuccess);
 
-  cudaError_t err = cudaDeviceSynchronize();
-  REQUIRE(err == cudaSuccess);
+  CUDA_CHECK(cudaDeviceSynchronize());
 
   nvcompBatchedLZ4DecompressDestroyMetadata(metadata_ptr);
   cudaFree(temp_ptr);
@@ -577,21 +571,26 @@ int test_batch_compression_and_decompression(void)
 
 int main(int argc, char** argv)
 {
+  if (argc != 1) {
+    printf("ERROR: %s accepts no arguments.\n", argv[0]);
+    return 1;
+  }
+
   int num_tests = 3;
   int rv = 0;
 
   if (!test_batch_compression()) {
-    printf("compression only test failed.");
+    printf("compression only test failed.\n");
     rv += 1;
   }
 
   if (!test_batch_decompression()) {
-    printf("decompression only test failed.");
+    printf("decompression only test failed.\n");
     rv += 1;
   }
 
   if (!test_batch_compression_and_decompression()) {
-    printf("compression and decompression test failed.");
+    printf("compression and decompression test failed.\n");
     rv += 1;
   }
 
