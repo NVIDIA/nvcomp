@@ -29,7 +29,8 @@
 #ifndef NVCOMP_RUNLENGTHENCODEGPU_H
 #define NVCOMP_RUNLENGTHENCODEGPU_H
 
-#include "cascaded.h"
+#include "nvcomp.h"
+
 #include "cuda_runtime.h"
 
 #include <cstddef>

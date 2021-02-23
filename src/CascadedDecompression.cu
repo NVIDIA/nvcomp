@@ -26,16 +26,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "nvcomp.h"
+#include "nvcomp.hpp"
+#include "nvcomp/cascaded.h"
+
 #include "CascadedCompressionGPU.h"
 #include "CascadedMetadata.h"
 #include "CascadedMetadataOnGPU.h"
-
 #include "CascadedDecompressionKernels.cuh"
 #include "Check.h"
 #include "CudaUtils.h"
-#include "cascaded.h"
-#include "nvcomp.h"
-#include "nvcomp.hpp"
 #include "type_macros.h"
 #include "unpack.h"
 

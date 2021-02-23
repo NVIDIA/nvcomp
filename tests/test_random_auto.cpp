@@ -28,19 +28,17 @@
 
 #define CATCH_CONFIG_MAIN
 
-//#include "../src/common.h"
-#include "test_common.h"
+#include "nvcomp.h"
+#include "nvcomp/cascaded.h"
+#include "nvcomp/cascaded.hpp"
 
-#include <cascaded.h>
-#include <cascaded.hpp>
-#include <nvcomp.h>
-#include <thread>
-#include <vector>
+#include "test_common.h"
 
 #include <cuda_profiler_api.h>
 #include <iomanip>
 #include <random>
-
+#include <thread>
+#include <vector>
 
 // Test method that takes an input data, compresses it (on the CPU),
 // decompresses it on the GPU, and verifies it is correct.

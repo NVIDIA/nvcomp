@@ -30,7 +30,7 @@
 #define NVCOMP_API_HPP
 
 #include "nvcomp.h"
-#include "lz4.h"
+#include "nvcomp/lz4.h"
 
 #include <memory>
 #include <stdexcept>

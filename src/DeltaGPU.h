@@ -29,7 +29,8 @@
 #ifndef NVCOMP_DELTAGPU_H
 #define NVCOMP_DELTAGPU_H
 
-#include "cascaded.h"
+#include "nvcomp.h"
+
 #include "cuda_runtime.h"
 
 #include <cstddef>

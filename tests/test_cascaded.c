@@ -26,8 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cascaded.h"
 #include "nvcomp.h"
+#include "nvcomp/cascaded.h"
 
 #include "cuda_runtime.h"
 

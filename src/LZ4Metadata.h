@@ -30,7 +30,7 @@
 #define NVCOMP_LZ4METADATA_H
 
 #include "Metadata.h"
-#include "lz4.h"
+#include "nvcomp/lz4.h"
 
 #include <cstddef>
 #include <cstdint>

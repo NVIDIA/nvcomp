@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include "cascaded.h"
+#include "nvcomp/cascaded.h"
+
 #include "common.h"
 #include "CascadedCommon.h"
 

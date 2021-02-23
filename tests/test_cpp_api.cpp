@@ -27,11 +27,11 @@
  */
 
 #define CATCH_CONFIG_MAIN
-#include "catch.hpp"
 
-#include "cascaded.hpp"
 #include "nvcomp.hpp"
+#include "nvcomp/cascaded.hpp"
 
+#include "catch.hpp"
 #include <assert.h>
 #include <stdlib.h>
 #include <vector>

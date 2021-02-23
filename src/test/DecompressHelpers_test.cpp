@@ -28,10 +28,11 @@
 
 #define CATCH_CONFIG_MAIN
 
+#include "nvcomp/cascaded.h"
+
 #include "../../tests/catch.hpp"
 #include "CascadedMetadata.h"
 #include "CascadedMetadataOnGPU.h"
-#include "cascaded.h"
 #include "common.h"
 #include "CascadedCommon.h"
 

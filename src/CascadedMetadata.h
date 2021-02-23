@@ -29,8 +29,9 @@
 #ifndef CASCACDEDMETADATA_H
 #define CASCACDEDMETADATA_H
 
+#include "nvcomp/cascaded.h"
+
 #include "Metadata.h"
-#include "cascaded.h"
 
 #include <cstddef>
 #include <cstdint>

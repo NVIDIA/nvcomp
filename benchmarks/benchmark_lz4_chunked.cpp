@@ -30,16 +30,15 @@
 #define VERBOSE 0
 #endif
 
+#include "nvcomp/lz4.hpp"
+
 #include "benchmark_common.h"
-#include "lz4.hpp"
 
 #include <getopt.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-
-
 #include <string>
 
 using namespace nvcomp;

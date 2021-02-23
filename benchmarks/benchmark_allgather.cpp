@@ -30,14 +30,15 @@
 #define VERBOSE 0
 #endif
 
+#include "nvcomp/cascaded.hpp"
+#include "nvcomp/lz4.hpp"
+
 #include "benchmark_common.h"
-#include "cascaded.hpp"
-#include "lz4.hpp"
-#include <nvml.h>
 
 #include <algorithm>
 #include <getopt.h>
 #include <iostream>
+#include <nvml.h>
 
 using namespace nvcomp;
 

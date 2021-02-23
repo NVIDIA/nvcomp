@@ -26,10 +26,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "Metadata.h"
-#include "cascaded.h"
-#include "lz4.h"
 #include "nvcomp.h"
+#include "nvcomp/cascaded.h"
+#include "nvcomp/lz4.h"
+
+#include "Metadata.h"
 
 #include <iostream>
 
