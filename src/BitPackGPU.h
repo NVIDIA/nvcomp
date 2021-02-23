@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "cascaded.h"
 #include "cuda_runtime.h"
+#include "nvcomp.h"
 
 #include <cstddef>
 

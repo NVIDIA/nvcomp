@@ -28,25 +28,25 @@
 
 #define CATCH_CONFIG_MAIN
 
-#include "../common.h"
-#include "../type_macros.h"
-#include "cascaded.hpp"
-#include "cascaded.h"
 #include "nvcomp.h"
 #include "nvcomp.hpp"
-#include <algorithm>
-#include <assert.h>
-#include <cstring>
-#include <getopt.h>
-#include <vector>
+#include "nvcomp/cascaded.h"
+#include "nvcomp/cascaded.hpp"
 
 #include "../../tests/catch.hpp"
-#include "common.h"
-#include "CascadedCommon.h"
-#include "cuda_runtime.h"
-#include <cstdlib>
-
 #include "../CascadedCompressionGPU.h"
+#include "../common.h"
+#include "../type_macros.h"
+#include "CascadedCommon.h"
+#include "common.h"
+
+#include <algorithm>
+#include <assert.h>
+#include <cstdlib>
+#include <cstring>
+#include <cuda_runtime.h>
+#include <getopt.h>
+#include <vector>
 
 #ifndef CUDA_RT_CALL
 #define CUDA_RT_CALL(call)                                                     \

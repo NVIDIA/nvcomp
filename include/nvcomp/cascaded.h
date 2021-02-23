@@ -213,7 +213,6 @@ nvcompError_t nvcompCascadedCompressAsync(
     size_t* out_bytes,
     cudaStream_t stream);
 
-
 /**************************************************************************
  *  Automatically configured API calls
  *************************************************************************/
@@ -264,9 +263,9 @@ nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
 
 /**
  * @brief Perform compression by first determining the best configuration for
- * the input.  Runs synchronously because we first find the configuration to use.
- * Random sampling is performed and selected using random numbers generated using
- * the seed provided.
+ * the input.  Runs synchronously because we first find the configuration to
+ * use. Random sampling is performed and selected using random numbers generated
+ * using the seed provided.
  *
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
@@ -296,9 +295,8 @@ nvcompError_t nvcompCascadedCompressAuto(
     unsigned seed,
     cudaStream_t stream);
 
-
 /**************************************************************************
- *  Cascaded Selector types and API calls 
+ *  Cascaded Selector types and API calls
  *************************************************************************/
 
 /**
@@ -310,7 +308,7 @@ nvcompError_t nvcompCascadedCompressAuto(
 typedef struct
 {
   /**
-   * @brief The number of elements used in each sample 
+   * @brief The number of elements used in each sample
    * minimum value 1, maximum value 1024
    */
   size_t sample_size;
@@ -326,7 +324,7 @@ typedef struct
    */
   unsigned seed;
 
-}nvcompCascadedSelectorOpts;
+} nvcompCascadedSelectorOpts;
 
 /**
  * @brief Get the required temporary workspace size needed to run the
@@ -354,9 +352,10 @@ nvcompError_t nvcompCascadedSelectorGetTempSize(
  * @param in_type The data type of the uncompressed data.
  * @param opts The configuration options for the selector.
  * @param temp_ptr The temporary workspace memory on the device
- * @param temp_bytes The size of the temporary workspace in bytes 
+ * @param temp_bytes The size of the temporary workspace in bytes
  * @param format_opts The best cascaded compression configuration (output)
- * @param est_ratio The estimated compression ratio using the configuration (output)
+ * @param est_ratio The estimated compression ratio using the configuration
+ * (output)
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.

@@ -29,8 +29,8 @@
 #ifndef CASCADEDSELECTORKERNEL_HPP
 #define CASCADEDSELECTORKERNEL_HPP
 
-#include "cascaded.hpp"
 #include "nvcomp.hpp"
+#include "nvcomp/cascaded.hpp"
 
 namespace nvcomp
 {

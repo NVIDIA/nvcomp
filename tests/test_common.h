@@ -28,15 +28,15 @@
 
 #pragma once
 
+#include "nvcomp.h"
+#include "nvcomp.hpp"
+#include "nvcomp/cascaded.h"
+#include "nvcomp/lz4.hpp"
+
 #include "../src/common.h"
 #include "catch.hpp"
-#include "lz4.hpp"
-#include "nvcomp.hpp"
 
-#include <cascaded.h>
-#include <nvcomp.h>
 #include <vector>
-
 #include <cuda_profiler_api.h>
 #include <iomanip>
 #include <random>

@@ -30,9 +30,10 @@
 #define VERBOSE 0
 #endif
 
-#include "../src/common.h"
-#include "cascaded.h"
 #include "nvcomp.hpp"
+#include "nvcomp/cascaded.h"
+
+#include "../src/common.h"
 
 #include <iomanip>
 #include <iostream>

@@ -27,11 +27,13 @@
  */
 
 #define CATCH_CONFIG_MAIN
-#include "catch.hpp"
 
-#include "lz4.hpp"
 #include "nvcomp.hpp"
+#include "nvcomp/lz4.hpp"
+
 #include "../src/LZ4Metadata.h"
+
+#include "catch.hpp"
 
 #include <assert.h>
 #include <stdlib.h>

@@ -39,7 +39,7 @@ namespace nvcomp
  * Compression and decompression run asynchronously, but compress() requires
  * that the compressed size (*out_bytes) is known and buffers are allocated. Can
  * define synchronous wrapper that includes size estimation kernel + allocation.
- * 
+ *
  * @param T the type of element to compress.
  */
 template <typename T>
