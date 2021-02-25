@@ -172,7 +172,8 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
  * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace in bytes.
  * @param out_bytes The required sizes of the output location for each chunk in
- * bytes (output).
+ * bytes (output). The values are computed without doing an actual compression,
+ * the compressed data will likely be of smaller sizes. 
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */

@@ -61,6 +61,11 @@ void check_format_opts(const nvcompSnappyFormatOpts* const format_opts)
   CHECK_NOT_NULL(format_opts);
 }
 
+size_t snappy_get_max_compressed_length(size_t source_bytes) {
+  // This is an estimate from the original snappy library 
+  return 32 + source_bytes + source_bytes / 6;
+}
+
 } // namespace
 
 /******************************************************************************
@@ -156,11 +161,14 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
     size_t* const temp_bytes)
 {
   try {
+    // error check inputs
     CHECK_NOT_NULL(in_bytes);
     CHECK_NOT_NULL(temp_bytes);
     check_format_opts(format_opts);
 
-    throw std::runtime_error("Not implemented");
+    // Snappy doesn't need any workspace in GPU memory
+    *temp_bytes = 0;
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompBatchedSnappyCompressGetTempSize()");
@@ -170,7 +178,7 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
 }
 
 nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    const void* const* const in_ptr,
+    const void* const* const /* in_ptr */,
     const size_t* const in_bytes,
     const size_t batch_size,
     const nvcompSnappyFormatOpts* const format_opts,
@@ -180,12 +188,14 @@ nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
 {
   try {
     // error check inputs
-    CHECK_NOT_NULL(in_ptr);
     CHECK_NOT_NULL(in_bytes);
     CHECK_NOT_NULL(out_bytes);
     check_format_opts(format_opts);
 
-    throw std::runtime_error("Not implemented");
+    for (size_t b = 0; b < batch_size; ++b) {
+      out_bytes[b] = snappy_get_max_compressed_length(in_bytes[b]);
+    }
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompBatchedSnappyCompressGetOutputSize()");
@@ -199,7 +209,7 @@ nvcompError_t nvcompBatchedSnappyCompressAsync(
     const size_t* const in_bytes,
     const size_t batch_size,
     const nvcompSnappyFormatOpts* const format_opts,
-    void* const temp_ptr,
+    void* const /* temp_ptr */,
     size_t const temp_bytes,
     void* const* const out_ptr,
     size_t* const out_bytes,
@@ -210,7 +220,6 @@ nvcompError_t nvcompBatchedSnappyCompressAsync(
     CHECK_NOT_NULL(format_opts);
     CHECK_NOT_NULL(in_ptr);
     CHECK_NOT_NULL(in_bytes);
-    CHECK_NOT_NULL(temp_ptr);
     CHECK_NOT_NULL(out_ptr);
     CHECK_NOT_NULL(out_bytes);
 
