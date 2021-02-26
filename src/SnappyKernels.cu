@@ -347,7 +347,7 @@ cudaError_t gpu_snap(gpu_inflate_input_s *inputs,
   dim3 dim_block(128, 1);  // 4 warps per stream, 1 stream per block
   dim3 dim_grid(count, 1);
   if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(inputs, outputs, count); }
-  return cudaSuccess;
+  return cudaGetLastError();
 }
 
 } // nvcomp namespace

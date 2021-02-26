@@ -28,14 +28,9 @@
 
 #include "nvcomp/snappy.h"
 
-//#include "BatchedLZ4Metadata.h"
 #include "Check.h"
 #include "CudaUtils.h"
-//#include "LZ4BatchCompressor.h"
-//#include "LZ4CompressionKernels.h"
-//#include "LZ4Metadata.h"
-//#include "LZ4MetadataOnGPU.h"
-//#include "MutableBatchedLZ4MetadataOnGPU.h"
+#include "SnappyKernels.h"
 #include "common.h"
 #include "nvcomp.h"
 #include "nvcomp.hpp"
@@ -192,8 +187,8 @@ nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
     CHECK_NOT_NULL(out_bytes);
     check_format_opts(format_opts);
 
-    for (size_t b = 0; b < batch_size; ++b) {
-      out_bytes[b] = snappy_get_max_compressed_length(in_bytes[b]);
+    for (size_t i = 0; i < batch_size; ++i) {
+      out_bytes[i] = snappy_get_max_compressed_length(in_bytes[i]);
     }
 
   } catch (const std::exception& e) {
@@ -223,7 +218,42 @@ nvcompError_t nvcompBatchedSnappyCompressAsync(
     CHECK_NOT_NULL(out_ptr);
     CHECK_NOT_NULL(out_bytes);
 
-    throw std::runtime_error("Not implemented");
+    gpu_inflate_input_s * compress_inputs;
+    CudaUtils::check(cudaMallocManaged((void **)&compress_inputs,
+      sizeof(gpu_inflate_input_s) * batch_size),
+      "Failed to allocate managed memory for inputs of snappy kernel");
+
+    for (size_t i = 0; i < batch_size; i++) {
+      compress_inputs[i].srcDevice = in_ptr[i];
+      compress_inputs[i].srcSize = in_bytes[i];
+      compress_inputs[i].dstDevice = out_ptr[i];
+      // We are assuming we have enough space in the destination buffer
+      compress_inputs[i].dstSize = snappy_get_max_compressed_length(in_bytes[i]);
+    }
+
+    gpu_inflate_status_s * statuses;
+    CudaUtils::check(cudaMallocManaged((void **)&statuses,
+      sizeof(gpu_inflate_status_s) * batch_size),
+      "Failed to allocate managed memory for status of snappy kernel");
+
+    CudaUtils::check(cudaStreamAttachMemAsync(stream, compress_inputs),
+      "Failed to attach managed memory to stream");
+    CudaUtils::check(cudaStreamAttachMemAsync(stream, statuses),
+      "Failed to attach managed memory to stream");
+    CudaUtils::check(gpu_snap(compress_inputs, statuses, batch_size, stream),
+      "Failed to run gpu_snap");
+
+    CudaUtils::check(cudaStreamSynchronize(stream),
+      "Failed to sync on CUDA stream");
+
+    for (size_t i = 0; i < batch_size; i++)
+      out_bytes[i] = statuses[i].bytes_written;
+
+    CudaUtils::check(cudaFree(compress_inputs),
+      "Failed to free managed memory for inputs of snappy kernel");
+    CudaUtils::check(cudaFree(statuses),
+      "Failed to free managed memory for status of snappy kernel");
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedSnappyCompressAsync()");
   }
