@@ -61,8 +61,6 @@ int test_batch_compression_and_decompression(void)
 {
   typedef int T;
 
-  nvcompSnappyFormatOpts comp_opts = {1 << 16};
-
   // set a constant seed
   srand(0);
 
@@ -75,9 +73,16 @@ int test_batch_compression_and_decompression(void)
   }
 
   size_t batch_bytes_host[BATCH_SIZE];
+  size_t max_batch_bytes_host = 0; 
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     batch_bytes_host[i] = sizeof(T) * batch_sizes_host[i];
+    if (batch_bytes_host[i] > max_batch_bytes_host)
+      max_batch_bytes_host = batch_bytes_host[i];
   }
+
+  size_t * batch_bytes_device;
+  CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(batch_bytes_host)));
+  cudaMemcpy(batch_bytes_device, batch_bytes_host, sizeof(batch_bytes_host), cudaMemcpyHostToDevice);
 
   T* input_host[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
@@ -103,6 +108,11 @@ int test_batch_compression_and_decompression(void)
         batch_bytes_host[i],
         cudaMemcpyHostToDevice));
   }
+  void** d_in_data_device;
+  CUDA_CHECK(cudaMalloc((void **)(&d_in_data_device), sizeof(d_in_data)));
+  cudaMemcpy(d_in_data_device, d_in_data, sizeof(d_in_data), cudaMemcpyHostToDevice);
+
+
   void* d_out_data[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     CUDA_CHECK(cudaMalloc(&d_out_data[i], batch_bytes_host[i]));
@@ -116,41 +126,41 @@ int test_batch_compression_and_decompression(void)
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
   status = nvcompBatchedSnappyCompressGetTempSize(
-      (const void* const*)d_in_data,
-      batch_bytes_host,
       BATCH_SIZE,
-      &comp_opts,
+      max_batch_bytes_host,
       &comp_temp_bytes);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
-  size_t comp_out_bytes[BATCH_SIZE];
+  size_t comp_out_bytes;
   status = nvcompBatchedSnappyCompressGetOutputSize(
-      (const void* const*)d_in_data,
-      batch_bytes_host,
       BATCH_SIZE,
-      &comp_opts,
-      d_comp_temp,
-      comp_temp_bytes,
-      comp_out_bytes);
+      max_batch_bytes_host,
+      &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_out[BATCH_SIZE];
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
-    CUDA_CHECK(cudaMalloc(&d_comp_out[i], comp_out_bytes[i]));
+    CUDA_CHECK(cudaMalloc(&d_comp_out[i], comp_out_bytes));
   }
 
+  void** d_comp_out_device;
+  CUDA_CHECK(cudaMalloc((void **)(&d_comp_out_device), sizeof(d_comp_out)));
+  cudaMemcpy(d_comp_out_device, d_comp_out, sizeof(d_comp_out), cudaMemcpyHostToDevice);
+
+  size_t * comp_out_bytes_device;
+  CUDA_CHECK(cudaMalloc((void **)(&comp_out_bytes_device), sizeof(size_t *) * BATCH_SIZE));
+
   status = nvcompBatchedSnappyCompressAsync(
-      (const void* const*)d_in_data,
-      batch_bytes_host,
+      (const void* const*)d_in_data_device,
+      batch_bytes_device,
       BATCH_SIZE,
-      &comp_opts,
       d_comp_temp,
       comp_temp_bytes,
-      d_comp_out,
-      comp_out_bytes,
+      d_comp_out_device,
+      comp_out_bytes_device,
       stream);
   REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));

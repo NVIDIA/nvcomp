@@ -43,6 +43,12 @@ struct snap_state_s {
   uint16_t hash_map[1 << HASH_BITS];  ///< Low 16-bit offset from hash
 };
 
+static inline __device__ uint32_t get_max_compressed_length(uint32_t source_bytes)
+{
+  // This is an estimate from the original snappy library 
+  return 32 + source_bytes + source_bytes / 6;
+}
+
 /**
  * @brief 12-bit hash from four consecutive bytes
  **/
@@ -256,7 +262,14 @@ static __device__ uint32_t Match60(const uint8_t *src1,
  * @param[in] count Number of blocks to compress
  **/
 extern "C" __global__ void __launch_bounds__(128)
-  snap_kernel(gpu_inflate_input_s *inputs, gpu_inflate_status_s *outputs, int count)
+snap_kernel(
+  const void* const* __restrict__ device_in_ptr,
+  const uint64_t* __restrict__ device_in_bytes,
+  void* const* __restrict__ device_out_ptr,
+  const uint64_t* __restrict__ device_out_available_bytes,
+  gpu_inflate_status_s * __restrict__ outputs,
+	uint64_t* device_out_bytes,
+  int count)
 {
   __shared__ __align__(16) snap_state_s state_g;
 
@@ -266,10 +279,13 @@ extern "C" __global__ void __launch_bounds__(128)
   const uint8_t *src;
 
   if (!t) {
-    const uint8_t *src = reinterpret_cast<const uint8_t *>(inputs[blockIdx.x].srcDevice);
-    uint32_t src_len   = static_cast<uint32_t>(inputs[blockIdx.x].srcSize);
-    uint8_t *dst       = reinterpret_cast<uint8_t *>(inputs[blockIdx.x].dstDevice);
-    uint32_t dst_len   = static_cast<uint32_t>(inputs[blockIdx.x].dstSize);
+    const uint8_t *src = reinterpret_cast<const uint8_t *>(device_in_ptr[blockIdx.x]);
+    uint32_t src_len   = static_cast<uint32_t>(device_in_bytes[blockIdx.x]);
+    uint8_t *dst       = reinterpret_cast<uint8_t *>(device_out_ptr[blockIdx.x]);
+    uint32_t dst_len   = static_cast<uint32_t>(device_out_available_bytes[blockIdx.x]);
+    if (dst_len == 0)
+      dst_len = get_max_compressed_length(src_len);
+
     uint8_t *end       = dst + dst_len;
     s->src             = src;
     s->src_len         = src_len;
@@ -333,20 +349,27 @@ extern "C" __global__ void __launch_bounds__(128)
   }
   __syncthreads();
   if (!t) {
-    outputs[blockIdx.x].bytes_written = s->dst - s->dst_base;
+    device_out_bytes[blockIdx.x] = s->dst - s->dst_base;
     outputs[blockIdx.x].status        = (s->dst > s->end) ? 1 : 0;
     outputs[blockIdx.x].reserved      = 0;
   }
 }
 
-cudaError_t gpu_snap(gpu_inflate_input_s *inputs,
-                              gpu_inflate_status_s *outputs,
-                              int count,
-                              cudaStream_t stream)
+cudaError_t gpu_snap(
+  const void* const* device_in_ptr,
+	const size_t* device_in_bytes,
+	void* const* device_out_ptr,
+	const size_t* device_out_available_bytes,
+  gpu_inflate_status_s *outputs,
+	size_t* device_out_bytes,
+  int count,
+  cudaStream_t stream)
 {
   dim3 dim_block(128, 1);  // 4 warps per stream, 1 stream per block
   dim3 dim_grid(count, 1);
-  if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(inputs, outputs, count); }
+  if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
+    device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
+      outputs, device_out_bytes, count); }
   return cudaGetLastError();
 }
 

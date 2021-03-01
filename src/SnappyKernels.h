@@ -30,20 +30,9 @@
 namespace nvcomp {
 
 /**
- * @brief Input parameters for the decompression interface
- **/
-struct gpu_inflate_input_s {
-  const void *srcDevice;
-  uint64_t srcSize;
-  void *dstDevice;
-  uint64_t dstSize;
-};
-
-/**
  * @brief Output parameters for the decompression interface
  **/
 struct gpu_inflate_status_s {
-  uint64_t bytes_written;
   uint32_t status;
   uint32_t reserved;
 };
@@ -59,9 +48,14 @@ struct gpu_inflate_status_s {
  * @param[in] count Number of input/output structures, default 1
  * @param[in] stream CUDA stream to use, default 0
  **/
-cudaError_t gpu_snap(gpu_inflate_input_s *inputs,
-                              gpu_inflate_status_s *outputs,
-                              int count,
-                              cudaStream_t stream);
+cudaError_t gpu_snap(
+  const void* const* device_in_ptr,
+	const size_t* device_in_bytes,
+	void* const* device_out_ptr,
+	const size_t* device_out_available_bytes,
+  gpu_inflate_status_s *outputs,
+	size_t* device_out_bytes,
+  int count,
+  cudaStream_t stream);
 }
 

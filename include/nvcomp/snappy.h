@@ -38,21 +38,6 @@
 extern "C" {
 #endif
 
-/**
- * @brief Structure for configuring Snappy compression.
- */
-typedef struct
-{
-  /**
-   * @brief The size of each chunk of data to decompress indepentently with
-   * Snappy. Must be within the range of [32768, 16777216]. Larger sizes will
-   * result in higher compression, but with decreased parallelism. The
-   * recommended size is 65536.
-   */
-  size_t chunk_size;
-} nvcompSnappyFormatOpts;
-
-
 /**************************************************************************
  *  - Experimental - Subject to change -
  * Batched compression/decompression interface for Snappy
@@ -142,80 +127,57 @@ nvcompError_t nvcompBatchedSnappyDecompressAsync(
     cudaStream_t stream);
 
 /**
- * @brief Get the temporary workspace size required to perform compression of
- * entire batch.
+ * @brief Get temporary space required for compression.
  *
- * @param in_ptr Array of uncompressed data chunks on the device.
- * @param in_bytes The sizes of each uncompressed data chunk in bytes.
- * @param batch_size The number of chunks in the batch.
- * @param format_opts The Snappy format options.
- * @param temp_bytes The size of the required temporary workspace in bytes to
- * compress the entire batch (output).
+ * @param batch_size The number of items in the batch.
+ * @param max_chunk_size The maximum size of a chunk in the batch.
+ * @param temp_bytes The size of the required GPU workspace for compression
+ * (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
-    const void* const* in_ptr,
-    const size_t* in_bytes,
     size_t batch_size,
-    const nvcompSnappyFormatOpts* format_opts,
-    size_t* temp_bytes);
+    size_t max_chunk_size,
+    size_t * temp_bytes);
 
 /**
- * @brief Get the required output sizes of each chunk to perform compression.
+ * @brief Get the maximum size any chunk could compress to in the batch. That is, the minimum amount of output memory required to be given nvcompBatchedLZ4CompressAsync() for each batch item.
  *
- * @param in_ptr Array of uncompressed chunks on the device.
- * @param in_bytes The sizes of each uncompressed chunk data in bytes.
- * @param batch_size The number of chunks in the batch (cardinality of in_ptr
- * and in_bytes).
- * @param format_opts The Snappy format options.
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_bytes The required sizes of the output location for each chunk in
- * bytes (output). The values are computed without doing an actual compression,
- * the compressed data will likely be of smaller sizes. 
+ * @param batch_size The number of chunks.
+ * @param max_chunk_size The maximum size of a chunk in the batch.
+ * @param max_compressed_size The maximum compressed size of the largest chunk (output).
  *
- * @return nvcompSuccess if successful, and an error code otherwise.
+ * @return The nvcompSuccess unless there is an error.
  */
 nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    const void* const* in_ptr,
-    const size_t* in_bytes,
     size_t batch_size,
-    const nvcompSnappyFormatOpts* format_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
-    size_t* out_bytes);
+    size_t max_chunk_size,
+    size_t * max_compressed_size);
 
 /**
- * @brief Perform asynchronous compression. The pointer `out_bytes` must be to
- * pinned memory for this to be asynchronous.
+ * @brief Perform compression.
  *
- * @param in_ptr Array of uncompressed chunks that make up the batch, on the
- * device.
- * @param in_bytes The sizes of each chunk of uncompressed data in bytes.
- * @param batch_size The number of chunks in the entire batch.
- * @param format_opts The Snappy format options.
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_ptr The starting location to write all the compresesd chunks to on
- * the device.
- * @param out_bytes The sizes of each compressed chunk of data, summed up totals
- * the size of the compressed data on output. If pinned memory, the stream must
- * be synchronized with, before reading.
- * @param stream The cuda stream to operate on.
+ * @param device_in_ptr The pointers on the GPU, to uncompressed batched items.
+ * @param device_in_bytes The size of each uncompressed batch item on the GPU.
+ * @param batch_size The number of batch items.
+ * @param temp_ptr The temporary GPU workspace.
+ * @param temp_bytes The size of the temporary GPU workspace.
+ * @param device_out_ptr The pointers on the GPU, to the output location for each compressed batch item (output).
+ * @param device_out_bytes The compressed size of each chunk on the GPU (output).
+ * @param stream The stream to operate on.
  *
- * @return nvcompSuccess if successful, and an error code otherwise.
+ * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyCompressAsync(
-    const void* const* in_ptr,
-    const size_t* in_bytes,
-    size_t batch_size,
-    const nvcompSnappyFormatOpts* format_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
-    void* const* out_ptr,
-    size_t* out_bytes,
-    cudaStream_t stream);
+	const void* const* device_in_ptr,
+	const size_t* device_in_bytes,
+	size_t batch_size,
+	void* temp_ptr,
+	size_t temp_bytes,
+	void* const* device_out_ptr,
+	size_t* device_out_bytes,
+	cudaStream_t stream);
 
 #ifdef __cplusplus
 }
