@@ -56,5 +56,14 @@ cudaError_t gpu_snap(
 	size_t* device_out_bytes,
   int count,
   cudaStream_t stream);
-}
 
+cudaError_t gpu_unsnap(
+  const void* const* device_in_ptr,
+  const size_t* device_in_bytes,
+  void* const* device_out_ptr,
+  const size_t* device_out_available_bytes,
+  gpu_inflate_status_s *outputs,
+  size_t* device_out_bytes,
+  int count,
+  cudaStream_t stream);
+};

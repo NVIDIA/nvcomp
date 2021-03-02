@@ -73,11 +73,11 @@ int test_batch_compression_and_decompression(void)
   }
 
   size_t batch_bytes_host[BATCH_SIZE];
-  size_t max_batch_bytes_host = 0; 
+  size_t max_batch_bytes_uncompressed = 0; 
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     batch_bytes_host[i] = sizeof(T) * batch_sizes_host[i];
-    if (batch_bytes_host[i] > max_batch_bytes_host)
-      max_batch_bytes_host = batch_bytes_host[i];
+    if (batch_bytes_host[i] > max_batch_bytes_uncompressed)
+      max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
   size_t * batch_bytes_device;
@@ -113,11 +113,6 @@ int test_batch_compression_and_decompression(void)
   cudaMemcpy(d_in_data_device, d_in_data, sizeof(d_in_data), cudaMemcpyHostToDevice);
 
 
-  void* d_out_data[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
-    CUDA_CHECK(cudaMalloc(&d_out_data[i], batch_bytes_host[i]));
-  }
-
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
@@ -127,7 +122,7 @@ int test_batch_compression_and_decompression(void)
   size_t comp_temp_bytes;
   status = nvcompBatchedSnappyCompressGetTempSize(
       BATCH_SIZE,
-      max_batch_bytes_host,
+      max_batch_bytes_uncompressed,
       &comp_temp_bytes);
   REQUIRE(status == nvcompSuccess);
 
@@ -136,7 +131,7 @@ int test_batch_compression_and_decompression(void)
 
   size_t comp_out_bytes;
   status = nvcompBatchedSnappyCompressGetOutputSize(
-      max_batch_bytes_host,
+      max_batch_bytes_uncompressed,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
@@ -162,65 +157,60 @@ int test_batch_compression_and_decompression(void)
       comp_out_bytes_device,
       stream);
   REQUIRE(status == nvcompSuccess);
+
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   cudaFree(d_comp_temp);
+  cudaFree(d_in_data_device);
   for (size_t i = 0; i < BATCH_SIZE; ++i) {
     cudaFree(d_in_data[i]);
   }
 
-  void* metadata_ptr;
-
-  status = nvcompBatchedSnappyDecompressGetMetadata(
-      (const void**)d_comp_out,
-      comp_out_bytes,
-      BATCH_SIZE,
-      &metadata_ptr,
-      stream);
-
   // Snappy decompression does not need temp space.
   size_t temp_bytes;
   status = nvcompBatchedSnappyDecompressGetTempSize(
-      (const void*)metadata_ptr, &temp_bytes);
+      BATCH_SIZE,
+      max_batch_bytes_uncompressed,
+      &temp_bytes);
+  REQUIRE(status == nvcompSuccess);
 
   void* temp_ptr;
   CUDA_CHECK(cudaMalloc(&temp_ptr, temp_bytes));
 
-  size_t decomp_out_bytes[BATCH_SIZE];
-  status = nvcompBatchedSnappyDecompressGetOutputSize(
-      (const void*)metadata_ptr, BATCH_SIZE, decomp_out_bytes);
-
   void* d_decomp_out[BATCH_SIZE];
   for (int i = 0; i < BATCH_SIZE; i++) {
-    CUDA_CHECK(cudaMalloc(&d_decomp_out[i], decomp_out_bytes[i]));
+    CUDA_CHECK(cudaMalloc(&d_decomp_out[i], max_batch_bytes_uncompressed));
   }
+  void** d_decomp_out_device;
+  CUDA_CHECK(cudaMalloc((void **)(&d_decomp_out_device), sizeof(d_decomp_out)));
+  cudaMemcpy(d_decomp_out_device, d_decomp_out, sizeof(d_decomp_out), cudaMemcpyHostToDevice);
 
   status = nvcompBatchedSnappyDecompressAsync(
-      (const void* const*)d_comp_out,
-      comp_out_bytes,
+      (const void* const*)d_comp_out_device,
+      comp_out_bytes_device,
+      batch_bytes_device,
       BATCH_SIZE,
       temp_ptr,
       temp_bytes,
-      metadata_ptr,
-      (void* const*)d_decomp_out,
-      decomp_out_bytes,
+      (void* const*)d_decomp_out_device,
       stream);
-
   REQUIRE(status == nvcompSuccess);
 
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(stream));
 
-  nvcompBatchedSnappyDecompressDestroyMetadata(metadata_ptr);
   cudaFree(temp_ptr);
+  cudaFree(d_comp_out_device);
+  cudaFree(comp_out_bytes_device);
+  cudaFree(batch_bytes_device);
 
   for (int i = 0; i < BATCH_SIZE; i++) {
     cudaMemcpy(
         output_host[i],
         d_decomp_out[i],
-        decomp_out_bytes[i],
+        batch_bytes_host[i],
         cudaMemcpyDeviceToHost);
     // Verify correctness
-    for (size_t j = 0; j < decomp_out_bytes[i] / sizeof(T); ++j) {
+    for (size_t j = 0; j < batch_bytes_host[i] / sizeof(T); ++j) {
       REQUIRE(output_host[i][j] == input_host[i][j]);
     }
   }
@@ -229,6 +219,7 @@ int test_batch_compression_and_decompression(void)
     cudaFree(d_comp_out[i]);
     cudaFree(d_decomp_out[i]);
     free(output_host[i]);
+    free(input_host[i]);
   }
 
   return 1;

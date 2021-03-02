@@ -60,36 +60,18 @@ size_t snappy_get_max_compressed_length(size_t source_bytes) {
  *     C-style API calls for BATCHED compression/decompress defined below.
  *****************************************************************************/
 
-nvcompError_t nvcompBatchedSnappyDecompressGetMetadata(
-    const void** in_ptr,
-    const size_t* in_bytes,
-    size_t batch_size,
-    void** metadata_ptr,
-    cudaStream_t stream)
+nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
+	size_t /* num_chunks */,
+	size_t /* max_uncompressed_chunk_size */,
+	size_t * temp_bytes)
 {
   try {
-    throw std::runtime_error("Not implemented");
-  } catch (std::exception& e) {
-    return Check::exception_to_error(
-        e, "nvcompBatchedSnappyDecompressGetMetadata()");
-  }
-
-  return nvcompSuccess;
-}
-
-void nvcompBatchedSnappyDecompressDestroyMetadata(void* metadata_ptr)
-{
-//  delete static_cast<BatchedLZ4Metadata*>(metadata_ptr);
-}
-
-nvcompError_t
-nvcompBatchedSnappyDecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
-{
-  try {
-    CHECK_NOT_NULL(metadata_ptr);
+    // error check inputs
     CHECK_NOT_NULL(temp_bytes);
 
-    throw std::runtime_error("Not implemented");
+    // Snappy doesn't need any workspace in GPU memory
+    *temp_bytes = 0;
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedSnappyDecompressGetTempSize()");
   }
@@ -97,43 +79,30 @@ nvcompBatchedSnappyDecompressGetTempSize(const void* metadata_ptr, size_t* temp_
   return nvcompSuccess;
 }
 
-nvcompError_t
-nvcompBatchedSnappyDecompressGetOutputSize(const void* metadata_ptr, size_t batch_size, size_t* output_bytes)
-{
-  try {
-    CHECK_NOT_NULL(metadata_ptr);
-    CHECK_NOT_NULL(output_bytes);
-
-    throw std::runtime_error("Not implemented");
-  } catch (const std::exception& e) {
-    return Check::exception_to_error(
-        e, "nvcompBatchedSnappyDecompressGetOutputSize()");
-  }
-
-  return nvcompSuccess;
-}
-
 nvcompError_t nvcompBatchedSnappyDecompressAsync(
-    const void* const* in_ptr,
-    const size_t* in_bytes,
-    size_t batch_size,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    const void* metadata_ptr,
-    void* const* out_ptr,
-    const size_t* out_bytes,
-    cudaStream_t stream)
+  const void* const* device_in_ptr,
+  const size_t* device_in_bytes,
+  const size_t* device_out_bytes,
+  size_t batch_size,
+  void* const /* temp_ptr */,
+  const size_t /* temp_bytes */,
+  void* const* device_out_ptr,
+  cudaStream_t stream)
 {
   try {
-    CHECK_NOT_NULL(metadata_ptr);
-    CHECK_NOT_NULL(out_ptr);
-    CHECK_NOT_NULL(in_ptr);
+    // error check inputs
+    CHECK_NOT_NULL(device_in_ptr);
+    CHECK_NOT_NULL(device_in_bytes);
+    CHECK_NOT_NULL(device_out_ptr);
+    CHECK_NOT_NULL(device_out_bytes);
 
-    if (temp_bytes > 0) {
-      CHECK_NOT_NULL(temp_ptr);
-    }
+    size_t * device_out_actual_bytes = 0;
+    gpu_inflate_status_s * statuses = 0;
 
-    throw std::runtime_error("Not implemented");
+    CudaUtils::check(gpu_unsnap(device_in_ptr, device_in_bytes, device_out_ptr,
+        device_out_bytes, statuses, device_out_actual_bytes, batch_size, stream),
+      "Failed to run gpu_snap");
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedSnappyDecompressAsync()");
   }
@@ -183,8 +152,8 @@ nvcompError_t nvcompBatchedSnappyCompressAsync(
 	const void* const* device_in_ptr,
 	const size_t* device_in_bytes,
 	size_t batch_size,
-	void* temp_ptr,
-	size_t temp_bytes,
+	void* /* temp_ptr */,
+	size_t /* temp_bytes */,
 	void* const* device_out_ptr,
 	size_t* device_out_bytes,
 	cudaStream_t stream)

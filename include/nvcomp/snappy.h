@@ -38,93 +38,44 @@
 extern "C" {
 #endif
 
-/**************************************************************************
- *  - Experimental - Subject to change -
- * Batched compression/decompression interface for Snappy
- * ************************************************************************/
-
 /**
- * @brief Extracts the metadata from all the input baches in_ptr on the device
- * and copies them to the host. This function synchronizes on the stream.
+ * @brief Get the amount of temp space required on the GPU for decompression.
  *
- * @param in_ptr Array of compressed chunks on the device.
- * @param in_bytes Array of sizes of the compressed chunks on the device.
- * @param batch_size Number of chunks in the batch (cardinality of in_bytes and
- * in_ptr)
- * @param metadata_ptr The batch of metadata on the host to create from all the
- * compresesed data chunks in the batch.
- * @param stream The stream to use for reading memory from the device.
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompBatchedSnappyDecompressGetMetadata(
-    const void** in_ptr,
-    const size_t* in_bytes,
-    size_t batch_size,
-    void** metadata_ptr,
-    cudaStream_t stream);
-
-/**
- * @brief Destroys metadata and frees the associated memory.
- *
- * @para metadata_ptr List of metadata to destroy.
- */
-void nvcompBatchedSnappyDecompressDestroyMetadata(void* metadata_ptr);
-
-/**
- * @brief Computes the temporary storage size needed to decompress the batch of
- * data.
- *
- * @param metadata_ptr The metadata for all compressed chunks in the batch.
- * @param temp_bytes The size of temporary workspace required to perform
- * decomrpession of all chunks in the batch, in bytes (output).
+ * @param num_chunks The number of items in the batch.
+ * @param max_uncompressed_chunk_size The size of the largest chunk when uncompressed.
+ * @param temp_bytes The amount of temporary GPU space that will be required to
+ * decompress.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
-    const void* metadata_ptr, size_t* temp_bytes);
+	size_t num_chunks,
+	size_t max_uncompressed_chunk_size,
+	size_t * temp_bytes);
 
 /**
- * @brief Computes the decompressed size of each chunk of in the batch.
+ * @brief Perform decompression.
  *
- * @param metadata_ptr The metadata for all compressed chunks.
- * @param batch_size The number of chunks in the batch (cardinality of
- * output_bytes).
- * @param output_bytes Array of sizes of the decompressed data in bytes
- * (output).
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompBatchedSnappyDecompressGetOutputSize(
-    const void* metadata_ptr, size_t batch_size, size_t* output_bytes);
-
-/**
- * @brief Perform the asynchronous decompression on batch of compressed chunks
- * of data.
- *
- * @param in_ptr Array of compressed data chunks on the device to decompress.
- * @param in_bytes The sizes of each chunk of compressed data.
- * @param batch_size The number of chunks in the batch (cardinality of other
- * inputs).
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace.
- * @param metadata_ptr The metadata of all chunks in the batch.
- * @param out_ptr The output location on the device.
- * @param out_bytes The sizes of each decompressed chunk.
- * @param stream The cuda stream to operate on.
+ * @param device_in_ptrs The pointers on the GPU, to the compressed chunks.
+ * @param device_in_bytes The size of each compressed chunk on the GPU.
+ * @param device_out_bytes The size of each uncompressed chunk on the GPU.
+ * @param batch_size The number of batch items.
+ * @param temp_ptr The temporary GPU space.
+ * @param temp_bytes The size of the temporary GPU space.
+ * @param device_out_ptr The pointers on the GPU, to where to uncompress each chunk (output).
+ * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyDecompressAsync(
-    const void* const* in_ptr,
-    const size_t* in_bytes,
-    size_t batch_size,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    const void* metadata_ptr,
-    void* const* out_ptr,
-    const size_t* out_bytes,
-    cudaStream_t stream);
+	const void* const* device_in_ptr,
+	const size_t* device_in_bytes,
+    const size_t* device_out_bytes,
+	size_t batch_size,
+	void* const temp_ptr,
+	const size_t temp_bytes,
+	void* const* device_out_ptr,
+	cudaStream_t stream);
 
 /**
  * @brief Get temporary space required for compression.
