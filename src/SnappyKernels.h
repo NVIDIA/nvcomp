@@ -34,7 +34,6 @@ namespace nvcomp {
  **/
 struct gpu_inflate_status_s {
   uint32_t status;
-  uint32_t reserved;
 };
 
 /**

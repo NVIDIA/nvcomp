@@ -196,36 +196,12 @@ nvcompError_t nvcompBatchedSnappyCompressAsync(
     CHECK_NOT_NULL(device_out_ptr);
     CHECK_NOT_NULL(device_out_bytes);
 
-    size_t * device_out_available_bytes;
-    CudaUtils::check(cudaMallocManaged((void **)&device_out_available_bytes,
-      sizeof(size_t) * batch_size),
-      "Failed to allocate managed memory for device_out_available_bytes of snappy kernel");
-
-    for (size_t i = 0; i < batch_size; i++) {
-      device_out_available_bytes[i] = 0;
-    }
-
-    gpu_inflate_status_s * statuses;
-    CudaUtils::check(cudaMallocManaged((void **)&statuses,
-      sizeof(gpu_inflate_status_s) * batch_size),
-      "Failed to allocate managed memory for status of snappy kernel");
-
-    CudaUtils::check(cudaStreamAttachMemAsync(stream, device_out_available_bytes),
-      "Failed to attach managed memory to stream");
-    CudaUtils::check(cudaStreamAttachMemAsync(stream, statuses),
-      "Failed to attach managed memory to stream");
+    size_t * device_out_available_bytes = 0;
+    gpu_inflate_status_s * statuses = 0;
 
     CudaUtils::check(gpu_snap(device_in_ptr, device_in_bytes, device_out_ptr,
         device_out_available_bytes, statuses, device_out_bytes, batch_size, stream),
       "Failed to run gpu_snap");
-
-    CudaUtils::check(cudaStreamSynchronize(stream),
-      "Failed to sync on CUDA stream");
-
-    CudaUtils::check(cudaFree(device_out_available_bytes),
-      "Failed to free managed memory for device_out_available_bytes of snappy kernel");
-    CudaUtils::check(cudaFree(statuses),
-      "Failed to free managed memory for status of snappy kernel");
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedSnappyCompressAsync()");

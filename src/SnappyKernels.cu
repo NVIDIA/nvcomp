@@ -282,7 +282,7 @@ snap_kernel(
     const uint8_t *src = reinterpret_cast<const uint8_t *>(device_in_ptr[blockIdx.x]);
     uint32_t src_len   = static_cast<uint32_t>(device_in_bytes[blockIdx.x]);
     uint8_t *dst       = reinterpret_cast<uint8_t *>(device_out_ptr[blockIdx.x]);
-    uint32_t dst_len   = static_cast<uint32_t>(device_out_available_bytes[blockIdx.x]);
+    uint32_t dst_len   = device_out_available_bytes ? static_cast<uint32_t>(device_out_available_bytes[blockIdx.x]) : 0;
     if (dst_len == 0)
       dst_len = get_max_compressed_length(src_len);
 
@@ -350,8 +350,8 @@ snap_kernel(
   __syncthreads();
   if (!t) {
     device_out_bytes[blockIdx.x] = s->dst - s->dst_base;
-    outputs[blockIdx.x].status        = (s->dst > s->end) ? 1 : 0;
-    outputs[blockIdx.x].reserved      = 0;
+    if (outputs)
+      outputs[blockIdx.x].status = (s->dst > s->end) ? 1 : 0;
   }
 }
 
