@@ -144,14 +144,12 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That is, the minimum amount of output memory required to be given nvcompBatchedLZ4CompressAsync() for each batch item.
  *
- * @param batch_size The number of chunks.
  * @param max_chunk_size The maximum size of a chunk in the batch.
  * @param max_compressed_size The maximum compressed size of the largest chunk (output).
  *
  * @return The nvcompSuccess unless there is an error.
  */
 nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    size_t batch_size,
     size_t max_chunk_size,
     size_t * max_compressed_size);
 

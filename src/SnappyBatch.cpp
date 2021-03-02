@@ -142,8 +142,8 @@ nvcompError_t nvcompBatchedSnappyDecompressAsync(
 }
 
 nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
-    size_t batch_size,
-    size_t max_chunk_size,
+    size_t /* batch_size */,
+    size_t /* max_chunk_size */,
     size_t * temp_bytes)
 {
   try {
@@ -162,7 +162,6 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
 }
 
 nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    size_t batch_size,
     size_t max_chunk_size,
     size_t * max_compressed_size)
 {

@@ -136,7 +136,6 @@ int test_batch_compression_and_decompression(void)
 
   size_t comp_out_bytes;
   status = nvcompBatchedSnappyCompressGetOutputSize(
-      BATCH_SIZE,
       max_batch_bytes_host,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
