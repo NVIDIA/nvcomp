@@ -30,22 +30,34 @@
 namespace nvcomp {
 
 /**
- * @brief Output parameters for the decompression interface
+ * @brief Output parameters for the compression and decompression interface
  **/
 struct gpu_inflate_status_s {
-  uint32_t status;
+  uint32_t status; // Non-zero value indicates an error
 };
 
 /**
  * @brief Interface for compressing data with Snappy
  *
- * Multiple, independent chunks of compressed data can be compressed by using
- * separate gpu_inflate_input_s/gpu_inflate_status_s pairs for each chunk.
+ * The function compresses multiple independent chunks of data.
+ * All the pointers parameters are to GPU-accessible memory.
  *
- * @param[in] inputs List of input argument structures
- * @param[out] outputs List of output status structures
- * @param[in] count Number of input/output structures, default 1
- * @param[in] stream CUDA stream to use, default 0
+ * @param[in] device_in_ptr Pointer to the list of pointers to
+ * the GPU-accessible uncompressed data.
+ * @param[in] device_in_bytes Pointer to the list of sizes of uncompressed
+ * data
+ * @param[in] device_out_ptr Pointer to the buffer with pointers,
+ * where the function should put compressed data to.
+ * @param[in] device_out_available_bytes Pointer to the list of sizes of
+ * memory chunks referenced by device_out_ptr. Could be null-ptr indicating
+ * all output buffers has enough size to store compressed data.
+ * @param[out] outputs Pointer to the statuses of compression for each chunk.
+ * Could be null-ptr.
+ * @param[out] device_out_bytes Pointer to the list of actual sizes
+ * of compressed data.
+ * @param[in] count The number of chunks to compress.
+ * @param[in] stream All the compression will be enqueued into this CUDA
+ * stream and run asynchronously.
  **/
 cudaError_t gpu_snap(
   const void* const* device_in_ptr,
@@ -57,6 +69,29 @@ cudaError_t gpu_snap(
   int count,
   cudaStream_t stream);
 
+/**
+ * @brief Interface for decompressing data with Snappy
+ *
+ * The function decompresses multiple independent chunks of data.
+ * All the pointers parameters are to GPU-accessible memory.
+ *
+ * @param[in] device_in_ptr Pointer to the kist of pointers to
+ * the GPU-accessible compressed data.
+ * @param[in] device_in_bytes Pointer to the list of sizes of compressed
+ * data.
+ * @param[in] device_out_ptr Pointer to the buffer with pointers,
+ * where the function should put uncompressed data to.
+ * @param[in] device_out_available_bytes Pointer to the list of sizes of
+ * memory chunks referenced by device_out_ptr. Could be null-ptr indicating
+ * all output buffers has enough size to stored uncompressed data.
+ * @param[out] outputs Pointer to the statuses of decompression for each chunk.
+ * Could be null-ptr.
+ * @param[out] device_out_bytes Pointer to the list of actual sizes
+ * of uncompressed data. Could be null-ptr.
+ * @param[in] count The number of chunks to decompress.
+ * @param[in] stream All the decompression will be enqueued into this CUDA
+ * stream and run asynchronously.
+ **/
 cudaError_t gpu_unsnap(
   const void* const* device_in_ptr,
   const size_t* device_in_bytes,
