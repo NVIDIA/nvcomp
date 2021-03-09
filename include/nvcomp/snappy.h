@@ -70,7 +70,7 @@ nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
 nvcompError_t nvcompBatchedSnappyDecompressAsync(
 	const void* const* device_in_ptr,
 	const size_t* device_in_bytes,
-    const size_t* device_out_bytes,
+	const size_t* device_out_bytes,
 	size_t batch_size,
 	void* const temp_ptr,
 	const size_t temp_bytes,

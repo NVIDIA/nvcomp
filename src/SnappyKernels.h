@@ -30,9 +30,9 @@
 namespace nvcomp {
 
 /**
- * @brief Output parameters for the compression and decompression interface
+ * @brief The result of the compression and decompression routines
  **/
-struct gpu_inflate_status_s {
+struct gpu_snappy_status_s {
   uint32_t status; // Non-zero value indicates an error
 };
 
@@ -64,7 +64,7 @@ cudaError_t gpu_snap(
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
 	const size_t* device_out_available_bytes,
-  gpu_inflate_status_s *outputs,
+	gpu_snappy_status_s *outputs,
 	size_t* device_out_bytes,
   int count,
   cudaStream_t stream);
@@ -97,7 +97,7 @@ cudaError_t gpu_unsnap(
   const size_t* device_in_bytes,
   void* const* device_out_ptr,
   const size_t* device_out_available_bytes,
-  gpu_inflate_status_s *outputs,
+  gpu_snappy_status_s *outputs,
   size_t* device_out_bytes,
   int count,
   cudaStream_t stream);

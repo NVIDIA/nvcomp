@@ -57,24 +57,22 @@
     }                                                                          \
   } while (0)
 
-int test_batch_compression_and_decompression(void)
+int test_batch_compression_and_decompression(int batch_size)
 {
   typedef int T;
 
   // set a constant seed
   srand(0);
 
-#define BATCH_SIZE 1130
-
   // prepare input and output on host
-  size_t batch_sizes_host[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  size_t batch_sizes_host[batch_size];
+  for (size_t i = 0; i < batch_size; ++i) {
     batch_sizes_host[i] = ((i * 1103) % 100000) + 10000;
   }
 
-  size_t batch_bytes_host[BATCH_SIZE];
+  size_t batch_bytes_host[batch_size];
   size_t max_batch_bytes_uncompressed = 0; 
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  for (size_t i = 0; i < batch_size; ++i) {
     batch_bytes_host[i] = sizeof(T) * batch_sizes_host[i];
     if (batch_bytes_host[i] > max_batch_bytes_uncompressed)
       max_batch_bytes_uncompressed = batch_bytes_host[i];
@@ -84,8 +82,8 @@ int test_batch_compression_and_decompression(void)
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(batch_bytes_host)));
   cudaMemcpy(batch_bytes_device, batch_bytes_host, sizeof(batch_bytes_host), cudaMemcpyHostToDevice);
 
-  T* input_host[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  T* input_host[batch_size];
+  for (size_t i = 0; i < batch_size; ++i) {
     input_host[i] = malloc(sizeof(T) * batch_sizes_host[i]);
     for (size_t j = 0; j < batch_sizes_host[i]; ++j) {
       // make sure there should be some repeats to compress
@@ -93,14 +91,14 @@ int test_batch_compression_and_decompression(void)
     }
   }
 
-  T* output_host[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  T* output_host[batch_size];
+  for (size_t i = 0; i < batch_size; ++i) {
     output_host[i] = malloc(batch_bytes_host[i]);
   }
 
   // prepare gpu buffers
-  void* d_in_data[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  void* d_in_data[batch_size];
+  for (size_t i = 0; i < batch_size; ++i) {
     CUDA_CHECK(cudaMalloc(&d_in_data[i], batch_bytes_host[i]));
     CUDA_CHECK(cudaMemcpy(
         d_in_data[i],
@@ -121,7 +119,7 @@ int test_batch_compression_and_decompression(void)
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
   status = nvcompBatchedSnappyCompressGetTempSize(
-      BATCH_SIZE,
+      batch_size,
       max_batch_bytes_uncompressed,
       &comp_temp_bytes);
   REQUIRE(status == nvcompSuccess);
@@ -135,8 +133,8 @@ int test_batch_compression_and_decompression(void)
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
-  void* d_comp_out[BATCH_SIZE];
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  void* d_comp_out[batch_size];
+  for (size_t i = 0; i < batch_size; ++i) {
     CUDA_CHECK(cudaMalloc(&d_comp_out[i], comp_out_bytes));
   }
 
@@ -145,12 +143,12 @@ int test_batch_compression_and_decompression(void)
   cudaMemcpy(d_comp_out_device, d_comp_out, sizeof(d_comp_out), cudaMemcpyHostToDevice);
 
   size_t * comp_out_bytes_device;
-  CUDA_CHECK(cudaMalloc((void **)(&comp_out_bytes_device), sizeof(size_t *) * BATCH_SIZE));
+  CUDA_CHECK(cudaMalloc((void **)(&comp_out_bytes_device), sizeof(size_t *) * batch_size));
 
   status = nvcompBatchedSnappyCompressAsync(
       (const void* const*)d_in_data_device,
       batch_bytes_device,
-      BATCH_SIZE,
+      batch_size,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out_device,
@@ -162,14 +160,14 @@ int test_batch_compression_and_decompression(void)
 
   cudaFree(d_comp_temp);
   cudaFree(d_in_data_device);
-  for (size_t i = 0; i < BATCH_SIZE; ++i) {
+  for (size_t i = 0; i < batch_size; ++i) {
     cudaFree(d_in_data[i]);
   }
 
   // Snappy decompression does not need temp space.
   size_t temp_bytes;
   status = nvcompBatchedSnappyDecompressGetTempSize(
-      BATCH_SIZE,
+      batch_size,
       max_batch_bytes_uncompressed,
       &temp_bytes);
   REQUIRE(status == nvcompSuccess);
@@ -177,8 +175,8 @@ int test_batch_compression_and_decompression(void)
   void* temp_ptr;
   CUDA_CHECK(cudaMalloc(&temp_ptr, temp_bytes));
 
-  void* d_decomp_out[BATCH_SIZE];
-  for (int i = 0; i < BATCH_SIZE; i++) {
+  void* d_decomp_out[batch_size];
+  for (int i = 0; i < batch_size; i++) {
     CUDA_CHECK(cudaMalloc(&d_decomp_out[i], max_batch_bytes_uncompressed));
   }
   void** d_decomp_out_device;
@@ -189,7 +187,7 @@ int test_batch_compression_and_decompression(void)
       (const void* const*)d_comp_out_device,
       comp_out_bytes_device,
       batch_bytes_device,
-      BATCH_SIZE,
+      batch_size,
       temp_ptr,
       temp_bytes,
       (void* const*)d_decomp_out_device,
@@ -203,7 +201,7 @@ int test_batch_compression_and_decompression(void)
   cudaFree(comp_out_bytes_device);
   cudaFree(batch_bytes_device);
 
-  for (int i = 0; i < BATCH_SIZE; i++) {
+  for (int i = 0; i < batch_size; i++) {
     cudaMemcpy(
         output_host[i],
         d_decomp_out[i],
@@ -215,7 +213,7 @@ int test_batch_compression_and_decompression(void)
     }
   }
 
-  for (int i = 0; i < BATCH_SIZE; i++) {
+  for (int i = 0; i < batch_size; i++) {
     cudaFree(d_comp_out[i]);
     cudaFree(d_decomp_out[i]);
     free(output_host[i]);
@@ -223,8 +221,6 @@ int test_batch_compression_and_decompression(void)
   }
 
   return 1;
-
-#undef BATCH_SIZE
 }
 
 int main(int argc, char** argv)
@@ -234,12 +230,16 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  int num_tests = 1;
   int rv = 0;
 
-  if (!test_batch_compression_and_decompression()) {
-    printf("compression and decompression test failed.\n");
-    rv += 1;
+  int batch_sizes[] = {1130, 920, 2700};
+  int num_tests = sizeof(batch_sizes) / sizeof(batch_sizes[0]);
+
+  for(int i = 0; i < sizeof(batch_sizes) / sizeof(batch_sizes[0]); ++i) {
+    if (!test_batch_compression_and_decompression(batch_sizes[i])) {
+      printf("compression and decompression test failed.\n");
+      rv += 1;
+    }
   }
 
   if (rv == 0) {

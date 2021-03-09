@@ -58,17 +58,6 @@ static inline __device__ uint32_t snap_hash(uint32_t v)
 }
 
 /**
- * @brief Fetches four consecutive bytes
- **/
-static inline __device__ uint32_t fetch4(const uint8_t *src)
-{
-  uint32_t src_align    = 3 & reinterpret_cast<uintptr_t>(src);
-  const uint32_t *src32 = reinterpret_cast<const uint32_t *>(src - src_align);
-  uint32_t v            = src32[0];
-  return (src_align) ? __funnelshift_r(v, src32[1], src_align * 8) : v;
-}
-
-/**
  * @brief Outputs a snappy literal symbol
  *
  * @param dst Destination compressed byte stream
@@ -197,7 +186,7 @@ static __device__ uint32_t FindFourByteMatch(snap_state_s *s,
   if (t == 0) { s->copy_length = 0; }
   do {
     bool valid4               = (pos + t + 4 <= len);
-    uint32_t data32           = (valid4) ? fetch4(src + pos + t) : 0;
+    uint32_t data32           = (valid4) ? unaligned_load32(src + pos + t) : 0;
     uint32_t hash             = (valid4) ? snap_hash(data32) : 0;
     uint32_t local_match      = HashMatchAny(hash, t);
     uint32_t local_match_lane = 31 - __clz(local_match & ((1 << t) - 1));
@@ -211,7 +200,7 @@ static __device__ uint32_t FindFourByteMatch(snap_state_s *s,
         offset = (pos & ~0xffff) | s->hash_map[hash];
         if (offset >= pos) { offset = (offset >= 0x10000) ? offset - 0x10000 : pos; }
         match =
-          (offset < pos && offset + MAX_COPY_DISTANCE >= pos + t && fetch4(src + offset) == data32);
+          (offset < pos && offset + MAX_COPY_DISTANCE >= pos + t && unaligned_load32(src + offset) == data32);
       }
     } else {
       match       = 0;
@@ -267,7 +256,7 @@ snap_kernel(
   const uint64_t* __restrict__ device_in_bytes,
   void* const* __restrict__ device_out_ptr,
   const uint64_t* __restrict__ device_out_available_bytes,
-  gpu_inflate_status_s * __restrict__ outputs,
+  gpu_snappy_status_s * __restrict__ outputs,
 	uint64_t* device_out_bytes)
 {
   __shared__ __align__(16) snap_state_s state_g;
@@ -390,7 +379,7 @@ struct unsnap_queue_s {
 /**
  * @brief Input parameters for the decompression interface
  **/
- struct gpu_inflate_input_s {
+ struct gpu_input_parameters {
   const void *srcDevice;
   uint64_t srcSize;
   void *dstDevice;
@@ -408,7 +397,7 @@ struct unsnap_state_s {
   int32_t error;               ///< current error status
   uint32_t tstart;             ///< start time for perf logging
   volatile unsnap_queue_s q;   ///< queue for cross-warp communication
-  gpu_inflate_input_s in;      ///< input parameters for current block
+  gpu_input_parameters in;      ///< input parameters for current block
 };
 
 /**
@@ -951,7 +940,7 @@ unsnap_kernel(
   const uint64_t* __restrict__ device_in_bytes,
   void* const* __restrict__ device_out_ptr,
   const uint64_t* __restrict__ device_out_available_bytes,
-  gpu_inflate_status_s * __restrict__ outputs,
+  gpu_snappy_status_s * __restrict__ outputs,
 	uint64_t* __restrict__ device_out_bytes)
 {
   __shared__ __align__(16) unsnap_state_s state_g;
@@ -1041,7 +1030,7 @@ cudaError_t gpu_snap(
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
 	const size_t* device_out_available_bytes,
-  gpu_inflate_status_s *outputs,
+	gpu_snappy_status_s *outputs,
 	size_t* device_out_bytes,
   int count,
   cudaStream_t stream)
@@ -1059,7 +1048,7 @@ cudaError_t gpu_unsnap(
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
 	const size_t* device_out_available_bytes,
-  gpu_inflate_status_s *outputs,
+	gpu_snappy_status_s *outputs,
 	size_t* device_out_bytes,
   int count,
   cudaStream_t stream)
