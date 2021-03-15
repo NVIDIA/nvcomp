@@ -62,6 +62,12 @@ IF(NOT CUB_HEADER)
       "to cub via 'CUB_DIR'")
 ENDIF()
 
+option (ENABLE_BITCOMP "Enable bitcomp inside nvcomp" OFF)
+if (ENABLE_BITCOMP)
+  message(STATUS "Finding Bitcomp")
+  find_package (bitcomp)
+  add_definitions (-DENABLE_BITCOMP)
+endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

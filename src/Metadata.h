@@ -93,6 +93,8 @@ protected:
 
   void setCompressedSize(size_t bytes);
 
+  void setValueType(nvcompType_t valueType);
+
 private:
   /**
    * @brief The datatype of decompressed elements.

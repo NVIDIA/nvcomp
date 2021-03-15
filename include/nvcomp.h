@@ -159,7 +159,7 @@ nvcompError_t nvcompDecompressAsync(
     size_t in_bytes,
     void* temp_ptr,
     size_t temp_bytes,
-    const void* metadata_ptr,
+    void* metadata_ptr,
     void* out_ptr,
     size_t out_bytes,
     cudaStream_t stream);
