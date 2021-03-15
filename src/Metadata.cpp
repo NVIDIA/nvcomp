@@ -86,6 +86,10 @@ int Metadata::getCompressionType() const
   return m_compressionType;
 }
 
+/******************************************************************************
+ * PROTECTED METHODS **********************************************************
+ *****************************************************************************/
+
 void Metadata::setUncompressedSize(const size_t bytes)
 {
   m_uncompressedBytes = bytes;
@@ -96,8 +100,9 @@ void Metadata::setCompressedSize(const size_t bytes)
   m_compressedBytes = bytes;
 }
 
-/******************************************************************************
- * PROTECTED METHODS **********************************************************
- *****************************************************************************/
+void Metadata::setValueType(nvcompType_t valueType)
+{
+  m_type = valueType;
+}
 
 } // namespace nvcomp

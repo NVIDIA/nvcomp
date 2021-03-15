@@ -20,4 +20,8 @@ if(DEFINED CUB_DIR)
 endif()
 target_include_directories(nvcomp PUBLIC "${CUDAToolkit_INCLUDE_DIRS}")
 
+if (ENABLE_BITCOMP)
+  target_link_libraries(nvcomp PUBLIC bitcomp)
+endif()
+
 add_subdirectory("test")

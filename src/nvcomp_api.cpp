@@ -29,6 +29,8 @@
 #include "nvcomp.h"
 #include "nvcomp/cascaded.h"
 #include "nvcomp/lz4.h"
+#include "nvcomp/bitcomp.h"
+#include "BitcompMetadata.h"
 
 #include "Metadata.h"
 
@@ -44,10 +46,17 @@ nvcompError_t nvcompDecompressGetMetadata(
     void** const metadata_ptr,
     cudaStream_t stream)
 {
+  cudaStreamSynchronize(stream);
   if (LZ4IsData(in_ptr, in_bytes, stream)) {
     return nvcompLZ4DecompressGetMetadata(
         in_ptr, in_bytes, metadata_ptr, stream);
   }
+#ifdef ENABLE_BITCOMP
+  else if (nvcompIsBitcompData(in_ptr, in_bytes)) {
+    return nvcompBitcompDecompressGetMetadata(
+        in_ptr, in_bytes, metadata_ptr, stream);
+  }
+#endif
   else {
     return nvcompCascadedDecompressGetMetadata(
         in_ptr, in_bytes, metadata_ptr, stream);
@@ -56,9 +65,18 @@ nvcompError_t nvcompDecompressGetMetadata(
 
 void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 {
+#ifdef ENABLE_BITCOMP
+  const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
+#endif
   if (LZ4IsMetadata(metadata_ptr)) {
     nvcompLZ4DecompressDestroyMetadata(metadata_ptr);
-  } else {
+  }
+#ifdef ENABLE_BITCOMP
+  else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
+    nvcompBitcompDecompressDestroyMetadata(metadata_ptr);
+  }
+#endif
+  else {
     nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
   }
 }
@@ -66,8 +84,17 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 nvcompError_t nvcompDecompressGetTempSize(
     const void* const metadata_ptr, size_t* const temp_bytes)
 {
+  const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
   if (LZ4IsMetadata(metadata_ptr)) {
     return nvcompLZ4DecompressGetTempSize(metadata_ptr, temp_bytes);
+  }
+  else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
+#ifdef ENABLE_BITCOMP
+    return nvcompBitcompDecompressGetTempSize (metadata_ptr, temp_bytes);
+#else
+    *temp_bytes = 0;
+    return nvcompErrorNotSupported;
+#endif
   }
   return nvcompCascadedDecompressGetTempSize(metadata_ptr, temp_bytes);
 }
@@ -121,11 +148,12 @@ nvcompError_t nvcompDecompressAsync(
     const size_t in_bytes,
     void* const temp_ptr,
     const size_t temp_bytes,
-    const void* const metadata_ptr,
+    void* const metadata_ptr,
     void* const out_ptr,
     const size_t out_bytes,
     cudaStream_t stream)
 {
+  const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
   if (LZ4IsMetadata(metadata_ptr)) {
     return nvcompLZ4DecompressAsync(
         in_ptr,
@@ -136,6 +164,21 @@ nvcompError_t nvcompDecompressAsync(
         out_ptr,
         out_bytes,
         stream);
+  }
+  else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
+#ifdef ENABLE_BITCOMP
+    return nvcompBitcompDecompressAsync(
+        in_ptr,
+        in_bytes,
+        temp_ptr,
+        temp_bytes,
+        metadata_ptr,
+        out_ptr,
+        out_bytes,
+        stream);
+#else
+    return nvcompErrorNotSupported;
+#endif        
   }
   else {
     return nvcompCascadedDecompressAsync(
