@@ -179,7 +179,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   std::cout << "comp_size: " << total_bytes_compressed
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
             << (double)total_bytes_uncompressed / total_bytes_compressed << std::endl;
-  std::cout << "compression throughput (GB/s): " << total_bytes_uncompressed / (elapsedTime * 0.001F) / 1.0e+9F
+  std::cout << "compression throughput read+write (GB/s): " << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F) / 1.0e+9F
             << std::endl;
 
   cudaFree(d_comp_temp);
@@ -224,8 +224,8 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   elapsedTime;
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
-  std::cout << "decompression throughput (GB/s): "
-            << total_bytes_uncompressed / (elapsedTime * 0.001F) / 1.0e+9F << std::endl;
+  std::cout << "decompression throughput read+write (GB/s): "
+            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F) / 1.0e+9F << std::endl;
 
   cudaFree(temp_ptr);
   cudaFree(d_comp_out_device);
