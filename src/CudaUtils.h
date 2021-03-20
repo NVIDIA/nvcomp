@@ -29,7 +29,6 @@
 
 #include "cuda_runtime.h"
 
-#include <stdexcept>
 #include <string>
 
 namespace nvcomp
@@ -51,30 +50,11 @@ public:
    * @param err The error.
    * @param msg The message to attach to the exception.
    */
-  static void check(const cudaError_t err, const std::string& msg)
-  {
-    if (err != cudaSuccess) {
-      std::string errorStr(
-          "Encountered Cuda Error: " + std::to_string(err) + ": '"
-          + std::string(cudaGetErrorString(err)) + "'");
-      if (!msg.empty()) {
-        errorStr += ": " + msg;
-      }
-      errorStr += ".";
+  static void check(const cudaError_t err, const std::string& msg);
 
-      throw std::runtime_error(errorStr);
-    }
-  }
+  static void sync(cudaStream_t stream);
 
-  static void sync(cudaStream_t stream)
-  {
-    check(cudaStreamSynchronize(stream), "Failed to sync with stream");
-  }
-
-  static void check_last_error(const std::string& msg = "")
-  {
-    check(cudaGetLastError(), msg);
-  }
+  static void check_last_error(const std::string& msg = "");
 
   /**
    * @brief Perform checked asynchronous memcpy.
@@ -121,7 +101,15 @@ public:
         "CudaUtils::copy(dst, src, count, kind)");
   }
 
+  template <typename T>
+  static T* device_pointer(T* const ptr)
+  {
+    return reinterpret_cast<T*>(void_device_pointer(ptr));
+  }
 
+private:
+  static const void* void_device_pointer(const void* ptr);
+  static void* void_device_pointer(void* ptr);
 };
 
 } // namespace nvcomp

@@ -26,9 +26,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+namespace nvcomp
+{
+namespace lowlevel
+{
 
-namespace nvcomp {
-
+// Deprecated
 /**
  * @brief Compress a batch of memory locations.
  *
@@ -57,15 +60,36 @@ void lz4CompressBatch(
     const size_t* const comp_prefix_offset_device,
     cudaStream_t stream);
 
+void lz4CompressBatch(
+    const uint8_t* const* decomp_data_device,
+    const size_t* decomp_sizes_device,
+    const size_t batch_size,
+    void* temp_data,
+    size_t temp_bytes,
+    uint8_t* const* comp_data_device,
+    size_t* const comp_sizes_device,
+    cudaStream_t stream);
+
+// Deprecated
 void lz4DecompressBatches(
     void* const temp_space,
     const size_t temp_size,
     void* const* decompData,
     const uint8_t* const* compData,
     int batch_size,
-    const size_t** compPrefix,
+    const size_t* const* compPrefix,
     int chunk_size,
-    int* chunks_in_item,
+    const int* chunks_in_item,
+    cudaStream_t stream);
+
+void lz4BatchDecompress(
+    const uint8_t* const* device_in_ptrs,
+    const size_t* device_in_bytes,
+    const size_t* device_out_bytes,
+    const size_t batch_size,
+    void* temp_ptr,
+    const size_t temp_bytes,
+    uint8_t* const* device_out_ptrs,
     cudaStream_t stream);
 
 size_t lz4ComputeChunksInBatch(
@@ -73,8 +97,12 @@ size_t lz4ComputeChunksInBatch(
     const size_t batch_size,
     const size_t chunk_size);
 
+// Deprecated
 size_t lz4CompressComputeTempSize(
     const size_t max_chunks_in_batch, const size_t chunk_size);
+
+size_t lz4BatchCompressComputeTempSize(
+    const size_t max_chunk_size, const size_t batch_size);
 
 size_t lz4DecompressComputeTempSize(
     const size_t max_chunks_in_batch, const size_t chunk_size);
@@ -84,5 +112,5 @@ size_t lz4ComputeMaxSize(const size_t chunk_size);
 size_t lz4MinChunkSize();
 
 size_t lz4MaxChunkSize();
-}
-
+} // namespace lowlevel
+} // namespace nvcomp

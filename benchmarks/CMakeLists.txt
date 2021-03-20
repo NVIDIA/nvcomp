@@ -1,4 +1,4 @@
-file(GLOB EXAMPLE_SOURCES *.cpp)
+file(GLOB EXAMPLE_SOURCES *.cpp *.cu)
 
 find_package(Threads REQUIRED)
 

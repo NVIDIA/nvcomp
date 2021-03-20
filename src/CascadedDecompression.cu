@@ -58,7 +58,6 @@
 #include <list>
 #include <map>
 #include <mutex>
-#include <sstream>
 #include <vector>
 
 // align all temp allocations by 512B
@@ -787,26 +786,8 @@ void unpackGpu(
     const void* h_hdr,
     cudaStream_t stream)
 {
-  void* d_input = NULL;
-
   // prepare input data
-  cudaPointerAttributes attr;
-
-  cudaError_t err = cudaPointerGetAttributes(&attr, data);
-  if (err != cudaSuccess) {
-    std::ostringstream oss;
-    oss << data;
-    throw std::runtime_error(
-        "unpackGpu(): Failed to get pointer attributes for " + oss.str()
-        + " due to: " + std::to_string(err));
-  }
-
-  if (attr.type != cudaMemoryTypeUnregistered) {
-    // memory is accessible to the GPU
-    d_input = attr.devicePointer;
-  } else {
-    throw std::runtime_error("unpackGpu(): Data not accessible to the GPU");
-  }
+  const void* const d_input = CudaUtils::device_pointer(data);
 
   // Get length of run from the host-side header
   size_t length = static_cast<const CascadedMetadata::Header*>(h_hdr)->length;
