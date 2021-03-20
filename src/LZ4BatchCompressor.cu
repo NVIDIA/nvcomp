@@ -28,12 +28,14 @@
 
 #include "CudaUtils.h"
 #include "LZ4BatchCompressor.h"
-#include "LZ4CompressionKernels.h"
 #include "TempSpaceBroker.h"
 #include "common.h"
+#include "lowlevel/LZ4CompressionKernels.h"
 
 namespace nvcomp
 {
+
+using namespace lowlevel;
 
 /******************************************************************************
  * KERNELS ********************************************************************
