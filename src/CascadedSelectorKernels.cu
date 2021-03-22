@@ -55,6 +55,10 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
+
 namespace nvcomp
 {
 
@@ -509,9 +513,9 @@ void SampleFusedInternal(
         "Fail to launch SampleFusedKernel: " + std::to_string(err));
   }
 
-  unsigned long long int size_buffer[NUM_SCHEMES];
+  std::vector<unsigned long long int> size_buffer(NUM_SCHEMES);
   err = cudaMemcpyAsync(
-      size_buffer,
+      size_buffer.data(),
       d_sizeBuffer,
       sizeof(unsigned long long int) * NUM_SCHEMES,
       cudaMemcpyDeviceToHost,

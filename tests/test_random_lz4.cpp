@@ -120,8 +120,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
       T* out_ptr = NULL;
       cudaMalloc(&out_ptr, decomp_out_bytes);
 
-      struct timespec start, end;
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      auto start = std::chrono::steady_clock::now();
 
       decompressor.decompress_async(
           temp_ptr, temp_bytes, out_ptr, decomp_out_bytes, stream);
@@ -129,7 +128,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
       CUDA_CHECK(cudaStreamSynchronize(stream));
 
       // stop timing and the profiler
-      clock_gettime(CLOCK_MONOTONIC, &end);
+      auto end = std::chrono::steady_clock::now();
       std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
                 << std::endl;
 

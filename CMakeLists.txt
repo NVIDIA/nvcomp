@@ -7,8 +7,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
+    "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR
+    "${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
+
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
+endif()
+
 # Using '-G' can cause the register count to overflow for some kernels
 # and cause launch failures
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG};-G")
@@ -44,6 +50,9 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
   # TODO: add clang warnings
 endif()
 
+  if (MSVC)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W3>")
+  endif()
 
 if(NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})
   set(CUB_DIR ENV{CUB_DIR})

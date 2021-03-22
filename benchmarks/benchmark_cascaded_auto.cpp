@@ -33,8 +33,8 @@
 #include "benchmark_common.h"
 
 #include <algorithm>
-#include <getopt.h>
 #include <chrono>
+#include <string.h>
 
 using namespace nvcomp;
 
@@ -125,8 +125,7 @@ static void run_benchmark(
   // Random time-based seed
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  auto start = std::chrono::steady_clock::now();
 
   // Launch compression
   status = nvcompCascadedCompressAuto(
@@ -144,7 +143,7 @@ static void run_benchmark(
       status == nvcompSuccess, "nvcompCascadedCompressAuto not successful");
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  auto end = std::chrono::steady_clock::now();
 
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
@@ -195,7 +194,7 @@ static void run_benchmark(
   CUDA_CHECK(cudaMalloc(
       &decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
 
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  start = std::chrono::steady_clock::now();
 
   // execute decompression (asynchronous)
   status = nvcompDecompressAsync(
@@ -212,7 +211,7 @@ static void run_benchmark(
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // stop timing and the profiler
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  end = std::chrono::steady_clock::now();
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
@@ -254,44 +253,48 @@ int main(int argc, char* argv[])
   std::string dtype = "int";
   size_t size = 0;
 
-  // Parse command-line arguments
-  while (1) {
-    int option_index = 0;
-    static struct option long_options[]{{"file", required_argument, 0, 'f'},
-                                        {"type", required_argument, 0, 't'},
-                                        {"size", required_argument, 0, 'z'},
-                                        {"gpu", required_argument, 0, 'g'},
-                                        {"memory", no_argument, 0, 'm'},
-                                        {"help", no_argument, 0, '?'}};
-    int c;
-    opterr = 0;
-    c = getopt_long(
-        argc, argv, "f:r:d:b:g:t:z:s:m?", long_options, &option_index);
-    if (c == -1)
-      break;
 
-    switch (c) {
-    case 'f':
-      fname = optarg;
-      break;
-    case 'z':
-      size = atoll(optarg);
-      break;
-    case 'g':
-      gpu_num = atoi(optarg);
-      break;
-    case 't':
-      dtype = optarg;
-      break;
-    case 'm':
-      verbose_memory = 1;
-      break;
-    case '?':
-    default:
+  // Parse command-line arguments
+  char** argv_end = argv + argc;
+  argv += 1;
+  while (argv != argv_end) {
+    char* arg = *argv++;
+    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
-      exit(1);
+      return 1;
     }
+    if (strcmp(arg, "--memory") == 0 || strcmp(arg, "-m") == 0) {
+      verbose_memory = 1;
+      continue;
+    }
+
+    // all arguments below require at least a second value in argv
+    if (argv >= argv_end) {
+      print_usage();
+      return 1;
+    }
+
+    char* optarg = *argv++;
+    if (strcmp(arg, "--filename") == 0 || strcmp(arg, "-f") == 0) {
+      fname = optarg;
+      continue;
+    }
+    if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
+      gpu_num = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
+      dtype = optarg;
+      continue;
+    }
+    if (strcmp(arg, "--size") == 0 || strcmp(arg, "-gpu") == 0) {
+      size = atoll(optarg);
+      continue;
+    }
+    print_usage();
+    return 1;
   }
+
   if (fname == NULL) {
     print_usage();
   }

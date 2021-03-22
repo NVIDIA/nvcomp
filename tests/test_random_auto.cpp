@@ -159,10 +159,7 @@ void test_auto_c(const std::vector<T>& data)
     CUDA_CHECK(cudaMalloc(
         &decomp_out_ptr, decomp_out_bytes)); // also can use RMM_ALLOC instead
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    nvcompError_t status;
+    auto start = std::chrono::steady_clock::now();
 
     // execute decompression (asynchronous)
     err = nvcompDecompressAsync(
@@ -179,7 +176,7 @@ void test_auto_c(const std::vector<T>& data)
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
     // stop timing and the profiler
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    auto end = std::chrono::steady_clock::now();
     std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
               << std::endl;
 
@@ -298,8 +295,7 @@ void test_auto_cpp(const std::vector<T>& data)
     CUDA_CHECK(cudaMalloc(
         &decomp_out_ptr, decomp_out_bytes)); // also can use RMM_ALLOC instead
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    auto start = std::chrono::steady_clock::now();
 
     // execute decompression 
     decompressor.decompress_async(d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_out_bytes, stream);
@@ -307,7 +303,7 @@ void test_auto_cpp(const std::vector<T>& data)
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
     // stop timing and the profiler
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    auto end = std::chrono::steady_clock::now();
     std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
               << std::endl;
 
