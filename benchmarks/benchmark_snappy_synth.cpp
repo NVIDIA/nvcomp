@@ -56,16 +56,22 @@ namespace
 
 constexpr const size_t CHUNK_SIZE = 1 << 16;
 constexpr const int DEFAULT_BATCH_SIZE = 4000;
+constexpr const int DEFAULT_WARMUP_COUNT = 10;
+constexpr const int DEFAULT_ITERATIONS_COUNT = 10;
+constexpr const int DEFAULT_MAX_BYTE_VALUE = 255;
 
 void print_usage()
 {
   printf("Usage: benchmark_binary [OPTIONS]\n");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
   printf("  %-35s Batch size (default %d)\n", "-b, --batch_size", DEFAULT_BATCH_SIZE);
+  printf("  %-35s Warm up benchmark (default %d)\n", "-w, --warmup_count", DEFAULT_WARMUP_COUNT);
+  printf("  %-35s Average multiple kernel runtimes (default %d)\n", "-i, --iterations_count", DEFAULT_ITERATIONS_COUNT);
+  printf("  %-35s Maximum value for the bytes of uncompressed data (default %d)\n", "-m, --max_byte", DEFAULT_MAX_BYTE_VALUE);
   exit(1);
 }
 
-void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
+void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, int warmup_count, int iterations_count)
 {
   size_t batch_size = uncompressed_data.size();
 
@@ -80,7 +86,6 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
       max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
-  std::cout << "----------" << std::endl;
   std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
   std::cout << "chunks " << batch_size << std::endl;
 
@@ -151,18 +156,33 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   CUDA_CHECK(cudaEventCreate(&start));
   CUDA_CHECK(cudaEventCreate(&stop));
 
+  // warmup
+  for(int i = 0; i < warmup_count; ++i) {
+    status = nvcompBatchedSnappyCompressAsync(
+        (const void* const*)d_in_data_device,
+        batch_bytes_device,
+        batch_size,
+        d_comp_temp,
+        comp_temp_bytes,
+        d_comp_out_device,
+        comp_out_bytes_device,
+        stream);
+    REQUIRE(status == nvcompSuccess);
+  }
   CUDA_CHECK(cudaEventRecord(start, 0));
-  status = nvcompBatchedSnappyCompressAsync(
-      (const void* const*)d_in_data_device,
-      batch_bytes_device,
-      batch_size,
-      d_comp_temp,
-      comp_temp_bytes,
-      d_comp_out_device,
-      comp_out_bytes_device,
-      stream);
+  for(int i = 0; i < iterations_count; ++i) {
+    status = nvcompBatchedSnappyCompressAsync(
+        (const void* const*)d_in_data_device,
+        batch_bytes_device,
+        batch_size,
+        d_comp_temp,
+        comp_temp_bytes,
+        d_comp_out_device,
+        comp_out_bytes_device,
+        stream);
+    REQUIRE(status == nvcompSuccess);
+  }
   CUDA_CHECK(cudaEventRecord(stop, 0));
-  REQUIRE(status == nvcompSuccess);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -179,7 +199,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   std::cout << "comp_size: " << total_bytes_compressed
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
             << (double)total_bytes_uncompressed / total_bytes_compressed << std::endl;
-  std::cout << "compression throughput read+write (GB/s): " << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F) / 1.0e+9F
+  std::cout << "compression throughput read+write (GB/s): " << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F
             << std::endl;
 
   cudaFree(d_comp_temp);
@@ -206,18 +226,32 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   CUDA_CHECK(cudaMalloc((void **)(&d_decomp_out_device), sizeof(d_decomp_out)));
   cudaMemcpy(d_decomp_out_device, d_decomp_out, sizeof(d_decomp_out), cudaMemcpyHostToDevice);
 
+  for(int i = 0; i < warmup_count; ++i) {
+    status = nvcompBatchedSnappyDecompressAsync(
+        (const void* const*)d_comp_out_device,
+        comp_out_bytes_device,
+        batch_bytes_device,
+        batch_size,
+        temp_ptr,
+        temp_bytes,
+        (void* const*)d_decomp_out_device,
+        stream);
+    REQUIRE(status == nvcompSuccess);
+  }
   CUDA_CHECK(cudaEventRecord(start, 0));
-  status = nvcompBatchedSnappyDecompressAsync(
-      (const void* const*)d_comp_out_device,
-      comp_out_bytes_device,
-      batch_bytes_device,
-      batch_size,
-      temp_ptr,
-      temp_bytes,
-      (void* const*)d_decomp_out_device,
-      stream);
+  for(int i = 0; i < iterations_count; ++i) {
+    status = nvcompBatchedSnappyDecompressAsync(
+        (const void* const*)d_comp_out_device,
+        comp_out_bytes_device,
+        batch_bytes_device,
+        batch_size,
+        temp_ptr,
+        temp_bytes,
+        (void* const*)d_decomp_out_device,
+        stream);
+    REQUIRE(status == nvcompSuccess);
+  }
   CUDA_CHECK(cudaEventRecord(stop, 0));
-  REQUIRE(status == nvcompSuccess);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -225,7 +259,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data)
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
   std::cout << "decompression throughput read+write (GB/s): "
-            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F) / 1.0e+9F << std::endl;
+            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F << std::endl;
 
   cudaFree(temp_ptr);
   cudaFree(d_comp_out_device);
@@ -268,32 +302,28 @@ gen_data(int max_byte, const size_t size, std::mt19937& rng)
   return data;
 }
 
-void run_tests(std::mt19937& rng, int batch_size)
-{
-  // benchmark random bytes
-  std::vector<std::vector<uint8_t>> uncompressed_data;
-  for(int i = 0; i < batch_size; ++i)
-    uncompressed_data.emplace_back(gen_data(255, CHUNK_SIZE, rng));
-
-  run_benchmark(uncompressed_data);
-}
-
 } // namespace
 
 int main(int argc, char* argv[])
 {
   int gpu_num = 0;
   int batch_size = DEFAULT_BATCH_SIZE;
+  int warmup_count = DEFAULT_WARMUP_COUNT;
+  int iterations_count = DEFAULT_ITERATIONS_COUNT;
+  int max_byte = DEFAULT_MAX_BYTE_VALUE;
 
   // Parse command-line arguments
   while (1) {
     int option_index = 0;
     static struct option long_options[]{{"gpu", required_argument, 0, 'g'},
                                         {"batch_size", required_argument, 0, 'b'},
+                                        {"warmup_count", required_argument, 0, 'w'},
+                                        {"iterations_count", required_argument, 0, 'i'},
+                                        {"max_byte", required_argument, 0, 'm'},
                                         {"help", no_argument, 0, '?'}};
     int c;
     opterr = 0;
-    c = getopt_long(argc, argv, "g:b:", long_options, &option_index);
+    c = getopt_long(argc, argv, "g:b:w:i:m:", long_options, &option_index);
     if (c == -1)
       break;
 
@@ -304,6 +334,15 @@ int main(int argc, char* argv[])
     case 'b':
       batch_size = atoi(optarg);
       break;
+    case 'w':
+      warmup_count = atoi(optarg);
+      break;
+    case 'i':
+      iterations_count = atoi(optarg);
+      break;
+    case 'm':
+      max_byte = atoi(optarg);
+      break;
     case '?':
     default:
       print_usage();
@@ -311,11 +350,20 @@ int main(int argc, char* argv[])
     }
   }
 
+  std::cout << "----------" << std::endl;
+  std::cout << "Max byte = " << max_byte << std::endl;
+
   cudaSetDevice(gpu_num);
 
   std::mt19937 rng(0);
 
-  run_tests(rng, batch_size);
+  std::vector<std::vector<uint8_t>> uncompressed_data;
+  for(int i = 0; i < batch_size; ++i)
+    uncompressed_data.emplace_back(gen_data(max_byte, CHUNK_SIZE, rng));
+
+  run_benchmark(uncompressed_data, warmup_count, iterations_count);
+
+  std::cout << "----------" << std::endl;
 
   return 0;
 }

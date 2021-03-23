@@ -934,7 +934,7 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
  * @param[in] inputs Source & destination information per block
  * @param[out] outputs Decompression status per block
  **/
-extern "C" __global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(96)
 unsnap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -953,7 +953,7 @@ unsnap_kernel(
     s->in.srcDevice = device_in_ptr[strm_id];
     s->in.srcSize = device_in_bytes[strm_id];
     s->in.dstDevice = device_out_ptr[strm_id];
-    s->in.dstSize = device_out_available_bytes[strm_id];
+    s->in.dstSize = device_out_available_bytes ? device_out_available_bytes[strm_id] : 0;
   }
   if (t < BATCH_COUNT) { s->q.batch_len[t] = 0; }
   __syncthreads();
@@ -993,6 +993,8 @@ unsnap_kernel(
       s->bytes_left        = uncompressed_size;
       s->base              = cur;
       s->end               = end;
+      if (s->in.dstSize == 0)
+        s->in.dstSize = uncompressed_size;
       if ((cur >= end && uncompressed_size != 0) || (uncompressed_size > s->in.dstSize)) {
         s->error = -1;
       }
@@ -1054,7 +1056,7 @@ cudaError_t gpu_unsnap(
   cudaStream_t stream)
 {
   uint32_t count32 = (count > 0) ? count : 0;
-  dim3 dim_block(128, 1);     // 4 warps per stream, 1 stream per block
+  dim3 dim_block(96, 1);     // 4 warps per stream, 1 stream per block
   dim3 dim_grid(count32, 1);  // TODO: Check max grid dimensions vs max expected count
 
   unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(
