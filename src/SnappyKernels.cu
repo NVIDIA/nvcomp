@@ -350,8 +350,10 @@ snap_kernel(
 #define BATCH_SIZE (1 << LOG2_BATCH_SIZE)
 #define LOG2_BATCH_COUNT 2
 #define BATCH_COUNT (1 << LOG2_BATCH_COUNT)
-#define LOG2_PREFETCH_SIZE 9
+#define LOG2_PREFETCH_SIZE 10
 #define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 512B, in 32B chunks
+#define PREFETCH_SECTORS 8
+#define LITERAL_SECTORS 8
 
 #define LOG_CYCLECOUNT 0
 
@@ -421,8 +423,8 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
     if (!t) {
       uint32_t minrdpos;
       s->q.prefetch_wrpos = pos;
-      minrdpos            = pos - min(pos, PREFETCH_SIZE - 32u);
-      blen                = (int)min(32u, end - pos);
+      minrdpos            = pos - min(pos, PREFETCH_SIZE - PREFETCH_SECTORS * 32u);
+      blen                = (int)min(PREFETCH_SECTORS * 32u, end - pos);
       for (;;) {
         uint32_t rdpos = s->q.prefetch_rdpos;
         if (rdpos >= minrdpos) break;
@@ -434,7 +436,18 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
       }
     }
     blen = SHFL0(blen);
-    if (t < blen) { s->q.buf[(pos + t) & (PREFETCH_SIZE - 1)] = base[pos + t]; }
+    if (blen == PREFETCH_SECTORS * 32u) {
+      uint8_t vals[PREFETCH_SECTORS];
+      for(int i = 0; i < PREFETCH_SECTORS; ++i)
+        vals[i] = base[pos + t + i * 32u];
+      for(int i = 0; i < PREFETCH_SECTORS; ++i)
+        s->q.buf[(pos + t + i * 32u) & (PREFETCH_SIZE - 1)] = vals[i];
+    } else {
+#pragma unroll 1
+      for(int elem = t; elem < blen; elem += 32) {
+        s->q.buf[(pos + elem) & (PREFETCH_SIZE - 1)] = base[pos + elem];
+      }
+    }
     pos += blen;
   } while (blen > 0);
 }
@@ -901,21 +914,23 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
         if (32 + t < blen) { out[32 + t] = b1; }
       } else {
         // Literal
-        uint8_t b0, b1;
+        uint8_t b[LITERAL_SECTORS];
         dist = -dist;
-        while (blen >= 64) {
-          b0          = literal_base[dist + t];
-          b1          = literal_base[dist + 32 + t];
-          out[t]      = b0;
-          out[32 + t] = b1;
-          dist += 64;
-          out += 64;
-          blen -= 64;
+        while (blen >= LITERAL_SECTORS * 32u) {
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            b[i] = literal_base[dist + i * 32u + t];
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            out[i * 32u + t] = b[i];
+          dist += LITERAL_SECTORS * 32u;
+          out += LITERAL_SECTORS * 32u;
+          blen -= LITERAL_SECTORS * 32u;
         }
-        if (t < blen) { b0 = literal_base[dist + t]; }
-        if (32 + t < blen) { b1 = literal_base[dist + 32 + t]; }
-        if (t < blen) { out[t] = b0; }
-        if (32 + t < blen) { out[32 + t] = b1; }
+        for(int i = 0; i < LITERAL_SECTORS; ++i)
+          if (i * 32u + t < blen)
+            b[i] = literal_base[dist + i * 32u + t];
+        for(int i = 0; i < LITERAL_SECTORS; ++i)
+          if (i * 32u + t < blen)
+            out[i * 32u + t] = b[i];
       }
       out += blen;
     }
