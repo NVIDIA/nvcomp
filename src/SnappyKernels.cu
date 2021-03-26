@@ -432,7 +432,7 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
           blen = 0;
           break;
         }
-        NANOSLEEP(100);
+        NANOSLEEP(1600);
       }
     }
     blen = SHFL0(blen);
