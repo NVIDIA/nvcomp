@@ -35,9 +35,9 @@
 #include "benchmark_common.h"
 
 #include <fstream>
-#include <getopt.h>
 #include <iostream>
 #include <string>
+#include <string.h>
 #include <thrust/device_vector.h>
 #include <vector>
 

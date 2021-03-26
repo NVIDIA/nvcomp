@@ -210,8 +210,7 @@ void test(
     CUDA_CHECK(cudaMalloc(
         &decomp_out_ptr, decomp_out_bytes)); // also can use RMM_ALLOC instead
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    auto start = std::chrono::steady_clock::now();
 
     nvcompError_t status;
 
@@ -230,7 +229,7 @@ void test(
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
     // stop timing and the profiler
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    auto end = std::chrono::steady_clock::now();
     std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
               << std::endl;
 

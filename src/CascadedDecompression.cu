@@ -153,7 +153,7 @@ struct nvcompIntHandle_t
       nvcompDataNode_t* node,
       const void** inputData,
       const void** h_headers,
-      cudaStream_t stream);
+      cudaStream_t stream = NULL);
 
   // workspace memory
   size_t workspaceBytes = 0;
@@ -945,7 +945,7 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
     nvcompDataNode_t* node,
     const void** inputData,
     const void** h_headers,
-    cudaStream_t stream = NULL)
+    cudaStream_t stream)
 {
   // prepare device output buffer if necessary
   // TODO: move to the init step

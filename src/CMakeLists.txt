@@ -14,10 +14,19 @@ file(GLOB CPP_SOURCES
   ./*.cpp
   ./lowlevel/*.cpp)
 
+if (MSVC_VERSION)
+# we have to export all symbols on windows for a dll
+add_library(nvcomp STATIC ${CUDA_SOURCES} ${CPP_SOURCES})
+else()
 add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
+endif()
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda -Xcompiler -pthread>)
+    $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
+if(THREADS_HAVE_PTHREAD_ARG)
+    target_compile_options(nvcomp PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -pthread>)
+endif()
 target_include_directories(nvcomp PUBLIC "../include")
 target_include_directories(nvcomp PUBLIC "./")
 if(DEFINED CUB_DIR)

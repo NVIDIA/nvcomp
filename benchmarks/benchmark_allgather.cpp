@@ -36,9 +36,9 @@
 #include "benchmark_common.h"
 
 #include <algorithm>
-#include <getopt.h>
 #include <iostream>
 #include <nvml.h>
+#include <string.h>
 
 using namespace nvcomp;
 
@@ -234,8 +234,7 @@ static void run_uncompressed_benchmark(
     }
   }
 
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  auto start = std::chrono::steady_clock::now();
 
   copy_to_all<T>(
       gpus,
@@ -256,7 +255,7 @@ static void run_uncompressed_benchmark(
 
   sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  auto end = std::chrono::steady_clock::now();
   std::cout << "Full data size (B): " << h_data->size() * sizeof(T) << std::endl
             << "Per-GPU benchmark throughput (GB/s): "
             << gbs(start,
@@ -370,8 +369,7 @@ static void run_lz4_benchmark(
     }
   }
 
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  auto start = std::chrono::steady_clock::now();
 
   // Issue compression calls
   for (int gpu = 0; gpu < gpus; ++gpu) {
@@ -458,7 +456,7 @@ static void run_lz4_benchmark(
 
   sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  auto end = std::chrono::steady_clock::now();
 
   // Test for correctness
   check_output<T>(
@@ -602,8 +600,7 @@ static void run_cascaded_benchmark(
     }
   }
 
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  auto start = std::chrono::steady_clock::now();
 
   // Issue compression calls
   for (int gpu = 0; gpu < gpus; ++gpu) {
@@ -694,7 +691,7 @@ static void run_cascaded_benchmark(
 
   sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  auto end = std::chrono::steady_clock::now();
 
   // Test for correctness
   check_output<T>(
@@ -777,54 +774,59 @@ int main(int argc, char* argv[])
   std::string dtype = "int";
 
   // Parse command-line arguments
-  while (1) {
-    int option_index = 0;
-    static struct option long_options[]{{"file", required_argument, 0, 'f'},
-                                        {"gpu", required_argument, 0, 'g'},
-                                        {"chunks", required_argument, 0, 'h'},
-                                        {"comp", required_argument, 0, 'c'},
-                                        {"rles", required_argument, 0, 'r'},
-                                        {"deltas", required_argument, 0, 'd'},
-                                        {"bitpack", required_argument, 0, 'b'},
-                                        {"type", required_argument, 0, 't'},
-                                        {"help", no_argument, 0, '?'}};
-    int c;
-    opterr = 0;
-    c = getopt_long(
-        argc, argv, "f:g:h:c:r:d:b:t:?", long_options, &option_index);
-    if (c == -1)
-      break;
-    switch (c) {
-    case 'f':
-      fname = optarg;
-      break;
-    case 'g':
-      gpu_num = atoi(optarg);
-      break;
-    case 'h':
-      chunks = atoi(optarg);
-      break;
-    case 'c':
-      comp_type = optarg;
-      break;
-    case 'r':
-      RLEs = atoi(optarg);
-      break;
-    case 'd':
-      deltas = atoi(optarg);
-      break;
-    case 'b':
-      bitPacking = atoi(optarg);
-      break;
-    case 't':
-      dtype = optarg;
-      break;
-    case '?':
-    default:
+
+  char** argv_end = argv + argc;
+  argv += 1;
+  while (argv != argv_end) {
+    char *arg = *argv++;
+    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
       return 1;
     }
+
+    // all arguments below require at least a second value in argv
+    if (argv >= argv_end) {
+      print_usage();
+      return 1;
+    }
+
+    char *optarg = *argv++;
+    if (strcmp(arg, "--filename") == 0 || strcmp(arg, "-f") == 0) {
+      fname = optarg;
+      continue;
+    }
+    if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
+      gpu_num = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--chunks") == 0 || strcmp(arg, "-h") == 0) {
+      chunks = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--comp") == 0 || strcmp(arg, "-c") == 0) {
+      comp_type = optarg;
+      continue;
+    }
+    if (strcmp(arg, "--rles") == 0 || strcmp(arg, "-r") == 0) {
+      RLEs = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--deltas") == 0 || strcmp(arg, "-d") == 0) {
+      deltas = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--bitpack") == 0 || strcmp(arg, "-b") == 0) {
+      bitPacking = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
+      dtype = optarg;
+      continue;
+    }
+    print_usage();
+    return 1;
   }
+  // TODO check if all options have been found
   if (fname == NULL) {
     std::cerr << "Missing filename." << std::endl;
     print_usage();
