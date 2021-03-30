@@ -274,6 +274,10 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         cudaMemcpyDeviceToHost);
     // Verify correctness
     for (size_t j = 0; j < batch_bytes_host[i]; ++j) {
+      if (output_host[i][j] != input_host[i][j])
+        std::cout << "Mismatch at batch # " << i << ", element " << j
+          << ", reference value = " << (unsigned int)input_host[i][j]
+          << ", actual value = " << (unsigned int)output_host[i][j] << std::endl;
       REQUIRE(output_host[i][j] == input_host[i][j]);
     }
   }

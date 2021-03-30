@@ -450,6 +450,9 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
     }
     pos += blen;
   } while (blen > 0);
+
+//  if (t == 0)
+//    printf("Exiting prefetch\n");
 }
 
 /**
@@ -621,7 +624,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
   int32_t batch       = 0;
 
   for (;;) {
-    int32_t batch_len;
+    int32_t batch_len = 0;
     volatile unsnap_batch_s *b;
 
     // Wait for prefetcher
@@ -635,6 +638,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
     // the stream will consist of a large number of short literals (1-byte or 2-byte)
     // followed by short repeat runs. This results in many 2-byte or 3-byte symbols
     // that can all be decoded in parallel once we know the symbol length.
+    /*
     {
       uint32_t v0, v1, v2, len3_mask, cur_t, is_long_sym, short_sym_mask;
       uint32_t b0;
@@ -731,6 +735,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
         } while (batch_add >= 6 && batch_len < BATCH_SIZE - 2);
       }
     }
+    */
     if (t == 0) {
       while (bytes_left > 0 && batch_len < BATCH_SIZE) {
         uint32_t blen, offset;
@@ -813,6 +818,117 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
     s->bytes_left         = bytes_left;
     if (bytes_left != 0) { s->error = -2; }
   }
+}
+
+__device__ void snappy_decode_symbols2(unsnap_state_s *s, uint32_t t)
+{
+  uint32_t cur = 0;
+  uint32_t end = static_cast<uint32_t>(s->end - s->base);
+  uint32_t bytes_left = s->uncompressed_size;
+  uint32_t dst_pos = 0;
+  int32_t batch = 0;
+  bool flag = true;
+
+  while (SHFL0(flag)) {
+    volatile unsnap_batch_s *b;
+
+    // Wait for prefetcher
+    if (t == 0) {
+      s->q.prefetch_rdpos = cur;
+#pragma unroll(1)  // We don't want unrolling here
+      while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
+      b = &s->q.batch[batch * BATCH_SIZE];
+    }
+
+    if (t == 0) {
+      uint8_t b0 = READ_BYTE(cur);
+      int len;
+      int offset;
+      if (b0 & 3) {
+        // Copy
+        uint8_t b1 = READ_BYTE(cur + 1);
+        if (!(b0 & 2)) {
+          // xxxxxx01.oooooooo: copy with 3-bit length, 11-bit offset
+          offset = ((b0 & 0xe0) << 3) | b1;
+          len = ((b0 >> 2) & 7) + 4;
+          cur += 2;
+        } else {
+          // xxxxxx1x: copy with 6-bit length, 2-byte or 4-byte offset
+          offset = b1 | (READ_BYTE(cur + 2) << 8);
+          if (b0 & 1)  // 4-byte offset
+          {
+            offset |= (READ_BYTE(cur + 3) << 16) | (READ_BYTE(cur + 4) << 24);
+            cur += 5;
+          } else {
+            cur += 3;
+          }
+          len = (b0 >> 2) + 1;
+        }
+        if (offset > dst_pos) {
+          flag = false;
+        }
+      }
+      else {
+        // xxxxxx00: literal
+        len = b0 >> 2;
+        if (len >= 60) {
+          uint32_t num_bytes = len - 59;
+          len = READ_BYTE(cur + 1);
+          if (num_bytes > 1) {
+            len |= READ_BYTE(cur + 2) << 8;
+            if (num_bytes > 2) {
+              len |= READ_BYTE(cur + 3) << 16;
+              if (num_bytes > 3)
+                len |= READ_BYTE(cur + 4) << 24;
+            }
+          }
+          cur += num_bytes;
+        }
+        cur += 1;
+        len += 1;
+        offset = -(int32_t)cur;
+        cur += len;
+      }
+
+      dst_pos += len;
+      if (bytes_left < len) {
+        flag = false;
+      }
+      bytes_left -= len;
+
+      //printf("Decoded len = %d, offset = %d\n", len, offset);
+      if (flag) {
+        b[0].len = len;
+        b[0].offset = offset;
+
+        {
+          s->q.batch_len[batch] = 1;
+          batch = (batch + 1) & (BATCH_COUNT - 1);
+        }
+      }
+
+      if (bytes_left <= 0) {
+        //printf("bytes_left %d <= 0, exiting\n", bytes_left);
+        flag = false;
+      }
+    }
+
+    if (t == 0) {
+      while (s->q.batch_len[batch] != 0) { NANOSLEEP(100); }
+    }
+  }
+
+  if (!t) {
+    s->q.prefetch_end = 1;
+    s->q.batch_len[batch] = -1;
+    //printf("Marking batch %d with -1\n", batch);
+    s->bytes_left = bytes_left;
+    if (bytes_left != 0)
+      s->error = -2;
+  }
+
+//  if (t == 0)
+//    printf("Exiting decode\n");
 }
 
 /**
@@ -938,6 +1054,9 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
     if (t == 0) { s->q.batch_len[batch] = 0; }
     batch = (batch + 1) & (BATCH_COUNT - 1);
   } while (1);
+
+//  if (t == 0)
+//    printf("Exiting process\n");
 }
 
 /**
@@ -1024,7 +1143,7 @@ unsnap_kernel(
   if (!s->error) {
     if (t < 32) {
       // WARP0: decode lengths and offsets
-      snappy_decode_symbols(s, t);
+      snappy_decode_symbols2(s, t);
     } else if (t < 64) {
       // WARP1: prefetch byte stream for WARP0
       snappy_prefetch_bytestream(s, t & 0x1f);
