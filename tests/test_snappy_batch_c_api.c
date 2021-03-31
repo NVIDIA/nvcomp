@@ -61,7 +61,7 @@
     }                                                                          \
   } while (0)
 
-int test_batch_compression_and_decompression(size_t batch_size)
+int test_batch_compression_and_decompression(const size_t batch_size)
 {
   typedef int T;
 
@@ -186,7 +186,6 @@ int test_batch_compression_and_decompression(size_t batch_size)
   CUDA_CHECK(cudaMalloc(&temp_ptr, temp_bytes));
 
   void** d_decomp_out = malloc(batch_size * sizeof(void*));
-
   for (size_t i = 0; i < batch_size; i++) {
     CUDA_CHECK(cudaMalloc(&d_decomp_out[i], max_batch_bytes_uncompressed));
   }
@@ -254,7 +253,7 @@ int main(int argc, char** argv)
   size_t batch_sizes[] = {1130, 920, 2700};
   size_t num_tests = sizeof(batch_sizes) / sizeof(batch_sizes[0]);
 
-  for(size_t i = 0; i < sizeof(batch_sizes) / sizeof(batch_sizes[0]); ++i) {
+  for (size_t i = 0; i < sizeof(batch_sizes) / sizeof(batch_sizes[0]); ++i) {
     if (!test_batch_compression_and_decompression(batch_sizes[i])) {
       printf("compression and decompression test failed.\n");
       rv += 1;
