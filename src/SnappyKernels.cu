@@ -1143,7 +1143,7 @@ unsnap_kernel(
   if (!s->error) {
     if (t < 32) {
       // WARP0: decode lengths and offsets
-      snappy_decode_symbols2(s, t);
+      snappy_decode_symbols(s, t);
     } else if (t < 64) {
       // WARP1: prefetch byte stream for WARP0
       snappy_prefetch_bytestream(s, t & 0x1f);
