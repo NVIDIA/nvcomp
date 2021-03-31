@@ -572,7 +572,8 @@ inline __device__ bool isValidHash(
     const offset_type* const hashTable,
     const position_type key,
     const position_type hashPos,
-    const position_type decomp_idx)
+    const position_type decomp_idx,
+    position_type& offset)
 {
   const offset_type hashed_offset = hashTable[hashPos];
 
@@ -580,7 +581,7 @@ inline __device__ bool isValidHash(
     return false;
   }
 
-  const position_type offset = convertIdx(hashed_offset, decomp_idx);
+  offset = convertIdx(hashed_offset, decomp_idx);
 
   if (decomp_idx - offset > MAX_OFFSET) {
     // can't match current position, ahead, or NULL_OFFSET
@@ -756,21 +757,21 @@ __device__ void compressStream(
         match_location
             = __shfl_sync(0xffffffff, match_location, first_match_thread);
       } else {
-        first_match_thread = COMP_THREADS_PER_CHUNK;
+        first_match_thread = numValidThreads;
       }
 
-      // only go to the hash table, if there is a possibility of a finding an
-      // earlier match
-      if (first_match_thread > 0) {
+      {
         // go to hash table for an earlier match
         position_type hashPos = hash(next);
-        const int match_found = threadIdx.x < numValidThreads
+        word_type offset = decomp_idx;
+        const int match_found = threadIdx.x < first_match_thread
                                     ? isValidHash(
                                           decompData,
                                           hashTable,
                                           next,
                                           hashPos,
-                                          decomp_idx + threadIdx.x)
+                                          decomp_idx + threadIdx.x,
+                                          offset)
                                     : 0;
 
         // determine the first thread to find a match
@@ -784,9 +785,7 @@ __device__ void compressStream(
           // if we found a valid match, and it occurs before a previously found
           // match, use that
           first_match_thread = candidate_first_match_thread;
-          hashPos = __shfl_sync(0xffffffff, hashPos, first_match_thread);
-          match_location
-              = convertIdx(hashTable[hashPos], decomp_idx + first_match_thread);
+          match_location = __shfl_sync(0xffffffff, offset, first_match_thread);
         }
       }
 
