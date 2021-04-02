@@ -196,7 +196,8 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
   size_t max_out_bytes;
-  status = nvcompBatchedLZ4CompressGetOutputSize(chunk_size, &max_out_bytes);
+  status = nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+      chunk_size, &max_out_bytes);
   BatchData compress_data(max_out_bytes, input_data.size());
 
   cudaStream_t stream;
@@ -210,6 +211,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   status = nvcompBatchedLZ4CompressAsync(
       input_data.ptrs(),
       input_data.sizes(),
+      chunk_size,
       input_data.size(),
       d_comp_temp,
       comp_temp_bytes,
@@ -265,6 +267,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
       compress_data.ptrs(),
       compress_data.sizes(),
       input_data.sizes(),
+      chunk_size,
       compress_data.size(),
       d_decomp_temp,
       decomp_temp_bytes,
@@ -321,8 +324,27 @@ int main(int argc, char* argv[])
 {
   std::vector<std::string> file_names(argc - 1);
 
-  for (int i = 1; i < argc; ++i) {
-    file_names[i - 1] = argv[i];
+  if (argc == 1) {
+    std::cerr << "Must specify at least one file." << std::endl;
+    return 1;
+  }
+
+  // if `-f` is speficieid, assume single file mode
+  if (strcmp(argv[1], "-f") == 0) {
+    if (argc == 2) {
+      std::cerr << "Missing file name following '-f'" << std::endl;
+      return 1;
+    } else if (argc > 3) {
+      std::cerr << "Unknown extra arguments with '-f'." << std::endl;
+      return 1;
+    }
+
+    file_names = {argv[2]};
+  } else {
+    // multi-file mode
+    for (int i = 1; i < argc; ++i) {
+      file_names[i - 1] = argv[i];
+    }
   }
 
   auto data = multi_file(file_names);

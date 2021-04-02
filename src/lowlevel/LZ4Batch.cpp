@@ -69,12 +69,17 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t* const device_out_bytes,
+    const size_t /* max_uncompressed_chunk_bytes */,
     const size_t batch_size,
     void* const temp_ptr,
     const size_t temp_bytes,
     void* const* const device_out_ptrs,
     cudaStream_t stream)
 {
+  // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check
+  // to make sure it is not zero, as we have notified users to supply zero if
+  // they are not finding the maximum size.
+
   try {
     lz4BatchDecompress(
         CudaUtils::device_pointer(
@@ -112,7 +117,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
+nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
     const size_t max_chunk_size, size_t* const max_compressed_size)
 {
   CHECK_NOT_NULL(max_compressed_size);
@@ -130,6 +135,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
 nvcompError_t nvcompBatchedLZ4CompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
+    const size_t /* max_uncompressed_chunk_size */,
     const size_t batch_size,
     void* const temp_ptr,
     const size_t temp_bytes,
@@ -137,6 +143,10 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
     size_t* const device_out_bytes,
     cudaStream_t stream)
 {
+  // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check
+  // to make sure it is not zero, as we have notified users to supply zero if
+  // they are not finding the maximum size.
+
   try {
     lz4CompressBatch(
         CudaUtils::device_pointer(

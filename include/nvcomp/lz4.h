@@ -229,14 +229,15 @@ nvcompError_t nvcompLZ4CompressAsync(
  * recommended.
  *
  * @param batch_size The number of items in the batch.
- * @param max_chunk_size The maximum size of a chunk in the batch.
+ * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the
+ * batch.
  * @param temp_bytes The size of the required GPU workspace for compression
  * (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
-    size_t batch_size, size_t max_chunk_size, size_t* temp_bytes);
+    size_t batch_size, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That
@@ -247,14 +248,14 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
  * 16777216 bytes. For best performance, a chunk size of 65536 bytes is
  * recommended.
  *
- * @param max_chunk_size The maximum size of a chunk in the batch.
- * @param max_compressed_size The maximum compressed size of the largest chunk
+ * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the batch.
+ * @param max_compressed_byes The maximum compressed size of the largest chunk
  * (output).
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
-    size_t max_chunk_size, size_t* max_compressed_size);
+nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+    size_t max_uncompressed_chunk_bytes, size_t* max_compressed_bytes);
 
 /**
  * @brief Perform compression asynchronously. All pointers must point to GPU
@@ -265,6 +266,10 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
  * @param device_in_ptr The pointers on the GPU, to uncompressed batched items.
  * This pointer must be GPU accessible.
  * @param device_in_bytes The size of each uncompressed batch item on the GPU.
+ * @param max_uncompressed_chunk_bytes The maximum size in bytes of the largest
+ * chunk in the batch. This parameter is currently unused, so if it is not set
+ * with the maximum size, it should be set to zero. If a future version makes
+ * use of it, it will return an error if it is set to zero.
  * @param batch_size The number of batch items.
  * @param device_temp_ptr The temporary GPU workspace.
  * @param temp_bytes The size of the temporary GPU workspace.
@@ -279,6 +284,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetOutputSize(
 nvcompError_t nvcompBatchedLZ4CompressAsync(
     const void* const* device_in_ptr,
     const size_t* device_in_bytes,
+    size_t max_uncompressed_chunk_bytes,
     size_t batch_size,
     void* device_temp_ptr,
     size_t temp_bytes,
@@ -290,15 +296,15 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
  * @brief Get the amount of temp space required on the GPU for decompression.
  *
  * @param num_chunks The number of items in the batch.
- * @param max_uncompressed_chunk_size The size of the largest chunk when
- * uncompressed.
+ * @param max_uncompressed_chunk_bytes The size of the largest chunk in bytes
+ * when uncompressed.
  * @param temp_bytes The amount of temporary GPU space that will be required to
  * decompress.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
-    size_t num_chunks, size_t max_uncompressed_chunk_size, size_t* temp_bytes);
+    size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
  * @brief Perform decompression asynchronously. All pointers must be GPU
@@ -308,6 +314,10 @@ nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
  * This pointer must be accessible from the GPU.
  * @param device_in_bytes The size of each compressed chunk on the GPU.
  * @param device_out_bytes The size of each uncompressed chunk on the GPU.
+ * @param max_uncompressed_chunk_bytes The maximum size in bytes of the largest
+ * chunk in the batch. This parameter is currently unused, so if it is not set
+ * with the maximum size, it should be set to zero. If a future version makes
+ * use of it, it will return an error if it is set to zero.
  * @param batch_size The number of batch items.
  * @param device_temp_ptr The temporary GPU space.
  * @param temp_bytes The size of the temporary GPU space.
@@ -321,6 +331,7 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
     const void* const* device_in_ptrs,
     const size_t* device_in_bytes,
     const size_t* device_out_bytes,
+    size_t max_uncompressed_chunk_bytes,
     size_t batch_size,
     void* const device_temp_ptr,
     const size_t temp_bytes,
