@@ -450,9 +450,6 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
     }
     pos += blen;
   } while (blen > 0);
-
-//  if (t == 0)
-//    printf("Exiting prefetch\n");
 }
 
 /**
@@ -638,7 +635,6 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
     // the stream will consist of a large number of short literals (1-byte or 2-byte)
     // followed by short repeat runs. This results in many 2-byte or 3-byte symbols
     // that can all be decoded in parallel once we know the symbol length.
-    /*
     {
       uint32_t v0, v1, v2, len3_mask, cur_t, is_long_sym, short_sym_mask;
       uint32_t b0;
@@ -735,7 +731,6 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
         } while (batch_add >= 6 && batch_len < BATCH_SIZE - 2);
       }
     }
-    */
     if (t == 0) {
       while (bytes_left > 0 && batch_len < BATCH_SIZE) {
         uint32_t blen, offset;
@@ -896,7 +891,6 @@ __device__ void snappy_decode_symbols2(unsnap_state_s *s, uint32_t t)
       }
       bytes_left -= len;
 
-      //printf("Decoded len = %d, offset = %d\n", len, offset);
       if (flag) {
         b[0].len = len;
         b[0].offset = offset;
@@ -908,7 +902,6 @@ __device__ void snappy_decode_symbols2(unsnap_state_s *s, uint32_t t)
       }
 
       if (bytes_left <= 0) {
-        //printf("bytes_left %d <= 0, exiting\n", bytes_left);
         flag = false;
       }
     }
@@ -921,14 +914,10 @@ __device__ void snappy_decode_symbols2(unsnap_state_s *s, uint32_t t)
   if (!t) {
     s->q.prefetch_end = 1;
     s->q.batch_len[batch] = -1;
-    //printf("Marking batch %d with -1\n", batch);
     s->bytes_left = bytes_left;
     if (bytes_left != 0)
       s->error = -2;
   }
-
-//  if (t == 0)
-//    printf("Exiting decode\n");
 }
 
 /**
@@ -1054,9 +1043,6 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
     if (t == 0) { s->q.batch_len[batch] = 0; }
     batch = (batch + 1) & (BATCH_COUNT - 1);
   } while (1);
-
-//  if (t == 0)
-//    printf("Exiting process\n");
 }
 
 /**

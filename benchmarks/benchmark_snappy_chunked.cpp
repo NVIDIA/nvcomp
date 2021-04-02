@@ -67,6 +67,7 @@ void print_usage()
   printf("  %-35s Warm up benchmark (default %d)\n", "-w, --warmup_count", DEFAULT_WARMUP_COUNT);
   printf("  %-35s Average multiple kernel runtimes (default %d)\n", "-i, --iterations_count", DEFAULT_ITERATIONS_COUNT);
   printf("  %-35s Maximum value for the bytes of uncompressed data (default %d)\n", "-m, --max_byte", DEFAULT_MAX_BYTE_VALUE);
+  printf("  %-35s Clone uncompressed chunks multiple times (default 0)\n", "-x, --duplicate_data");
   exit(1);
 }
 
@@ -317,6 +318,7 @@ int main(int argc, char* argv[])
   std::string input_file;
   int warmup_count = DEFAULT_WARMUP_COUNT;
   int iterations_count = DEFAULT_ITERATIONS_COUNT;
+  int duplicate_data = 0;
 
   // Parse command-line arguments
   while (1) {
@@ -325,10 +327,11 @@ int main(int argc, char* argv[])
                                         {"input_file", required_argument, 0, 'f'},
                                         {"warmup_count", required_argument, 0, 'w'},
                                         {"iterations_count", required_argument, 0, 'i'},
+                                        {"duplicate_data", required_argument, 0, 'x'},
                                         {"help", no_argument, 0, '?'}};
     int c;
     opterr = 0;
-    c = getopt_long(argc, argv, "g:f:w:i:m:", long_options, &option_index);
+    c = getopt_long(argc, argv, "g:f:w:i:m:x:", long_options, &option_index);
     if (c == -1)
       break;
 
@@ -345,6 +348,9 @@ int main(int argc, char* argv[])
     case 'i':
       iterations_count = atoi(optarg);
       break;
+    case 'x':
+      duplicate_data = atoi(optarg);
+      break;
     case '?':
     default:
       print_usage();
@@ -355,9 +361,19 @@ int main(int argc, char* argv[])
   std::cout << "----------" << std::endl;
   std::cout << "Input file = " << input_file << std::endl;
 
-  cudaSetDevice(gpu_num);
-
   std::vector<std::vector<uint8_t>> uncompressed_data = readFile(input_file);
+
+  size_t original_chunks = uncompressed_data.size();
+  if (duplicate_data > 0) {
+    std::cout << "Chunks duplicated " << duplicate_data << "x" << std::endl;
+
+    uncompressed_data.resize(original_chunks * (duplicate_data + 1));
+    for(int i = 0; i < duplicate_data; ++i)
+      for(int j = 0; j < original_chunks; ++j)
+        uncompressed_data[(i + 1) * original_chunks + j] = uncompressed_data[j];
+  }
+
+  cudaSetDevice(gpu_num);
 
   uint64_t total_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
     [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return accum + chunk.size(); } );
