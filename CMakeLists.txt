@@ -5,6 +5,10 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+LIST( APPEND CMAKE_MODULE_PATH
+  ${CMAKE_SOURCE_DIR}/cmake
+)
+
 find_package(CUDAToolkit REQUIRED)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
@@ -76,6 +80,11 @@ if (ENABLE_BITCOMP)
   message(STATUS "Finding Bitcomp")
   find_package (bitcomp)
   add_definitions (-DENABLE_BITCOMP)
+endif()
+
+find_package(gdeflate)
+if (GDEFLATE_FOUND)
+  add_definitions(-DENABLE_GDEFLATE)
 endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

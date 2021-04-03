@@ -38,4 +38,9 @@ if (ENABLE_BITCOMP)
   target_link_libraries(nvcomp PUBLIC bitcomp)
 endif()
 
+if (GDEFLATE_FOUND)
+  target_include_directories(nvcomp PUBLIC ${GDEFLATE_INCLUDE_DIRS})
+  target_link_libraries(nvcomp PUBLIC ${GDEFLATE_LIBRARIES})
+endif()
+
 add_subdirectory("test")
