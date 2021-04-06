@@ -252,10 +252,11 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  int num_tests = 1;
   int rv = 0;
 
 #ifdef ENABLE_GDEFLATE
+  int num_tests = 1;
+
   if (!test_batch_compression_and_decompression()) {
     printf("compression and decompression test failed.\n");
     rv += 1;
