@@ -164,7 +164,6 @@ nvcompError_t nvcompDecompressAsync(
     size_t out_bytes,
     cudaStream_t stream);
 
-
 #ifdef __cplusplus
 }
 #endif

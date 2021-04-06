@@ -218,7 +218,7 @@ nvcompType_t CascadedMetadata::getDataType(size_t index) const
 
 void CascadedMetadata::initialize()
 {
-  m_headers.resize(getNumInputs());
+  m_headers.resize(getNumInputs(), {0, 0, 0});
   m_dataOffsets.resize(getNumInputs(), NULL_OFFSET);
   m_dataType.resize(getNumInputs(), getValueType());
   m_isSaved.resize(getNumInputs(), false);

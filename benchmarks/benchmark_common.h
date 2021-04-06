@@ -35,11 +35,13 @@
 
 #include "../src/common.h"
 
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
 
 #define CUDA_CHECK(func)                                                       \
   do {                                                                         \
@@ -58,6 +60,7 @@ namespace nvcomp
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
+
 template <>
 inline nvcompType_t getnvcompType<float>()
 {

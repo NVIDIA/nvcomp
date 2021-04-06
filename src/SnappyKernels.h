@@ -101,4 +101,4 @@ cudaError_t gpu_unsnap(
   size_t* device_out_bytes,
   int count,
   cudaStream_t stream);
-};
+} // namespace nvcomp

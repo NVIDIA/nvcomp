@@ -50,24 +50,79 @@
 
 using offset_type = uint16_t;
 using word_type = uint32_t;
-using position_type = size_t;
+
+// This restricts us to 4GB chunk sizes (total buffer can be up to
+// max(size_t)). We actually artificially restrict it to much less, to
+// limit what we have to test, as well as to encourage users to exploit some
+// parallelism.
+using position_type = uint32_t;
 using double_word_type = uint64_t;
 using item_type = uint32_t;
 
-namespace nvcomp {
+namespace nvcomp
+{
+namespace lowlevel
+{
 
-constexpr const int COMP_THREADS = 32;
-constexpr const int DECOMP_THREADS = 32;
-constexpr const int Y_DIM = 2;
-constexpr const position_type BUFFER_SIZE
-    = DECOMP_THREADS * sizeof(double_word_type);
-constexpr const position_type PREFETCH_DIST = BUFFER_SIZE / 2;
+/**
+ * @brief The number of threads to use per chunk in compression.
+ */
+constexpr const int COMP_THREADS_PER_CHUNK = 32;
 
+/**
+ * @brief The number of threads to use per chunk in decompression.
+ */
+constexpr const int DECOMP_THREADS_PER_CHUNK = 32;
+
+/**
+ * @brief The number of chunks to decompression concurrently per threadblock.
+ */
+constexpr const int DECOMP_CHUNKS_PER_BLOCK = 2;
+
+/**
+ * @brief The size of the shared memory buffer to use per decompression stream.
+ */
+constexpr const position_type DECOMP_INPUT_BUFFER_SIZE
+    = DECOMP_THREADS_PER_CHUNK * sizeof(double_word_type);
+
+/**
+ * @brief The threshold of reading from the buffer during decompression, that
+ * more data will be loaded inot the buffer and its contents shifted.
+ */
+constexpr const position_type DECOMP_BUFFER_PREFETCH_DIST
+    = DECOMP_INPUT_BUFFER_SIZE / 2;
+
+/**
+ * @brief The number of elements in the hash table to use while performing
+ * compression.
+ */
 constexpr const position_type HASH_TABLE_SIZE = 1U << 14;
+
+/**
+ * @brief The value used to explicitly represent and invalid offset. This
+ * denotes an empty slot in the hashtable.
+ */
 constexpr const offset_type NULL_OFFSET = static_cast<offset_type>(-1);
+
+/**
+ * @brief The maximum size of a valid offset.
+ */
 constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
 
+/**
+ * @brief The minimum chunk size that can be used in single buffer compression.
+ * This is so that we can re-use the output buffer to work as a hashtable, since
+ * the compressed chunks are written to independent locations in the temporary
+ * space. Later they are copied to by contiguous in the output buffer.
+ * NOTE: the "batched" interface does not make use of this since it writes it's
+ * output directly to the specififed locations, and stores it's hashtables in
+ * the temporary space.
+ */
 constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
+
+/**
+ * @brief The maximum size of an uncompressed chunk.
+ */
 constexpr const size_t MAX_CHUNK_SIZE = 1U << 24; // 16 MB
 
 // ideally this would fit in a quad-word -- right now though it spills into
@@ -100,7 +155,7 @@ inline __device__ __host__ size_t maxSizeOfStream(const size_t size)
 
 inline __device__ void syncCTA()
 {
-  if (DECOMP_THREADS > 32) {
+  if (DECOMP_THREADS_PER_CHUNK > 32) {
     __syncthreads();
   } else {
     __syncwarp();
@@ -151,14 +206,14 @@ inline __device__ T readWord(const uint8_t* const address)
   return word;
 }
 
-template<int BLOCK_SIZE>
+template <int BLOCK_SIZE>
 inline __device__ void writeLSIC(uint8_t* const out, const position_type number)
 {
   assert(BLOCK_SIZE == blockDim.x);
 
   const position_type num = (number / 0xffu) + 1;
   const uint8_t leftOver = number % 0xffu;
-  for (size_t i = threadIdx.x; i < num; i += BLOCK_SIZE) {
+  for (position_type i = threadIdx.x; i < num; i += BLOCK_SIZE) {
     const uint8_t val = i + 1 < num ? 0xffu : leftOver;
     out[i] = val;
   }
@@ -169,12 +224,12 @@ struct token_type
   position_type num_literals;
   position_type num_matches;
 
-   __device__ bool hasNumLiteralsOverflow() const
+  __device__ bool hasNumLiteralsOverflow() const
   {
     return num_literals >= 15;
   }
 
-   __device__ bool hasNumMatchesOverflow() const
+  __device__ bool hasNumMatchesOverflow() const
   {
     return num_matches >= 19;
   }
@@ -240,9 +295,10 @@ struct token_type
 class BufferControl
 {
 public:
-
   __device__ BufferControl(
-      uint8_t* const buffer, const uint8_t* const compData, const position_type length) :
+      uint8_t* const buffer,
+      const uint8_t* const compData,
+      const position_type length) :
       m_offset(0),
       m_length(length),
       m_buffer(buffer),
@@ -251,23 +307,23 @@ public:
     // do nothing
   }
 
-  #ifdef WARP_READ_LSIC
-    // this is currently unused as its slower
+#ifdef WARP_READ_LSIC
+  // this is currently unused as its slower
   inline __device__ position_type queryLSIC(const position_type idx) const
   {
-    if (idx + DECOMP_THREADS <= end()) {
+    if (idx + DECOMP_THREADS_PER_CHUNK <= end()) {
       // most likely case
       const uint8_t byte = rawAt(idx)[threadIdx.x];
 
       uint32_t mask = warpBallot(byte != 0xff);
       mask = __brev(mask);
-  
+
       const position_type fullBytes = __clz(mask);
-  
-      if (fullBytes < DECOMP_THREADS) {
+
+      if (fullBytes < DECOMP_THREADS_PER_CHUNK) {
         return fullBytes * 0xff + rawAt(idx)[fullBytes];
       } else {
-        return DECOMP_THREADS * 0xff;
+        return DECOMP_THREADS_PER_CHUNK * 0xff;
       }
     } else {
       uint8_t byte;
@@ -279,35 +335,35 @@ public:
 
       uint32_t mask = warpBallot(byte != 0xff);
       mask = __brev(mask);
-  
+
       const position_type fullBytes = __clz(mask);
-  
-      if (fullBytes < DECOMP_THREADS) {
+
+      if (fullBytes < DECOMP_THREADS_PER_CHUNK) {
         return fullBytes * 0xff + __shfl_sync(0xffffffff, byte, fullBytes);
       } else {
-        return DECOMP_THREADS * 0xff;
+        return DECOMP_THREADS_PER_CHUNK * 0xff;
       }
     }
   }
-  #endif
-  
+#endif
+
   inline __device__ position_type readLSIC(position_type& idx) const
   {
-  #ifdef WARP_READ_LSIC
+#ifdef WARP_READ_LSIC
     position_type num = 0;
     while (true) {
       const position_type block = queryLSIC(idx);
       num += block;
-  
-      if (block < DECOMP_THREADS * 0xff) {
+
+      if (block < DECOMP_THREADS_PER_CHUNK * 0xff) {
         idx += (block / 0xff) + 1;
         break;
       } else {
-        idx += DECOMP_THREADS;
+        idx += DECOMP_THREADS_PER_CHUNK;
       }
     }
     return num;
-  #else
+#else
     position_type num = 0;
     uint8_t next = 0xff;
     // read from the buffer
@@ -316,98 +372,102 @@ public:
       ++idx;
       num += next;
     }
-      // read from global memory
+    // read from global memory
     while (next == 0xff) {
       next = m_compData[idx];
       ++idx;
       num += next;
     }
     return num;
-  #endif
+#endif
   }
-  
-    inline __device__ const uint8_t* raw() const
-    {
-      return m_buffer;
+
+  inline __device__ const uint8_t* raw() const
+  {
+    return m_buffer;
+  }
+
+  inline __device__ const uint8_t* rawAt(const position_type i) const
+  {
+    return raw() + (i - begin());
+  }
+  inline __device__ uint8_t operator[](const position_type i) const
+  {
+    if (i >= m_offset && i - m_offset < DECOMP_INPUT_BUFFER_SIZE) {
+      return m_buffer[i - m_offset];
+    } else {
+      return m_compData[i];
     }
-  
-    inline __device__ const uint8_t* rawAt(const position_type i) const
-    {
-      return raw() + (i - begin());
-    }
-    inline __device__ uint8_t operator[](const position_type i) const
-    {
-      if (i >= m_offset && i - m_offset < BUFFER_SIZE) {
-        return m_buffer[i - m_offset];
-      } else {
-        return m_compData[i];
-      }
-    }
+  }
 
-    inline __device__ void setAndAlignOffset(const position_type offset)
-    {
-      static_assert(
-          sizeof(size_t) == sizeof(const uint8_t*),
-          "Size of pointer must be equal to size_t.");
+  inline __device__ void setAndAlignOffset(const position_type offset)
+  {
+    static_assert(
+        sizeof(size_t) == sizeof(const uint8_t*),
+        "Size of pointer must be equal to size_t.");
 
-      const uint8_t* const alignedPtr = reinterpret_cast<const uint8_t*>(
-          (reinterpret_cast<size_t>(m_compData + offset)
-           / sizeof(double_word_type))
-          * sizeof(double_word_type));
+    const uint8_t* const alignedPtr = reinterpret_cast<const uint8_t*>(
+        (reinterpret_cast<size_t>(m_compData + offset)
+         / sizeof(double_word_type))
+        * sizeof(double_word_type));
 
-      m_offset = alignedPtr - m_compData;
-    }
+    m_offset = alignedPtr - m_compData;
+  }
 
-    inline __device__ void loadAt(const position_type offset)
-    {
-      setAndAlignOffset(offset);
+  inline __device__ void loadAt(const position_type offset)
+  {
+    setAndAlignOffset(offset);
 
-      if (m_offset + BUFFER_SIZE <= m_length) {
-        assert(
-            reinterpret_cast<size_t>(m_compData + m_offset)
-                % sizeof(double_word_type)
-            == 0);
-        assert(BUFFER_SIZE == DECOMP_THREADS * sizeof(double_word_type));
-        const double_word_type* const word_data
-            = reinterpret_cast<const double_word_type*>(m_compData + m_offset);
-        double_word_type* const word_buffer
-            = reinterpret_cast<double_word_type*>(m_buffer);
-        word_buffer[threadIdx.x] = word_data[threadIdx.x];
-      } else {
-  #pragma unroll
-      for (int i = threadIdx.x; i < BUFFER_SIZE; i += DECOMP_THREADS) {
+    if (m_offset + DECOMP_INPUT_BUFFER_SIZE <= m_length) {
+      assert(
+          reinterpret_cast<size_t>(m_compData + m_offset)
+              % sizeof(double_word_type)
+          == 0);
+      assert(
+          DECOMP_INPUT_BUFFER_SIZE
+          == DECOMP_THREADS_PER_CHUNK * sizeof(double_word_type));
+      const double_word_type* const word_data
+          = reinterpret_cast<const double_word_type*>(m_compData + m_offset);
+      double_word_type* const word_buffer
+          = reinterpret_cast<double_word_type*>(m_buffer);
+      word_buffer[threadIdx.x] = word_data[threadIdx.x];
+    } else {
+#pragma unroll
+      for (int i = threadIdx.x; i < DECOMP_INPUT_BUFFER_SIZE;
+           i += DECOMP_THREADS_PER_CHUNK) {
         if (m_offset + i < m_length) {
           m_buffer[i] = m_compData[m_offset + i];
         }
       }
     }
-  
+
     syncCTA();
   }
-  
+
   inline __device__ position_type begin() const
   {
     return m_offset;
   }
-  
-  
+
   inline __device__ position_type end() const
   {
-    return m_offset + BUFFER_SIZE;
+    return m_offset + DECOMP_INPUT_BUFFER_SIZE;
   }
 
 private:
-  position_type m_offset;
+  // may potentially be negative for mis-aligned m_compData.
+  int64_t m_offset;
   const position_type m_length;
   uint8_t* const m_buffer;
   const uint8_t* const m_compData;
-}; //End BufferControl Class
-
+}; // End BufferControl Class
 
 inline __device__ void coopCopyNoOverlap(
-    uint8_t* const dest, const uint8_t* const source, const size_t length)
+    uint8_t* const dest,
+    const uint8_t* const source,
+    const position_type length)
 {
-  for (size_t i = threadIdx.x; i < length; i += blockDim.x) {
+  for (position_type i = threadIdx.x; i < length; i += blockDim.x) {
     dest[i] = source[i];
   }
 }
@@ -418,8 +478,8 @@ inline __device__ void coopCopyRepeat(
     const position_type dist,
     const position_type length)
 {
-// if there is overlap, it means we repeat, so we just
-// need to organize our copy around that
+  // if there is overlap, it means we repeat, so we just
+  // need to organize our copy around that
   for (position_type i = threadIdx.x; i < length; i += blockDim.x) {
     dest[i] = source[i % dist];
   }
@@ -441,7 +501,7 @@ inline __device__ void coopCopyOverlap(
 inline __device__ position_type hash(const word_type key)
 {
   // needs to be 12 bits
-  return (__brev(key) + (key^0xc375)) & (HASH_TABLE_SIZE - 1);
+  return (__brev(key) + (key ^ 0xc375)) & (HASH_TABLE_SIZE - 1);
 }
 
 inline __device__ uint8_t encodePair(const uint8_t t1, const uint8_t t2)
@@ -455,12 +515,14 @@ inline __device__ token_type decodePair(const uint8_t num)
                     static_cast<uint8_t>(num & 0x0f)};
 }
 
-template<int BLOCK_SIZE>
+template <int BLOCK_SIZE>
 inline __device__ void copyLiterals(
-    uint8_t* const dest, const uint8_t* const source, const size_t length)
+    uint8_t* const dest,
+    const uint8_t* const source,
+    const position_type length)
 {
   assert(BLOCK_SIZE == blockDim.x);
-  for (size_t i = threadIdx.x; i < length; i += BLOCK_SIZE) {
+  for (position_type i = threadIdx.x; i < length; i += BLOCK_SIZE) {
     dest[i] = source[i];
   }
 }
@@ -510,15 +572,16 @@ inline __device__ bool isValidHash(
     const offset_type* const hashTable,
     const position_type key,
     const position_type hashPos,
-    const position_type decomp_idx)
+    const position_type decomp_idx,
+    position_type& offset)
 {
-  const position_type hashed_offset = hashTable[hashPos];
+  const offset_type hashed_offset = hashTable[hashPos];
 
   if (hashed_offset == NULL_OFFSET) {
     return false;
   }
 
-  const position_type offset = convertIdx(hashed_offset, decomp_idx);
+  offset = convertIdx(hashed_offset, decomp_idx);
 
   if (decomp_idx - offset > MAX_OFFSET) {
     // can't match current position, ahead, or NULL_OFFSET
@@ -534,7 +597,7 @@ inline __device__ bool isValidHash(
   return true;
 }
 
-template<int BLOCK_SIZE>
+template <int BLOCK_SIZE>
 inline __device__ void writeSequenceData(
     uint8_t* const compData,
     const uint8_t* const decompData,
@@ -581,10 +644,9 @@ inline __device__ void writeSequenceData(
   }
 }
 
-inline __device__ int numValidThreadsToMask(
-    const int numValidThreads)
+inline __device__ int numValidThreadsToMask(const int numValidThreads)
 {
-  return 0xffffffff >> (32-numValidThreads);
+  return 0xffffffff >> (32 - numValidThreads);
 }
 
 inline __device__ void insertHashTableWarp(
@@ -596,7 +658,8 @@ inline __device__ void insertHashTableWarp(
   position_type hashPos = hash(next);
 
   if (threadIdx.x < numValidThreads) {
-    const int match = warpMatchAny(numValidThreadsToMask(numValidThreads), hashPos);
+    const int match
+        = warpMatchAny(numValidThreadsToMask(numValidThreads), hashPos);
     if (!match || 31 - __clz(match) == threadIdx.x) {
       // I'm the last match -- can insert
       hashTable[hashPos] = pos & MAX_OFFSET;
@@ -610,17 +673,20 @@ __device__ void compressStream(
     uint8_t* compData,
     const uint8_t* decompData,
     offset_type* const hashTable,
-    const size_t length,
+    const position_type length,
     size_t* comp_length)
 {
-  assert(blockDim.x == COMP_THREADS);
-  static_assert(COMP_THREADS <= 32, "Compression can be done with at "
+  assert(blockDim.x == COMP_THREADS_PER_CHUNK);
+  static_assert(
+      COMP_THREADS_PER_CHUNK <= 32,
+      "Compression can be done with at "
       "most one warp");
 
   position_type decomp_idx = 0;
   position_type comp_idx = 0;
 
-  for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE; i += COMP_THREADS) {
+  for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE;
+       i += COMP_THREADS_PER_CHUNK) {
     hashTable[i] = NULL_OFFSET;
   }
 
@@ -637,7 +703,8 @@ __device__ void compressStream(
         token_type tok;
         tok.num_literals = length - tokenStart;
         tok.num_matches = 0;
-        writeSequenceData<COMP_THREADS>(compData, decompData, tok, 0, tokenStart, comp_idx);
+        writeSequenceData<COMP_THREADS_PER_CHUNK>(
+            compData, decompData, tok, 0, tokenStart, comp_idx);
         break;
       }
 
@@ -660,14 +727,16 @@ __device__ void compressStream(
 
       // since we do not have valid data for the last 3 threads (or more if
       // we're at the end of the data), mark them as inactive.
-      const int numValidThreads
-          = min(static_cast<size_t>(COMP_THREADS - 3), length - decomp_idx - 9);
+      const int numValidThreads = min(
+          static_cast<int>(COMP_THREADS_PER_CHUNK - 3),
+          static_cast<int>(length - decomp_idx - 9));
 
       // first try to find a local match
       position_type match_location = length;
       int match_mask_self = 0;
       if (threadIdx.x < numValidThreads) {
-        match_mask_self = warpMatchAny(numValidThreadsToMask(numValidThreads), next);
+        match_mask_self
+            = warpMatchAny(numValidThreadsToMask(numValidThreads), next);
       }
 
       // each thread has a mask of other threads with matches, next we need
@@ -685,23 +754,24 @@ __device__ void compressStream(
         match_location = __clz(__brev(match_mask_self)) + decomp_idx;
 
         // comunicate the global position of the match to other threads
-        match_location = __shfl_sync(0xffffffff, match_location, first_match_thread);
+        match_location
+            = __shfl_sync(0xffffffff, match_location, first_match_thread);
       } else {
-        first_match_thread = COMP_THREADS;
+        first_match_thread = numValidThreads;
       }
 
-      // only go to the hash table, if there is a possibility of a finding an
-      // earlier match
-      if (first_match_thread > 0) {
+      {
         // go to hash table for an earlier match
         position_type hashPos = hash(next);
-        const int match_found = threadIdx.x < numValidThreads
+        word_type offset = decomp_idx;
+        const int match_found = threadIdx.x < first_match_thread
                                     ? isValidHash(
                                           decompData,
                                           hashTable,
                                           next,
                                           hashPos,
-                                          decomp_idx + threadIdx.x)
+                                          decomp_idx + threadIdx.x,
+                                          offset)
                                     : 0;
 
         // determine the first thread to find a match
@@ -715,9 +785,7 @@ __device__ void compressStream(
           // if we found a valid match, and it occurs before a previously found
           // match, use that
           first_match_thread = candidate_first_match_thread;
-          hashPos = __shfl_sync(0xffffffff, hashPos, first_match_thread);
-          match_location
-              = convertIdx(hashTable[hashPos], decomp_idx + first_match_thread);
+          match_location = __shfl_sync(0xffffffff, offset, first_match_thread);
         }
       }
 
@@ -749,7 +817,7 @@ __device__ void compressStream(
         decomp_idx = tokenStart + num_matches + num_literals;
 
         // insert only the literals into the hash table
-        writeSequenceData<COMP_THREADS>(
+        writeSequenceData<COMP_THREADS_PER_CHUNK>(
             compData, decompData, tok, match_offset, tokenStart, comp_idx);
         break;
       }
@@ -763,7 +831,7 @@ __device__ void compressStream(
   }
 
   if (threadIdx.x == 0) {
-    *comp_length = comp_idx;
+    *comp_length = static_cast<size_t>(comp_idx);
   }
 }
 
@@ -771,17 +839,18 @@ inline __device__ void decompressStream(
     uint8_t* buffer,
     uint8_t* decompData,
     const uint8_t* compData,
-    position_type length)
+    const position_type length)
 {
-  position_type comp_end = length;
+  const position_type comp_end = length;
 
   BufferControl ctrl(buffer, compData, comp_end);
   ctrl.loadAt(0);
 
   position_type decomp_idx = 0;
   position_type comp_idx = 0;
+
   while (comp_idx < comp_end) {
-    if (comp_idx + PREFETCH_DIST > ctrl.end()) {
+    if (comp_idx + DECOMP_BUFFER_PREFETCH_DIST > ctrl.end()) {
       ctrl.loadAt(comp_idx);
     }
 
@@ -1025,6 +1094,26 @@ lz4CompressMultistreamKernel(const compression_chunk_header* const headers)
       comp_ptr, decomp_ptr, headers[bidx].hash, decomp_length, comp_length);
 }
 
+__global__ void lz4CompressBatchKernel(
+    const uint8_t* const* const device_in_ptr,
+    const size_t* const device_in_bytes,
+    uint8_t* const* const device_out_ptr,
+    size_t* const device_out_bytes,
+    offset_type* const temp_space)
+{
+  const int bidx = blockIdx.x * blockDim.y + threadIdx.y;
+
+  const uint8_t* decomp_ptr = device_in_ptr[bidx];
+  const size_t decomp_length = device_in_bytes[bidx];
+
+  uint8_t* const comp_ptr = device_out_ptr[bidx];
+  size_t* const comp_length = device_out_bytes + bidx;
+
+  offset_type* const hash_table = temp_space + bidx * HASH_TABLE_SIZE;
+
+  compressStream(comp_ptr, decomp_ptr, hash_table, decomp_length, comp_length);
+}
+
 template <int BLOCK_SIZE>
 __global__ void lz4CompressSumSizes(
     size_t* const* const sizes,
@@ -1089,17 +1178,44 @@ __global__ void copyToContig(
 __global__ void lz4DecompressMultistreamKernel(
     const chunk_header* const headers, const int num_chunks)
 {
-  const int bid = blockIdx.x * Y_DIM + threadIdx.y;
+  const int bid = blockIdx.x * DECOMP_CHUNKS_PER_BLOCK + threadIdx.y;
 
-  __shared__ uint8_t buffer[BUFFER_SIZE * Y_DIM];
+  __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
 
   if (bid < num_chunks) {
     uint8_t* const decomp_ptr = headers[bid].dst;
     const uint8_t* const comp_ptr = headers[bid].src;
-    const size_t chunk_length = headers[bid].size;
+    const position_type chunk_length = headers[bid].size;
 
     decompressStream(
-        buffer + threadIdx.y * BUFFER_SIZE, decomp_ptr, comp_ptr, chunk_length);
+        buffer + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE,
+        decomp_ptr,
+        comp_ptr,
+        chunk_length);
+  }
+}
+
+__global__ void lz4DecompressBatchKernel(
+    const uint8_t* const* const device_in_ptrs,
+    const size_t* const device_in_bytes,
+    const int batch_size,
+    uint8_t* const* const device_out_ptrs)
+{
+  const int bid = blockIdx.x * DECOMP_CHUNKS_PER_BLOCK + threadIdx.y;
+
+  __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
+
+  if (bid < batch_size) {
+    uint8_t* const decomp_ptr = device_out_ptrs[bid];
+    const uint8_t* const comp_ptr = device_in_ptrs[bid];
+    const position_type chunk_length
+        = static_cast<position_type>(device_in_bytes[bid]);
+
+    decompressStream(
+        buffer + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE,
+        decomp_ptr,
+        comp_ptr,
+        chunk_length);
   }
 }
 
@@ -1132,6 +1248,38 @@ __global__ void lz4DecompressGenerateHeaders(
 
 void lz4CompressBatch(
     const uint8_t* const* const decomp_data_device,
+    const size_t* const decomp_sizes_device,
+    const size_t batch_size,
+    void* const temp_data,
+    const size_t temp_bytes,
+    uint8_t* const* const comp_data_device,
+    size_t* const comp_sizes_device,
+    cudaStream_t stream)
+{
+  const size_t total_required_temp
+      = batch_size * HASH_TABLE_SIZE * sizeof(offset_type);
+  if (temp_bytes < total_required_temp) {
+    throw std::runtime_error(
+        "Insufficient temp space: got " + std::to_string(temp_bytes)
+        + " bytes, but need " + std::to_string(total_required_temp)
+        + " bytes.");
+  }
+
+  const dim3 grid(batch_size);
+  const dim3 block(COMP_THREADS_PER_CHUNK);
+
+  lz4CompressBatchKernel<<<grid, block, 0, stream>>>(
+      decomp_data_device,
+      decomp_sizes_device,
+      comp_data_device,
+      comp_sizes_device,
+      static_cast<offset_type*>(temp_data));
+  CudaUtils::check_last_error();
+}
+
+// Deprecated
+void lz4CompressBatch(
+    const uint8_t* const* const decomp_data_device,
     const size_t* const decomp_prefixes_device,
     const size_t* const decomp_sizes_host,
     const size_t batch_size,
@@ -1145,10 +1293,10 @@ void lz4CompressBatch(
 {
   if (max_chunk_size < lz4MinChunkSize()) {
     throw std::runtime_error(
-        "Minimum chunk size for LZ4 is " + std::to_string(MIN_CHUNK_SIZE));
+        "Minimum chunk size for LZ4 is " + std::to_string(lz4MinChunkSize()));
   } else if (max_chunk_size > lz4MaxChunkSize()) {
     throw std::runtime_error(
-        "Maximum chunk size for LZ4 is " + std::to_string(MAX_CHUNK_SIZE));
+        "Maximum chunk size for LZ4 is " + std::to_string(lz4MaxChunkSize()));
   }
 
   // most of the kernels take a negligible amount of time, so by default we
@@ -1201,7 +1349,7 @@ void lz4CompressBatch(
   // perform compression
   {
     const dim3 grid(chunks_in_batch);
-    const dim3 block(COMP_THREADS);
+    const dim3 block(COMP_THREADS_PER_CHUNK);
 
     lz4CompressMultistreamKernel<<<grid, block, 0, stream>>>(headers);
     CudaUtils::check_last_error();
@@ -1242,27 +1390,27 @@ void lz4CompressBatch(
 void lz4DecompressBatches(
     void* const temp_space,
     const size_t temp_size,
-    void* const* decompData,
-    const uint8_t* const* compData,
-    int batch_size,
-    const size_t** compPrefix,
-    int chunk_size,
-    int* chunks_in_item,
+    void* const* const decompData,
+    const uint8_t* const* const compData,
+    const int batch_size,
+    const size_t* const* const compPrefix,
+    const int chunk_size,
+    const int* const chunks_in_item,
     cudaStream_t stream)
-{   
+{
   TempSpaceBroker broker(temp_space, temp_size);
 
-  int total_chunks=0;
-  for(int i=0; i<batch_size; i++) {
+  int total_chunks = 0;
+  for (int i = 0; i < batch_size; i++) {
     total_chunks += chunks_in_item[i];
   }
 
   chunk_header* headers;
   broker.reserve(&headers, total_chunks);
 
-  int chunk_start=0;
+  int chunk_start = 0;
 
-  for(int i=0; i<batch_size; i++) {
+  for (int i = 0; i < batch_size; i++) {
 
     const dim3 header_block(128);
     const dim3 header_grid(roundUpDiv(chunks_in_item[i], header_block.x));
@@ -1279,14 +1427,29 @@ void lz4DecompressBatches(
   }
 
   lz4DecompressMultistreamKernel<<<
-      roundUpDiv(total_chunks, Y_DIM),
-      dim3(DECOMP_THREADS, Y_DIM, 1),
+      roundUpDiv(total_chunks, DECOMP_CHUNKS_PER_BLOCK),
+      dim3(DECOMP_THREADS_PER_CHUNK, DECOMP_CHUNKS_PER_BLOCK, 1),
       0,
       stream>>>(headers, total_chunks);
-
-
 }
 
+void lz4BatchDecompress(
+    const uint8_t* const* const device_in_ptrs,
+    const size_t* const device_in_bytes,
+    const size_t* const /* device_out_bytes */,
+    const size_t batch_size,
+    void* const /* temp_ptr */,
+    const size_t /* temp_bytes */,
+    uint8_t* const* const device_out_ptrs,
+    cudaStream_t stream)
+{
+  const dim3 grid(roundUpDiv(batch_size, DECOMP_CHUNKS_PER_BLOCK));
+  const dim3 block(DECOMP_THREADS_PER_CHUNK, DECOMP_CHUNKS_PER_BLOCK);
+
+  lz4DecompressBatchKernel<<<grid, block, 0, stream>>>(
+      device_in_ptrs, device_in_bytes, batch_size, device_out_ptrs);
+  CudaUtils::check_last_error("lz4DecompressBatchKernel()");
+}
 
 size_t lz4ComputeChunksInBatch(
     const size_t* const decomp_data_size,
@@ -1335,6 +1498,17 @@ size_t lz4CompressComputeTempSize(
          + map_size + prefix_size;
 }
 
+size_t lz4BatchCompressComputeTempSize(
+    const size_t max_chunk_size, const size_t batch_size)
+{
+  if (max_chunk_size > lz4MaxChunkSize()) {
+    throw std::runtime_error(
+        "Maximum chunk size for LZ4 is " + std::to_string(lz4MaxChunkSize()));
+  }
+
+  return HASH_TABLE_SIZE * sizeof(offset_type) * batch_size;
+}
+
 size_t lz4DecompressComputeTempSize(
     const size_t maxChunksInBatch, const size_t /* chunkSize */)
 {
@@ -1345,6 +1519,10 @@ size_t lz4DecompressComputeTempSize(
 
 size_t lz4ComputeMaxSize(const size_t size)
 {
+  if (size > lz4MaxChunkSize()) {
+    throw std::runtime_error(
+        "Maximum chunk size for LZ4 is " + std::to_string(lz4MaxChunkSize()));
+  }
   return maxSizeOfStream(size);
 }
 
@@ -1358,5 +1536,5 @@ size_t lz4MaxChunkSize()
   return MAX_CHUNK_SIZE;
 }
 
-} // nvcomp namespace
-
+} // namespace lowlevel
+} // namespace nvcomp

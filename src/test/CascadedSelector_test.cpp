@@ -45,7 +45,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <cuda_runtime.h>
-#include <getopt.h>
 #include <vector>
 
 #ifndef CUDA_RT_CALL

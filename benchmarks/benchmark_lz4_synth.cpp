@@ -34,9 +34,9 @@
 
 #include "benchmark_common.h"
 
-#include <getopt.h>
 #include <random>
 #include <string>
+#include <string.h>
 #include <vector>
 
 using namespace nvcomp;
@@ -99,8 +99,7 @@ void run_benchmark(const std::vector<uint8_t>& data)
   void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  auto start = std::chrono::steady_clock::now();
 
   // Launch compression
   compressor.compress_async(
@@ -108,7 +107,7 @@ void run_benchmark(const std::vector<uint8_t>& data)
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  auto end = std::chrono::steady_clock::now();
 
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
@@ -139,7 +138,7 @@ void run_benchmark(const std::vector<uint8_t>& data)
   CUDA_CHECK(cudaMalloc(
       (void**)&decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
 
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  start = std::chrono::steady_clock::now();
 
   // execute decompression (asynchronous)
   decompressor.decompress_async(
@@ -148,7 +147,7 @@ void run_benchmark(const std::vector<uint8_t>& data)
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // stop timing and the profiler
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  end = std::chrono::steady_clock::now();
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
@@ -168,12 +167,16 @@ void run_benchmark(const std::vector<uint8_t>& data)
 std::vector<uint8_t>
 gen_data(int max_byte, const size_t size, std::mt19937& rng)
 {
+#if defined(_MSC_VER)
+  std::uniform_int_distribution<uint16_t> dist(0, max_byte);
+#else
   std::uniform_int_distribution<uint8_t> dist(0, max_byte);
+#endif
 
   std::vector<uint8_t> data;
 
   for (size_t i = 0; i < size; ++i) {
-    data.emplace_back(dist(rng));
+    data.emplace_back(dist(rng)&0xff);
   }
 
   return data;
@@ -199,27 +202,29 @@ int main(int argc, char* argv[])
   int gpu_num = 0;
 
   // Parse command-line arguments
-  while (1) {
-    int option_index = 0;
-    static struct option long_options[]{{"gpu", required_argument, 0, 'g'},
-                                        {"help", no_argument, 0, '?'}};
-    int c;
-    opterr = 0;
-    c = getopt_long(argc, argv, "g?", long_options, &option_index);
-    if (c == -1)
-      break;
-
-    switch (c) {
-    case 'g':
-      gpu_num = atoi(optarg);
-      break;
-    case '?':
-    default:
+  char** argv_end = argv + argc;
+  argv += 1;
+  while (argv != argv_end) {
+    char* arg = *argv++;
+    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
-      exit(1);
+      return 1;
     }
-  }
 
+    // all arguments below require at least a second value in argv
+    if (argv >= argv_end) {
+      print_usage();
+      return 1;
+    }
+
+    char* optarg = *argv++;
+    if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
+      gpu_num = atoi(optarg);
+      continue;
+    }
+    print_usage();
+    return 1;
+  }
   cudaSetDevice(gpu_num);
 
   std::mt19937 rng(0);

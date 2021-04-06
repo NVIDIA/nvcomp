@@ -46,7 +46,6 @@
 #include <assert.h>
 #include <cstdlib>
 #include <cstring>
-#include <getopt.h>
 #include <vector>
 
 #ifndef CUDA_RT_CALL

@@ -31,10 +31,16 @@
 #include "nvcomp.h"
 
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <string>
+
+#if defined(_WIN32)
+#include <time.h>
+using ssize_t = ptrdiff_t;
+#endif
 
 namespace nvcomp
 {
@@ -61,10 +67,9 @@ inline double gibs(struct timespec start, struct timespec end, size_t s)
 }
 
 // size in bytes, returns GB/s
-inline double gbs(struct timespec start, struct timespec end, size_t s)
+inline double gbs(const std::chrono::time_point<std::chrono::steady_clock>& start, const std::chrono::time_point<std::chrono::steady_clock>& end, size_t s)
 {
-  uint64_t t = get_time(start, end);
-  return (double)s / t;
+  return (double)s / std::chrono::nanoseconds(end - start).count();
 }
 
 #ifdef __GNUC__
