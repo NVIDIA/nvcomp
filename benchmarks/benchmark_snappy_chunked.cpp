@@ -77,7 +77,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   // prepare input and output on host
   size_t total_bytes_uncompressed = 0;
-  size_t batch_bytes_host[batch_size];
+  std::vector<size_t> batch_bytes_host(batch_size);
   size_t max_batch_bytes_uncompressed = 0; 
   for (size_t i = 0; i < batch_size; ++i) {
     batch_bytes_host[i] = uncompressed_data[i].size();
@@ -90,21 +90,21 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   std::cout << "chunks " << batch_size << std::endl;
 
   size_t * batch_bytes_device;
-  CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(batch_bytes_host)));
-  cudaMemcpy(batch_bytes_device, batch_bytes_host, sizeof(batch_bytes_host), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
+  cudaMemcpy(batch_bytes_device, batch_bytes_host.data(), sizeof(size_t) * batch_bytes_host.size(), cudaMemcpyHostToDevice);
 
-  const uint8_t * input_host[batch_size];
+  std::vector<const uint8_t *> input_host(batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
     input_host[i] = uncompressed_data[i].data();
   }
 
-  uint8_t * output_host[batch_size];
+  std::vector<uint8_t *> output_host(batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
     output_host[i] = (uint8_t *)malloc(batch_bytes_host[i]);
   }
 
   // prepare gpu buffers
-  void* d_in_data[batch_size];
+  std::vector<void *> d_in_data(batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
     CUDA_CHECK(cudaMalloc(&d_in_data[i], batch_bytes_host[i]));
     CUDA_CHECK(cudaMemcpy(
@@ -114,8 +114,8 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         cudaMemcpyHostToDevice));
   }
   void** d_in_data_device;
-  CUDA_CHECK(cudaMalloc((void **)(&d_in_data_device), sizeof(d_in_data)));
-  cudaMemcpy(d_in_data_device, d_in_data, sizeof(d_in_data), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMalloc((void **)(&d_in_data_device), sizeof(void *) * d_in_data.size()));
+  cudaMemcpy(d_in_data_device, d_in_data.data(), sizeof(void *) * d_in_data.size(), cudaMemcpyHostToDevice);
 
 
   cudaStream_t stream;
@@ -140,14 +140,14 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
-  void* d_comp_out[batch_size];
+  std::vector<void *> d_comp_out(batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
     CUDA_CHECK(cudaMalloc(&d_comp_out[i], comp_out_bytes));
   }
 
   void** d_comp_out_device;
-  CUDA_CHECK(cudaMalloc((void **)(&d_comp_out_device), sizeof(d_comp_out)));
-  cudaMemcpy(d_comp_out_device, d_comp_out, sizeof(d_comp_out), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMalloc((void **)(&d_comp_out_device), sizeof(void *) * d_comp_out.size()));
+  cudaMemcpy(d_comp_out_device, d_comp_out.data(), sizeof(void *) * d_comp_out.size(), cudaMemcpyHostToDevice);
 
   size_t * comp_out_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&comp_out_bytes_device), sizeof(size_t) * batch_size));
@@ -218,13 +218,13 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   void* temp_ptr;
   CUDA_CHECK(cudaMalloc(&temp_ptr, temp_bytes));
 
-  void* d_decomp_out[batch_size];
-  for (int i = 0; i < batch_size; i++) {
+  std::vector<void *> d_decomp_out(batch_size);
+  for (size_t i = 0; i < batch_size; i++) {
     CUDA_CHECK(cudaMalloc(&d_decomp_out[i], max_batch_bytes_uncompressed));
   }
   void** d_decomp_out_device;
-  CUDA_CHECK(cudaMalloc((void **)(&d_decomp_out_device), sizeof(d_decomp_out)));
-  cudaMemcpy(d_decomp_out_device, d_decomp_out, sizeof(d_decomp_out), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMalloc((void **)(&d_decomp_out_device), sizeof(void *) * d_decomp_out.size()));
+  cudaMemcpy(d_decomp_out_device, d_decomp_out.data(), sizeof(void *) * d_decomp_out.size(), cudaMemcpyHostToDevice);
 
   for(int i = 0; i < warmup_count; ++i) {
     status = nvcompBatchedSnappyDecompressAsync(
@@ -255,7 +255,6 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
-  elapsedTime;
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
   std::cout << "decompression throughput read+write (GB/s): "
@@ -266,7 +265,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   cudaFree(comp_out_bytes_device);
   cudaFree(batch_bytes_device);
 
-  for (int i = 0; i < batch_size; i++) {
+  for (size_t i = 0; i < batch_size; i++) {
     cudaMemcpy(
         output_host[i],
         d_decomp_out[i],
@@ -282,7 +281,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
     }
   }
 
-  for (int i = 0; i < batch_size; i++) {
+  for (size_t i = 0; i < batch_size; i++) {
     cudaFree(d_comp_out[i]);
     cudaFree(d_decomp_out[i]);
     free(output_host[i]);
@@ -369,7 +368,7 @@ int main(int argc, char* argv[])
 
     uncompressed_data.resize(original_chunks * (duplicate_data + 1));
     for(int i = 0; i < duplicate_data; ++i)
-      for(int j = 0; j < original_chunks; ++j)
+      for(size_t j = 0; j < original_chunks; ++j)
         uncompressed_data[(i + 1) * original_chunks + j] = uncompressed_data[j];
   }
 
