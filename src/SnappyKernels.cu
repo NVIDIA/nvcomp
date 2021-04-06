@@ -250,7 +250,7 @@ static __device__ uint32_t Match60(const uint8_t *src1,
  * @param[out] outputs Compression status per block
  * @param[in] count Number of blocks to compress
  **/
-extern "C" __global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(64)
 snap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -352,8 +352,8 @@ snap_kernel(
 #define BATCH_COUNT (1 << LOG2_BATCH_COUNT)
 #define LOG2_PREFETCH_SIZE 10
 #define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 512B, in 32B chunks
-#define PREFETCH_SECTORS 8
-#define LITERAL_SECTORS 8
+#define PREFETCH_SECTORS 8 // How many loads in flight when prefetching
+#define LITERAL_SECTORS 8 // How many loads in flight when processing the literal
 
 #define LOG_CYCLECOUNT 0
 
@@ -815,111 +815,6 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
   }
 }
 
-__device__ void snappy_decode_symbols2(unsnap_state_s *s, uint32_t t)
-{
-  uint32_t cur = 0;
-  uint32_t end = static_cast<uint32_t>(s->end - s->base);
-  uint32_t bytes_left = s->uncompressed_size;
-  uint32_t dst_pos = 0;
-  int32_t batch = 0;
-  bool flag = true;
-
-  while (SHFL0(flag)) {
-    volatile unsnap_batch_s *b;
-
-    // Wait for prefetcher
-    if (t == 0) {
-      s->q.prefetch_rdpos = cur;
-#pragma unroll(1)  // We don't want unrolling here
-      while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
-      b = &s->q.batch[batch * BATCH_SIZE];
-    }
-
-    if (t == 0) {
-      uint8_t b0 = READ_BYTE(cur);
-      int len;
-      int offset;
-      if (b0 & 3) {
-        // Copy
-        uint8_t b1 = READ_BYTE(cur + 1);
-        if (!(b0 & 2)) {
-          // xxxxxx01.oooooooo: copy with 3-bit length, 11-bit offset
-          offset = ((b0 & 0xe0) << 3) | b1;
-          len = ((b0 >> 2) & 7) + 4;
-          cur += 2;
-        } else {
-          // xxxxxx1x: copy with 6-bit length, 2-byte or 4-byte offset
-          offset = b1 | (READ_BYTE(cur + 2) << 8);
-          if (b0 & 1)  // 4-byte offset
-          {
-            offset |= (READ_BYTE(cur + 3) << 16) | (READ_BYTE(cur + 4) << 24);
-            cur += 5;
-          } else {
-            cur += 3;
-          }
-          len = (b0 >> 2) + 1;
-        }
-        if (offset > dst_pos) {
-          flag = false;
-        }
-      }
-      else {
-        // xxxxxx00: literal
-        len = b0 >> 2;
-        if (len >= 60) {
-          uint32_t num_bytes = len - 59;
-          len = READ_BYTE(cur + 1);
-          if (num_bytes > 1) {
-            len |= READ_BYTE(cur + 2) << 8;
-            if (num_bytes > 2) {
-              len |= READ_BYTE(cur + 3) << 16;
-              if (num_bytes > 3)
-                len |= READ_BYTE(cur + 4) << 24;
-            }
-          }
-          cur += num_bytes;
-        }
-        cur += 1;
-        len += 1;
-        offset = -(int32_t)cur;
-        cur += len;
-      }
-
-      dst_pos += len;
-      if (bytes_left < len) {
-        flag = false;
-      }
-      bytes_left -= len;
-
-      if (flag) {
-        b[0].len = len;
-        b[0].offset = offset;
-
-        {
-          s->q.batch_len[batch] = 1;
-          batch = (batch + 1) & (BATCH_COUNT - 1);
-        }
-      }
-
-      if (bytes_left <= 0) {
-        flag = false;
-      }
-    }
-
-    if (t == 0) {
-      while (s->q.batch_len[batch] != 0) { NANOSLEEP(100); }
-    }
-  }
-
-  if (!t) {
-    s->q.prefetch_end = 1;
-    s->q.batch_len[batch] = -1;
-    s->bytes_left = bytes_left;
-    if (bytes_left != 0)
-      s->error = -2;
-  }
-}
-
 /**
  * @brief process LZ77 symbols and output uncompressed stream
  *
@@ -1157,7 +1052,7 @@ cudaError_t gpu_snap(
   int count,
   cudaStream_t stream)
 {
-  dim3 dim_block(128, 1);  // 4 warps per stream, 1 stream per block
+  dim3 dim_block(64, 1);  // 2 warps per stream, 1 stream per block
   dim3 dim_grid(count, 1);
   if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
     device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
@@ -1176,7 +1071,7 @@ cudaError_t gpu_unsnap(
   cudaStream_t stream)
 {
   uint32_t count32 = (count > 0) ? count : 0;
-  dim3 dim_block(96, 1);     // 4 warps per stream, 1 stream per block
+  dim3 dim_block(96, 1);     // 3 warps per stream, 1 stream per block
   dim3 dim_grid(count32, 1);  // TODO: Check max grid dimensions vs max expected count
 
   unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(
