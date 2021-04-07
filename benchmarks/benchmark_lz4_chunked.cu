@@ -36,8 +36,8 @@
 
 #include <fstream>
 #include <iostream>
-#include <string>
 #include <string.h>
+#include <string>
 #include <thrust/device_vector.h>
 #include <vector>
 

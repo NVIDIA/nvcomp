@@ -778,7 +778,7 @@ int main(int argc, char* argv[])
   char** argv_end = argv + argc;
   argv += 1;
   while (argv != argv_end) {
-    char *arg = *argv++;
+    char* arg = *argv++;
     if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
       return 1;
@@ -790,7 +790,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    char *optarg = *argv++;
+    char* optarg = *argv++;
     if (strcmp(arg, "--filename") == 0 || strcmp(arg, "-f") == 0) {
       fname = optarg;
       continue;

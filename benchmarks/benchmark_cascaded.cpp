@@ -281,7 +281,7 @@ int main(int argc, char* argv[])
       print_usage();
       return 1;
     }
-    if (strcmp(arg, "--sort") == 0 || strcmp(arg, "-s" )== 0) {
+    if (strcmp(arg, "--sort") == 0 || strcmp(arg, "-s") == 0) {
       sort = 1;
       continue;
     }
@@ -290,13 +290,12 @@ int main(int argc, char* argv[])
       continue;
     }
 
-
     // all arguments below require at least a second value in argv
     if (argv >= argv_end) {
       print_usage();
       return 1;
     }
-    char *optarg = *argv++;
+    char* optarg = *argv++;
 
     if (strcmp(arg, "--filename") == 0 || strcmp(arg, "-f") == 0) {
       fname = optarg;

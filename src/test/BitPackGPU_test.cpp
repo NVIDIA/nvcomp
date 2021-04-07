@@ -31,9 +31,10 @@
 #include "../../tests/catch.hpp"
 #include "BitPackGPU.h"
 #include "common.h"
-#include "CascadedCommon.h"
 #include "nvcomp.hpp"
 #include "unpack.h"
+
+#include "highlevel/CascadedCommon.h"
 
 #include "cuda_runtime.h"
 
