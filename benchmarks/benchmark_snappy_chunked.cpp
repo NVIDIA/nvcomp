@@ -86,8 +86,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
       max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
-  std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
-  std::cout << "chunks " << batch_size << std::endl;
+  std::cout << "\t" << total_bytes_uncompressed;
 
   size_t * batch_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
@@ -196,11 +195,10 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
     sizeof(size_t) * batch_size,
     cudaMemcpyDeviceToHost));
   size_t total_bytes_compressed = std::accumulate(comp_out_bytes_host.begin(), comp_out_bytes_host.end(), (size_t)0);
-  std::cout << "comp_size: " << total_bytes_compressed
-            << ", compressed ratio: " << std::fixed << std::setprecision(2)
-            << (double)total_bytes_uncompressed / total_bytes_compressed << std::endl;
-  std::cout << "compression throughput read+write (GB/s): " << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F
-            << std::endl;
+  std::cout << "\t" << total_bytes_compressed;
+  std::cout << "\t" << std::fixed << std::setprecision(2)
+            << (double)total_bytes_uncompressed / total_bytes_compressed;
+  std::cout << "\t" << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
   cudaFree(d_comp_temp);
   cudaFree(d_in_data_device);
@@ -257,8 +255,8 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
-  std::cout << "decompression throughput read+write (GB/s): "
-            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F << std::endl;
+  std::cout << "\t"
+            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
   cudaFree(temp_ptr);
   cudaFree(d_comp_out_device);
@@ -314,7 +312,7 @@ std::vector<std::vector<uint8_t>> readFile(const std::string& filename)
 int main(int argc, char* argv[])
 {
   int gpu_num = 0;
-  std::string input_file;
+  std::vector<std::string> input_files;
   int warmup_count = DEFAULT_WARMUP_COUNT;
   int iterations_count = DEFAULT_ITERATIONS_COUNT;
   int duplicate_data = 0;
@@ -339,7 +337,7 @@ int main(int argc, char* argv[])
       gpu_num = atoi(optarg);
       break;
     case 'f':
-      input_file = optarg;
+      input_files.push_back(optarg);
       break;
     case 'w':
       warmup_count = atoi(optarg);
@@ -357,34 +355,49 @@ int main(int argc, char* argv[])
     }
   }
 
-  std::cout << "----------" << std::endl;
-  std::cout << "Input file = " << input_file << std::endl;
-
-  std::vector<std::vector<uint8_t>> uncompressed_data = readFile(input_file);
-
-  size_t original_chunks = uncompressed_data.size();
-  if (duplicate_data > 0) {
-    std::cout << "Chunks duplicated " << duplicate_data << "x" << std::endl;
-
-    uncompressed_data.resize(original_chunks * (duplicate_data + 1));
-    for(int i = 0; i < duplicate_data; ++i)
-      for(size_t j = 0; j < original_chunks; ++j)
-        uncompressed_data[(i + 1) * original_chunks + j] = uncompressed_data[j];
-  }
-
   cudaSetDevice(gpu_num);
 
-  uint64_t total_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
-    [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return accum + chunk.size(); } );
-  uint64_t max_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
-    [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return std::max<uint64_t>(accum, chunk.size()); } );
-  std::cout << "Size " << std::fixed << std::setprecision(2) << (total_size / 1.0e+6F) << "MB, in "
-    << uncompressed_data.size() << " chunks, " << total_size / uncompressed_data.size() / 1.0e+3F << " KB per chunk, max chunk size "
-    << max_size / 1.0e+3F << " KB" << std::endl;
+  std::cout << "File"
+    << "\t" << "Duplicate data"
+    << "\t" << "Size, in MB"
+    << "\t" << "Pages"
+    << "\t" << "Avg page size, in KB"
+    << "\t" << "Max page size, in KB"
+    << "\t" << "Ucompressed size, in bytes"
+    << "\t" << "Compressed size, in bytes"
+    << "\t" << "Compression ratio"
+    << "\t" << "Compression throughput read+write, in GB/s"
+    << "\t" << "Decompression throughput read+write, in GB/s"
+    << std::endl;
 
-  run_benchmark(uncompressed_data, warmup_count, iterations_count);
+  for(const std::string& input_file: input_files) {
+    std::cout << input_file;
+    std::vector<std::vector<uint8_t>> uncompressed_data = readFile(input_file);
 
-  std::cout << "----------" << std::endl;
+    size_t original_chunks = uncompressed_data.size();
+    {
+      std::cout << "\t" << duplicate_data;
+
+      uncompressed_data.resize(original_chunks * (duplicate_data + 1));
+      for(int i = 0; i < duplicate_data; ++i)
+        for(size_t j = 0; j < original_chunks; ++j)
+          uncompressed_data[(i + 1) * original_chunks + j] = uncompressed_data[j];
+    }
+
+    uint64_t total_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
+      [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return accum + chunk.size(); } );
+    uint64_t max_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
+      [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return std::max<uint64_t>(accum, chunk.size()); } );
+
+    std::cout << "\t" << std::fixed << std::setprecision(2) << (total_size / 1.0e+6F);
+    std::cout << "\t" << uncompressed_data.size();
+    std::cout << "\t" << total_size / uncompressed_data.size() / 1.0e+3F;
+    std::cout << "\t" << max_size / 1.0e+3F;
+
+    run_benchmark(uncompressed_data, warmup_count, iterations_count);
+
+    std::cout << std::endl;
+  }
 
   return 0;
 }
