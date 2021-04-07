@@ -12,17 +12,20 @@ endif()
 
 file(GLOB CUDA_SOURCES
   ./*.cu
-  ./lowlevel/*.cu)
+  ./lowlevel/*.cu
+  ./highlevel/*.cu)
 file(GLOB CPP_SOURCES
   ./*.cpp
-  ./lowlevel/*.cpp)
+  ./lowlevel/*.cpp
+  ./highlevel/*.cpp)
 
 if (MSVC_VERSION)
-# we have to export all symbols on windows for a dll
-add_library(nvcomp STATIC ${CUDA_SOURCES} ${CPP_SOURCES})
+  # we have to export all symbols on windows for a dll
+  add_library(nvcomp STATIC ${CUDA_SOURCES} ${CPP_SOURCES})
 else()
-add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
+  add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
 endif()
+
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
@@ -41,4 +44,7 @@ if (ENABLE_BITCOMP)
   target_link_libraries(nvcomp PUBLIC bitcomp)
 endif()
 
+
 add_subdirectory("test")
+add_subdirectory("highlevel/test")
+add_subdirectory("lowlevel/test")

@@ -253,7 +253,6 @@ int main(int argc, char* argv[])
   std::string dtype = "int";
   size_t size = 0;
 
-
   // Parse command-line arguments
   char** argv_end = argv + argc;
   argv += 1;

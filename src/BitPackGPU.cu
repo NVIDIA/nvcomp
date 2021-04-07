@@ -29,7 +29,6 @@
 #include "BitPackGPU.h"
 #include "unpack.h"
 #include "common.h"
-#include "CascadedCommon.h"
 
 #include <algorithm>
 #include <cassert>
