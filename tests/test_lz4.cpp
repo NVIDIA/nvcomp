@@ -31,8 +31,6 @@
 #include "nvcomp.hpp"
 #include "nvcomp/lz4.hpp"
 
-#include "../src/LZ4Metadata.h"
-
 #include "catch.hpp"
 
 #include <assert.h>
