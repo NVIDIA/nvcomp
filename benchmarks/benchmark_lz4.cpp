@@ -34,8 +34,8 @@
 
 #include "benchmark_common.h"
 
-#include <string>
 #include <string.h>
+#include <string>
 
 using namespace nvcomp;
 

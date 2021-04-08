@@ -28,10 +28,13 @@
 
 #define CATCH_CONFIG_MAIN
 
-#include "../../tests/catch.hpp"
-#include "DeltaGPU.h"
+#include "nvcomp/cascaded.h"
+
+#include "../../../tests/catch.hpp"
+#include "../CascadedCommon.h"
+#include "../CascadedMetadata.h"
+#include "../CascadedMetadataOnGPU.h"
 #include "common.h"
-#include "nvcomp.hpp"
 
 #include "cuda_runtime.h"
 
@@ -57,6 +60,7 @@
 #endif
 
 using namespace nvcomp;
+using namespace nvcomp::highlevel;
 
 /******************************************************************************
  * HELPER FUNCTIONS ***********************************************************
@@ -93,99 +97,101 @@ __global__ void fromGPU(
  * UNIT TEST ******************************************************************
  *****************************************************************************/
 
-TEST_CASE("compress_10Thousand_Test", "[small]")
+TEST_CASE("Metadata-fcns", "[small]")
 {
-  size_t const n = 10000;
+  // Create test header
+  nvcompCascadedFormatOpts format_opts;
+  format_opts.num_RLEs = 1;
+  format_opts.num_deltas = 0;
+  format_opts.use_bp = 1;
 
-  using T = int32_t;
+  CascadedMetadata meta_in(
+      format_opts,
+      NVCOMP_TYPE_INT,
+      sizeof(CascadedMetadata),
+      sizeof(CascadedMetadata));
 
-  T *input, *inputHost;
-  size_t const numBytes = n * sizeof(*input);
+  meta_in.setHeader(0, {9, 0, 0});
+  meta_in.setHeader(1, {37, 5, 3});
+  meta_in.setHeader(2, {49, 2, 5});
+  meta_in.setDataOffset(0, 10);
+  meta_in.setDataOffset(1, 38);
+  meta_in.setDataOffset(2, 58);
 
-  CUDA_RT_CALL(cudaMalloc((void**)&input, numBytes));
-
-  CUDA_RT_CALL(cudaMallocHost((void**)&inputHost, n * sizeof(*inputHost)));
-
-  float const totalGB = numBytes / (1024.0 * 1024.0 * 1024.0);
+  short version_num = 1;
 
   cudaStream_t stream;
-  CUDA_RT_CALL(cudaStreamCreate(&stream));
+  cudaStreamCreate(&stream);
 
-  std::srand(0);
+  // get size of serialized metadata
+  size_t serialized_metadata_bytes
+      = CascadedMetadataOnGPU::getSerializedSizeOf(meta_in);
 
-  T last = 0;
-  for (size_t i = 0; i < n; ++i) {
-    if (std::rand() % 3 == 0) {
-      last = std::rand() % 1024;
-    }
-    inputHost[i] = last;
+  // set serialized metadata
+  void* d_meta;
+  CUDA_RT_CALL(cudaMalloc(
+      (void**)&d_meta, serialized_metadata_bytes)); // version number + metadata
+
+  CascadedMetadataOnGPU gpuMetadata(d_meta, serialized_metadata_bytes);
+  gpuMetadata.copyToGPU(meta_in, 0);
+
+  void* meta_out;
+
+  nvcompError_t err = nvcompCascadedDecompressGetMetadata(
+      d_meta, serialized_metadata_bytes, &meta_out, stream);
+  REQUIRE(err == nvcompSuccess);
+
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->getNumRLEs()
+      == meta_in.getNumRLEs());
+
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->getNumDeltas()
+      == meta_in.getNumDeltas());
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->useBitPacking()
+      == meta_in.useBitPacking());
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->getCompressedSize()
+      == meta_in.getCompressedSize());
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->getUncompressedSize()
+      == meta_in.getUncompressedSize());
+  CHECK(
+      (static_cast<CascadedMetadata*>(meta_out))->getValueType()
+      == meta_in.getValueType());
+  REQUIRE(
+      (static_cast<CascadedMetadata*>(meta_out))->getNumInputs()
+      == meta_in.getNumInputs());
+  for (size_t i = 0; i < meta_in.getNumInputs(); ++i) {
+    CHECK(
+        (static_cast<CascadedMetadata*>(meta_out))->getHeader(i).length
+        == meta_in.getHeader(i).length);
+    CHECK(
+        (static_cast<CascadedMetadata*>(meta_out))->getHeader(i).minValue.i32
+        == meta_in.getHeader(i).minValue.i32);
+    CHECK(
+        (static_cast<CascadedMetadata*>(meta_out))->getHeader(i).numBits
+        == meta_in.getHeader(i).numBits);
+    CHECK(
+        (static_cast<CascadedMetadata*>(meta_out))->getDataOffset(i)
+        == meta_in.getDataOffset(i));
   }
 
-  toGPU(input, inputHost, n, stream);
+  // Check tempSize result
+  size_t temp_bytes;
+  err = nvcompCascadedDecompressGetTempSize(meta_out, &temp_bytes);
+  REQUIRE(err == nvcompSuccess);
 
-  T *output, *outputHost;
-  T** outputPtr;
+  CHECK(temp_bytes == 4096);
 
-  CUDA_RT_CALL(cudaMalloc((void**)&output, numBytes));
-  CUDA_RT_CALL(cudaMallocHost((void**)&outputHost, numBytes));
+  // getOutputSize
+  size_t out_bytes;
+  err = nvcompCascadedDecompressGetOutputSize(meta_out, &out_bytes);
+  REQUIRE(err == nvcompSuccess);
 
-  CUDA_RT_CALL(cudaMalloc((void**)&outputPtr, sizeof(*outputPtr)));
-  CUDA_RT_CALL(cudaMemcpy(
-      outputPtr, &output, sizeof(*outputPtr), cudaMemcpyHostToDevice));
+  CHECK(out_bytes == sizeof(CascadedMetadata));
 
-  size_t* inputSizePtr;
-  CUDA_RT_CALL(cudaMalloc((void**)&inputSizePtr, sizeof(*inputSizePtr)));
-  CUDA_RT_CALL(cudaMemcpy(
-      inputSizePtr, &n, sizeof(*inputSizePtr), cudaMemcpyHostToDevice));
-
-  void* workspace;
-  size_t const workspaceSize
-      = DeltaGPU::requiredWorkspaceSize(n, getnvcompType<T>());
-  CUDA_RT_CALL(cudaMalloc((void**)&workspace, workspaceSize));
-
-  cudaEvent_t start, stop;
-
-  CUDA_RT_CALL(cudaEventCreate(&start));
-  CUDA_RT_CALL(cudaEventCreate(&stop));
-  CUDA_RT_CALL(cudaEventRecord(start, stream));
-
-  DeltaGPU::compress(
-      workspace,
-      workspaceSize,
-      getnvcompType<T>(),
-      (void**)outputPtr,
-      input,
-      inputSizePtr,
-      2 * n,
-      stream);
-  CUDA_RT_CALL(cudaEventRecord(stop, stream));
-
-  CUDA_RT_CALL(cudaStreamSynchronize(stream));
-  float time;
-  CUDA_RT_CALL(cudaEventElapsedTime(&time, start, stop));
-
-  fromGPU(outputHost, output, n, stream);
-  CUDA_RT_CALL(cudaStreamSynchronize(stream));
-  CUDA_RT_CALL(cudaStreamDestroy(stream));
-
-  CUDA_RT_CALL(cudaFree(output));
-  CUDA_RT_CALL(cudaFree(outputPtr));
-  CUDA_RT_CALL(cudaFree(inputSizePtr));
-
-  // compute Delta on host
-  std::vector<T> expected{inputHost[0]};
-
-  for (size_t i = 1; i < n; ++i) {
-    expected.emplace_back(inputHost[i] - inputHost[i - 1]);
-  }
-
-  // verify output
-  for (size_t i = 0; i < n; ++i) {
-    CHECK(expected[i] == outputHost[i]);
-  }
-
-  CUDA_RT_CALL(cudaFreeHost(outputHost));
-
-  CUDA_RT_CALL(cudaFree(input));
-  CUDA_RT_CALL(cudaFreeHost(inputHost));
+  nvcompCascadedDecompressDestroyMetadata(meta_out);
+  CUDA_RT_CALL(cudaFree(d_meta));
 }

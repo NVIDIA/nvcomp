@@ -26,19 +26,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "highlevel/BitcompMetadata.h"
+#include "highlevel/Metadata.h"
+
 #include "nvcomp.h"
 #include "nvcomp/cascaded.h"
 #include "nvcomp/lz4.h"
 #include "nvcomp/bitcomp.h"
-#include "BitcompMetadata.h"
-
-#include "Metadata.h"
 
 #include <iostream>
 
 // TODO: these all assume cascaded is being used
 
 using namespace nvcomp;
+using namespace nvcomp::highlevel;
 
 nvcompError_t nvcompDecompressGetMetadata(
     const void* const in_ptr,

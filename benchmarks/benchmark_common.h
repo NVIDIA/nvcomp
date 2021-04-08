@@ -42,7 +42,6 @@
 #include <string>
 #include <vector>
 
-
 #define CUDA_CHECK(func)                                                       \
   do {                                                                         \
     cudaError_t rt = (func);                                                   \

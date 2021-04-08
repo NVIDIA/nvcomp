@@ -35,8 +35,8 @@
 #include "benchmark_common.h"
 
 #include <random>
-#include <string>
 #include <string.h>
+#include <string>
 #include <vector>
 
 using namespace nvcomp;
@@ -176,7 +176,7 @@ gen_data(int max_byte, const size_t size, std::mt19937& rng)
   std::vector<uint8_t> data;
 
   for (size_t i = 0; i < size; ++i) {
-    data.emplace_back(dist(rng)&0xff);
+    data.emplace_back(dist(rng) & 0xff);
   }
 
   return data;

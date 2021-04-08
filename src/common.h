@@ -67,7 +67,10 @@ inline double gibs(struct timespec start, struct timespec end, size_t s)
 }
 
 // size in bytes, returns GB/s
-inline double gbs(const std::chrono::time_point<std::chrono::steady_clock>& start, const std::chrono::time_point<std::chrono::steady_clock>& end, size_t s)
+inline double
+gbs(const std::chrono::time_point<std::chrono::steady_clock>& start,
+    const std::chrono::time_point<std::chrono::steady_clock>& end,
+    size_t s)
 {
   return (double)s / std::chrono::nanoseconds(end - start).count();
 }
