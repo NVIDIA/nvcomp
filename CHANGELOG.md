@@ -1,3 +1,7 @@
+# nvcomp 1.2.3 (2021-04-07)
+
+- Fix bug in LZ4 compression kernel for the Pascal architecture.
+
 # nvcomp 1.2.2 (2021-02-08)
 
 - Fix linking errors in Clang++.
