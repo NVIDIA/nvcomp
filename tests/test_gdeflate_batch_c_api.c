@@ -58,8 +58,6 @@
   } while (0)
 
 
-#ifdef ENABLE_GDEFLATE
-
 int test_batch_compression_and_decompression(void)
 {
   typedef int T;
@@ -242,8 +240,6 @@ int test_batch_compression_and_decompression(void)
 
 #undef BATCH_SIZE
 }
-
-#endif // ENABLE_GDEFLATE
 
 int main(int argc, char** argv)
 {

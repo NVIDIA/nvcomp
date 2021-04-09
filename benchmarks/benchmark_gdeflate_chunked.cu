@@ -44,6 +44,16 @@
 
 using namespace nvcomp;
 
+#ifdef ENABLE_GDEFLATE
+#define CHECK_NVCOMP_STATUS(status) \
+  if ((status) != nvcompSuccess) \
+    throw std::runtime_error("Failed to compress data");
+#else
+#define CHECK_NVCOMP_STATUS(status) \
+  if ((status) != nvcompSuccess) \
+    throw std::runtime_error("nvcomp not configured with gdeflate support");
+#endif
+
 static size_t compute_batch_size(
     const std::vector<std::vector<char>>& data, const size_t chunk_size)
 {
@@ -223,7 +233,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   cudaEventRecord(end, stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
-  if (status != nvcompSuccess) throw std::runtime_error("Failed to compress data");
+  CHECK_NVCOMP_STATUS(status);
 
   // free compression memory
   cudaFree(d_comp_temp);
@@ -279,7 +289,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   cudaEventRecord(end, stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
-  if (status != nvcompSuccess) throw std::runtime_error("Failed to decompress data");
+  CHECK_NVCOMP_STATUS(status);
 
   cudaEventElapsedTime(&ms, start, end);
 
@@ -292,6 +302,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
 
   cudaStreamDestroy(stream);
 }
+#undef CHECK_NVCOMP_STATUS
 
 std::vector<char> readFile(const std::string& filename)
 {

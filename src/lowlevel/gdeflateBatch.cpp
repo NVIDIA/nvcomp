@@ -44,8 +44,8 @@
 #include <vector>
 
 #ifdef ENABLE_GDEFLATE
-
 #include "gdeflate.h"
+#endif
 
 using namespace nvcomp;
 
@@ -54,6 +54,7 @@ nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
     const size_t max_uncompressed_chunk_size,
     size_t* const temp_bytes)
 {
+#ifdef ENABLE_GDEFLATE
   CHECK_NOT_NULL(temp_bytes);
 
   try {
@@ -64,6 +65,12 @@ nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
   }
 
   return nvcompSuccess;
+#else
+  (void)num_chunks;
+  (void)max_uncompressed_chunk_size;
+  (void)temp_bytes;
+  return nvcompErrorNotSupported;
+#endif
 }
 
 nvcompError_t nvcompBatchedGdeflateDecompressAsync(
@@ -77,6 +84,7 @@ nvcompError_t nvcompBatchedGdeflateDecompressAsync(
     void* const* const device_out_ptrs,
     cudaStream_t stream)
 {
+#ifdef ENABLE_GDEFLATE
   // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check
   // to make sure it is not zero, as we have notified users to supply zero if
   // they are not finding the maximum size.
@@ -90,6 +98,18 @@ nvcompError_t nvcompBatchedGdeflateDecompressAsync(
   }
 
   return nvcompSuccess;
+#else
+    (void)device_in_ptrs;
+    (void)device_in_bytes;
+    (void)device_out_bytes;
+    (void)max_uncompressed_chunk_bytes;
+    (void)batch_size;
+    (void)temp_ptr;
+    (void)temp_bytes;
+    (void)device_out_ptrs;
+    (void)stream;
+  return nvcompErrorNotSupported;
+#endif
 }
 
 nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
@@ -97,6 +117,7 @@ nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
     const size_t max_chunk_size,
     size_t* const temp_bytes)
 {
+#ifdef ENABLE_GDEFLATE
   CHECK_NOT_NULL(temp_bytes);
 
   try {
@@ -107,11 +128,18 @@ nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
   }
 
   return nvcompSuccess;
+#else
+  (void)batch_size;
+  (void)max_chunk_size;
+  (void)temp_bytes;
+  return nvcompErrorNotSupported;
+#endif
 }
 
 nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
     const size_t max_chunk_size, size_t* const max_compressed_size)
 {
+#ifdef ENABLE_GDEFLATE
   CHECK_NOT_NULL(max_compressed_size);
 
   try {
@@ -122,6 +150,11 @@ nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
   }
 
   return nvcompSuccess;
+#else
+  (void)max_chunk_size;
+  (void)max_compressed_size;
+  return nvcompErrorNotSupported;
+#endif
 }
 
 nvcompError_t nvcompBatchedGdeflateCompressAsync(
@@ -135,6 +168,7 @@ nvcompError_t nvcompBatchedGdeflateCompressAsync(
     size_t* const device_out_bytes,
     cudaStream_t stream)
 {
+#ifdef ENABLE_GDEFLATE
   try {
     gdeflate::compressAsync(device_in_ptrs, device_in_bytes, max_uncompressed_chunk_size,
         batch_size, temp_ptr, temp_bytes, device_out_ptrs, device_out_bytes, stream);
@@ -143,6 +177,16 @@ nvcompError_t nvcompBatchedGdeflateCompressAsync(
   }
 
   return nvcompSuccess;
+#else
+  (void)device_in_ptrs;
+  (void)device_in_bytes;
+  (void)max_uncompressed_chunk_size;
+  (void)batch_size;
+  (void)temp_ptr;
+  (void)temp_bytes;
+  (void)device_out_ptrs;
+  (void)device_out_bytes;
+  (void)stream;
+  return nvcompErrorNotSupported;
+#endif
 }
-
-#endif // ENABLE_GDEFLATE

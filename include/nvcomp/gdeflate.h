@@ -34,8 +34,6 @@
 #include <cuda_runtime.h>
 #include <stdint.h>
 
-#ifdef ENABLE_GDEFLATE
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -166,7 +164,5 @@ nvcompError_t nvcompBatchedGdeflateDecompressAsync(
 #ifdef __cplusplus
 }
 #endif
-
-#endif // ENABLE_GDEFLATE
 
 #endif
