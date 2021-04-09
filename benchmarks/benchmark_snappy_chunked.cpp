@@ -35,11 +35,11 @@
 
 #include "cuda_runtime.h"
 
-#include <getopt.h>
 #include <string>
 #include <vector>
 #include <numeric>
 #include <fstream>
+#include <cstring>
 
 using namespace nvcomp;
 
@@ -61,9 +61,9 @@ constexpr const int DEFAULT_MAX_BYTE_VALUE = 255;
 
 void print_usage()
 {
-  printf("Usage: benchmark_binary [OPTIONS]\n");
+  printf("Usage: benchmark_snappy_chunked [OPTIONS]\n");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
-  printf("  %-35s Input file path\n", "-f, --input_file");
+  printf("  %-35s Input file path, you can specify multiple files this way\n", "-f, --input_file");
   printf("  %-35s Warm up benchmark (default %d)\n", "-w, --warmup_count", DEFAULT_WARMUP_COUNT);
   printf("  %-35s Average multiple kernel runtimes (default %d)\n", "-i, --iterations_count", DEFAULT_ITERATIONS_COUNT);
   printf("  %-35s Maximum value for the bytes of uncompressed data (default %d)\n", "-m, --max_byte", DEFAULT_MAX_BYTE_VALUE);
@@ -90,7 +90,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   size_t * batch_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
-  cudaMemcpy(batch_bytes_device, batch_bytes_host.data(), sizeof(size_t) * batch_bytes_host.size(), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMemcpy(batch_bytes_device, batch_bytes_host.data(), sizeof(size_t) * batch_bytes_host.size(), cudaMemcpyHostToDevice));
 
   std::vector<const uint8_t *> input_host(batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
@@ -114,7 +114,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   }
   void** d_in_data_device;
   CUDA_CHECK(cudaMalloc((void **)(&d_in_data_device), sizeof(void *) * d_in_data.size()));
-  cudaMemcpy(d_in_data_device, d_in_data.data(), sizeof(void *) * d_in_data.size(), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMemcpy(d_in_data_device, d_in_data.data(), sizeof(void *) * d_in_data.size(), cudaMemcpyHostToDevice));
 
 
   cudaStream_t stream;
@@ -146,7 +146,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   void** d_comp_out_device;
   CUDA_CHECK(cudaMalloc((void **)(&d_comp_out_device), sizeof(void *) * d_comp_out.size()));
-  cudaMemcpy(d_comp_out_device, d_comp_out.data(), sizeof(void *) * d_comp_out.size(), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMemcpy(d_comp_out_device, d_comp_out.data(), sizeof(void *) * d_comp_out.size(), cudaMemcpyHostToDevice));
 
   size_t * comp_out_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&comp_out_bytes_device), sizeof(size_t) * batch_size));
@@ -186,7 +186,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   float elapsedTime;
-  cudaEventElapsedTime(&elapsedTime, start, stop);
+  CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
   std::vector<size_t> comp_out_bytes_host(batch_size);
   CUDA_CHECK(cudaMemcpy(
@@ -200,10 +200,10 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
             << (double)total_bytes_uncompressed / total_bytes_compressed;
   std::cout << "\t" << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
-  cudaFree(d_comp_temp);
-  cudaFree(d_in_data_device);
+  CUDA_CHECK(cudaFree(d_comp_temp));
+  CUDA_CHECK(cudaFree(d_in_data_device));
   for (size_t i = 0; i < batch_size; ++i) {
-    cudaFree(d_in_data[i]);
+    CUDA_CHECK(cudaFree(d_in_data[i]));
   }
 
   size_t temp_bytes;
@@ -222,7 +222,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   }
   void** d_decomp_out_device;
   CUDA_CHECK(cudaMalloc((void **)(&d_decomp_out_device), sizeof(void *) * d_decomp_out.size()));
-  cudaMemcpy(d_decomp_out_device, d_decomp_out.data(), sizeof(void *) * d_decomp_out.size(), cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMemcpy(d_decomp_out_device, d_decomp_out.data(), sizeof(void *) * d_decomp_out.size(), cudaMemcpyHostToDevice));
 
   for(int i = 0; i < warmup_count; ++i) {
     status = nvcompBatchedSnappyDecompressAsync(
@@ -258,17 +258,13 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   std::cout << "\t"
             << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
-  cudaFree(temp_ptr);
-  cudaFree(d_comp_out_device);
-  cudaFree(comp_out_bytes_device);
-  cudaFree(batch_bytes_device);
+  CUDA_CHECK(cudaFree(temp_ptr));
+  CUDA_CHECK(cudaFree(d_comp_out_device));
+  CUDA_CHECK(cudaFree(comp_out_bytes_device));
+  CUDA_CHECK(cudaFree(batch_bytes_device));
 
   for (size_t i = 0; i < batch_size; i++) {
-    cudaMemcpy(
-        output_host[i],
-        d_decomp_out[i],
-        batch_bytes_host[i],
-        cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(output_host[i], d_decomp_out[i], batch_bytes_host[i], cudaMemcpyDeviceToHost));
     // Verify correctness
     for (size_t j = 0; j < batch_bytes_host[i]; ++j) {
       if (output_host[i][j] != input_host[i][j])
@@ -280,13 +276,13 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   }
 
   for (size_t i = 0; i < batch_size; i++) {
-    cudaFree(d_comp_out[i]);
-    cudaFree(d_decomp_out[i]);
+    CUDA_CHECK(cudaFree(d_comp_out[i]));
+    CUDA_CHECK(cudaFree(d_decomp_out[i]));
     free(output_host[i]);
   }
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
+  CUDA_CHECK(cudaEventDestroy(start));
+  CUDA_CHECK(cudaEventDestroy(stop));
 }
 
 std::vector<std::vector<uint8_t>> readFile(const std::string& filename)
@@ -317,42 +313,50 @@ int main(int argc, char* argv[])
   int iterations_count = DEFAULT_ITERATIONS_COUNT;
   int duplicate_data = 0;
 
-  // Parse command-line arguments
-  while (1) {
-    int option_index = 0;
-    static struct option long_options[]{{"gpu", required_argument, 0, 'g'},
-                                        {"input_file", required_argument, 0, 'f'},
-                                        {"warmup_count", required_argument, 0, 'w'},
-                                        {"iterations_count", required_argument, 0, 'i'},
-                                        {"duplicate_data", required_argument, 0, 'x'},
-                                        {"help", no_argument, 0, '?'}};
-    int c;
-    opterr = 0;
-    c = getopt_long(argc, argv, "g:f:w:i:m:x:", long_options, &option_index);
-    if (c == -1)
-      break;
-
-    switch (c) {
-    case 'g':
-      gpu_num = atoi(optarg);
-      break;
-    case 'f':
-      input_files.push_back(optarg);
-      break;
-    case 'w':
-      warmup_count = atoi(optarg);
-      break;
-    case 'i':
-      iterations_count = atoi(optarg);
-      break;
-    case 'x':
-      duplicate_data = atoi(optarg);
-      break;
-    case '?':
-    default:
+  char** argv_end = argv + argc;
+  argv += 1;
+  while (argv != argv_end) {
+    char* arg = *argv++;
+    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
-      exit(1);
+      return 1;
     }
+
+    // all arguments below require at least a second value in argv
+    if (argv >= argv_end) {
+      print_usage();
+      return 1;
+    }
+
+    char* optarg = *argv++;
+    if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
+      gpu_num = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--input_file") == 0 || strcmp(arg, "-f") == 0) {
+      input_files.push_back(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--warmup_count") == 0 || strcmp(arg, "-w") == 0) {
+      warmup_count = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--iterations_count") == 0 || strcmp(arg, "-i") == 0) {
+      iterations_count = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--duplicate_data") == 0 || strcmp(arg, "-x") == 0) {
+      duplicate_data = atoi(optarg);
+      continue;
+    }
+    print_usage();
+    return 1;
+  }
+
+  if (input_files.empty()) {
+    printf("No input files specified\n");
+    print_usage();
+    exit(1);
   }
 
   cudaSetDevice(gpu_num);
