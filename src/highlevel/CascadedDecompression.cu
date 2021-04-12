@@ -36,22 +36,9 @@
 #include "CascadedMetadataOnGPU.h"
 #include "Check.h"
 #include "CudaUtils.h"
+#include "nvcomp_cub.cuh"
 #include "type_macros.h"
 #include "unpack.h"
-
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-#include <cub/cub.cuh>
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
-#ifdef USE_RMM
-#include <rmm/rmm.h>
-#endif
 
 #include <cassert>
 #include <iostream>

@@ -29,16 +29,7 @@
 #ifndef NVCOMP_GPUKERNELS_H
 #define NVCOMP_GPUKERNELS_H
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-#include <cub/cub.cuh>
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
+#include "nvcomp_cub.cuh"
 #include "unpack.h"
 
 namespace nvcomp
