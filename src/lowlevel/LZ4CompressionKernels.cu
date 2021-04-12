@@ -31,17 +31,8 @@
 #include "TempSpaceBroker.h"
 #include "common.h"
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-#include <cub/cub.cuh>
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
 #include "cuda_runtime.h"
+#include "nvcomp_cub.cuh"
 
 #include <cassert>
 #include <fstream>

@@ -34,16 +34,7 @@
 #include "nvcomp.hpp"
 #include "type_macros.h"
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-#include <cub/device/device_run_length_encode.cuh>
-#include <cub/device/device_scan.cuh>
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
+#include "nvcomp_cub.cuh"
 
 #include <cassert>
 #include <stdexcept>
