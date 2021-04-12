@@ -35,7 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Test GPU decompression with cascaded compression API //
+// Test GPU compression and decompression using the gdeflate chunked API //
 
 #define REQUIRE(a)                                                             \
   do {                                                                         \
