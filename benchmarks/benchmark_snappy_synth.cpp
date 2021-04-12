@@ -58,7 +58,7 @@ constexpr const size_t CHUNK_SIZE = 1 << 16;
 constexpr const int DEFAULT_BATCH_SIZE = 4000;
 constexpr const int DEFAULT_WARMUP_COUNT = 10;
 constexpr const int DEFAULT_ITERATIONS_COUNT = 10;
-constexpr const int DEFAULT_MAX_BYTE_VALUE = 255;
+constexpr const int DEFAULT_MAX_BYTE_VALUE = 3;
 
 void print_usage()
 {
@@ -169,7 +169,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(start, 0));
+  CUDA_CHECK(cudaEventRecord(start, stream));
   for(int i = 0; i < iterations_count; ++i) {
     status = nvcompBatchedSnappyCompressAsync(
         (const void* const*)d_in_data_device,
@@ -182,7 +182,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(stop, 0));
+  CUDA_CHECK(cudaEventRecord(stop, stream));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -238,7 +238,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(start, 0));
+  CUDA_CHECK(cudaEventRecord(start, stream));
   for(int i = 0; i < iterations_count; ++i) {
     status = nvcompBatchedSnappyDecompressAsync(
         (const void* const*)d_comp_out_device,
@@ -251,7 +251,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(stop, 0));
+  CUDA_CHECK(cudaEventRecord(stop, stream));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 

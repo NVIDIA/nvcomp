@@ -57,7 +57,7 @@ namespace
 constexpr const size_t CHUNK_SIZE = 1 << 16;
 constexpr const int DEFAULT_WARMUP_COUNT = 10;
 constexpr const int DEFAULT_ITERATIONS_COUNT = 10;
-constexpr const int DEFAULT_MAX_BYTE_VALUE = 255;
+constexpr const int DEFAULT_PAGE_SIZE = 65536;
 
 void print_usage()
 {
@@ -66,12 +66,14 @@ void print_usage()
   printf("  %-35s Input file path, you can specify multiple files this way\n", "-f, --input_file");
   printf("  %-35s Warm up benchmark (default %d)\n", "-w, --warmup_count", DEFAULT_WARMUP_COUNT);
   printf("  %-35s Average multiple kernel runtimes (default %d)\n", "-i, --iterations_count", DEFAULT_ITERATIONS_COUNT);
-  printf("  %-35s Maximum value for the bytes of uncompressed data (default %d)\n", "-m, --max_byte", DEFAULT_MAX_BYTE_VALUE);
   printf("  %-35s Clone uncompressed chunks multiple times (default 0)\n", "-x, --duplicate_data");
+  printf("  %-35s Use tab separator for the output (default comma)\n", "-t, --tab");
+  printf("  %-35s Files(s) contain pages, each prefixed with int64 size\n", "-w, --file_with_page_sizes");
+  printf("  %-35s Page size to use when splitting uncompressed data (default %d)\n", "-p, --page_size", DEFAULT_PAGE_SIZE);
   exit(1);
 }
 
-void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, int warmup_count, int iterations_count)
+void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, int warmup_count, int iterations_count, char separator)
 {
   size_t batch_size = uncompressed_data.size();
 
@@ -86,7 +88,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
       max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
-  std::cout << "\t" << total_bytes_uncompressed;
+  std::cout << separator << total_bytes_uncompressed;
 
   size_t * batch_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
@@ -168,7 +170,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(start, 0));
+  CUDA_CHECK(cudaEventRecord(start, stream));
   for(int i = 0; i < iterations_count; ++i) {
     status = nvcompBatchedSnappyCompressAsync(
         (const void* const*)d_in_data_device,
@@ -181,7 +183,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(stop, 0));
+  CUDA_CHECK(cudaEventRecord(stop, stream));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -195,10 +197,10 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
     sizeof(size_t) * batch_size,
     cudaMemcpyDeviceToHost));
   size_t total_bytes_compressed = std::accumulate(comp_out_bytes_host.begin(), comp_out_bytes_host.end(), (size_t)0);
-  std::cout << "\t" << total_bytes_compressed;
-  std::cout << "\t" << std::fixed << std::setprecision(2)
+  std::cout << separator << total_bytes_compressed;
+  std::cout << separator << std::fixed << std::setprecision(2)
             << (double)total_bytes_uncompressed / total_bytes_compressed;
-  std::cout << "\t" << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
+  std::cout << separator << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
   CUDA_CHECK(cudaFree(d_comp_temp));
   CUDA_CHECK(cudaFree(d_in_data_device));
@@ -236,7 +238,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(start, 0));
+  CUDA_CHECK(cudaEventRecord(start, stream));
   for(int i = 0; i < iterations_count; ++i) {
     status = nvcompBatchedSnappyDecompressAsync(
         (const void* const*)d_comp_out_device,
@@ -249,13 +251,13 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         stream);
     REQUIRE(status == nvcompSuccess);
   }
-  CUDA_CHECK(cudaEventRecord(stop, 0));
+  CUDA_CHECK(cudaEventRecord(stop, stream));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
-  std::cout << "\t"
+  std::cout << separator
             << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
 
   CUDA_CHECK(cudaFree(temp_ptr));
@@ -285,7 +287,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   CUDA_CHECK(cudaEventDestroy(stop));
 }
 
-std::vector<std::vector<uint8_t>> readFile(const std::string& filename)
+std::vector<std::vector<uint8_t>> readFileWithPageSizes(const std::string& filename)
 {
   std::vector<std::vector<uint8_t>> res;
 
@@ -303,6 +305,22 @@ std::vector<std::vector<uint8_t>> readFile(const std::string& filename)
   return res;
 }
 
+std::vector<std::vector<uint8_t>> readFile(const std::string& filename, int page_size)
+{
+  std::vector<std::vector<uint8_t>> res;
+
+  std::ifstream fin(filename, std::ifstream::binary);
+
+  while (!fin.eof()) {
+    res.emplace_back(page_size);
+    fin.read((char *)(res.back().data()), page_size);
+    if (fin.gcount() < page_size)
+      res.back().resize(fin.gcount());
+  }
+
+  return res;
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -312,6 +330,9 @@ int main(int argc, char* argv[])
   int warmup_count = DEFAULT_WARMUP_COUNT;
   int iterations_count = DEFAULT_ITERATIONS_COUNT;
   int duplicate_data = 0;
+  char separator = ',';
+  int page_size = DEFAULT_PAGE_SIZE;
+  bool file_with_page_sizes = false;
 
   char** argv_end = argv + argc;
   argv += 1;
@@ -320,6 +341,14 @@ int main(int argc, char* argv[])
     if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
       print_usage();
       return 1;
+    }
+    if (strcmp(arg, "--tab") == 0 || strcmp(arg, "-t") == 0) {
+      separator = '\t';
+      continue;
+    }
+    if (strcmp(arg, "--file_with_page_sizes") == 0 || strcmp(arg, "-w") == 0) {
+      file_with_page_sizes = true;
+      continue;
     }
 
     // all arguments below require at least a second value in argv
@@ -349,6 +378,10 @@ int main(int argc, char* argv[])
       duplicate_data = atoi(optarg);
       continue;
     }
+    if (strcmp(arg, "--page_size") == 0 || strcmp(arg, "-p") == 0) {
+      page_size = atoi(optarg);
+      continue;
+    }
     print_usage();
     return 1;
   }
@@ -362,25 +395,27 @@ int main(int argc, char* argv[])
   cudaSetDevice(gpu_num);
 
   std::cout << "File"
-    << "\t" << "Duplicate data"
-    << "\t" << "Size, in MB"
-    << "\t" << "Pages"
-    << "\t" << "Avg page size, in KB"
-    << "\t" << "Max page size, in KB"
-    << "\t" << "Ucompressed size, in bytes"
-    << "\t" << "Compressed size, in bytes"
-    << "\t" << "Compression ratio"
-    << "\t" << "Compression throughput read+write, in GB/s"
-    << "\t" << "Decompression throughput read+write, in GB/s"
+    << separator << "Duplicate data"
+    << separator << "Size in MB"
+    << separator << "Pages"
+    << separator << "Avg page size in KB"
+    << separator << "Max page size in KB"
+    << separator << "Ucompressed size in bytes"
+    << separator << "Compressed size in bytes"
+    << separator << "Compression ratio"
+    << separator << "Compression throughput read+write in GB/s"
+    << separator << "Decompression throughput read+write in GB/s"
     << std::endl;
 
   for(const std::string& input_file: input_files) {
     std::cout << input_file;
-    std::vector<std::vector<uint8_t>> uncompressed_data = readFile(input_file);
+
+    std::vector<std::vector<uint8_t>> uncompressed_data = file_with_page_sizes ? 
+      readFileWithPageSizes(input_file) : readFile(input_file, page_size);
 
     size_t original_chunks = uncompressed_data.size();
     {
-      std::cout << "\t" << duplicate_data;
+      std::cout << separator << duplicate_data;
 
       uncompressed_data.resize(original_chunks * (duplicate_data + 1));
       for(int i = 0; i < duplicate_data; ++i)
@@ -393,12 +428,12 @@ int main(int argc, char* argv[])
     uint64_t max_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
       [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return std::max<uint64_t>(accum, chunk.size()); } );
 
-    std::cout << "\t" << std::fixed << std::setprecision(2) << (total_size / 1.0e+6F);
-    std::cout << "\t" << uncompressed_data.size();
-    std::cout << "\t" << total_size / uncompressed_data.size() / 1.0e+3F;
-    std::cout << "\t" << max_size / 1.0e+3F;
+    std::cout << separator << std::fixed << std::setprecision(2) << (total_size / 1.0e+6F);
+    std::cout << separator << uncompressed_data.size();
+    std::cout << separator << total_size / uncompressed_data.size() / 1.0e+3F;
+    std::cout << separator << max_size / 1.0e+3F;
 
-    run_benchmark(uncompressed_data, warmup_count, iterations_count);
+    run_benchmark(uncompressed_data, warmup_count, iterations_count, separator);
 
     std::cout << std::endl;
   }
