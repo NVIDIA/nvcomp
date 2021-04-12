@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -202,6 +202,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t comp_temp_bytes;
   status = nvcompBatchedGdeflateCompressGetTempSize(
       chunk_size, input_data.size(), &comp_temp_bytes);
+  CHECK_NVCOMP_STATUS(status);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -209,6 +210,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t max_out_bytes;
   status = nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
       chunk_size, &max_out_bytes);
+  CHECK_NVCOMP_STATUS(status);
   BatchData compress_data(max_out_bytes, input_data.size());
 
   cudaStream_t stream;
@@ -244,11 +246,11 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   if (!warmup) {
     // compute compression ratio
     std::vector<size_t> compressed_sizes_host(compress_data.size());
-    cudaMemcpy(
+    CUDA_CHECK(cudaMemcpy(
         compressed_sizes_host.data(),
         compress_data.sizes(),
         compress_data.size() * sizeof(*compress_data.sizes()),
-        cudaMemcpyDeviceToHost);
+        cudaMemcpyDeviceToHost));
 
     size_t comp_bytes = 0;
     for (const size_t s : compressed_sizes_host) {
@@ -269,6 +271,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t decomp_temp_bytes;
   status = nvcompBatchedGdeflateDecompressGetTempSize(
       compress_data.size(), chunk_size, &decomp_temp_bytes);
+  CHECK_NVCOMP_STATUS(status);
 
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
