@@ -250,7 +250,7 @@ static __device__ uint32_t Match60(const uint8_t *src1,
  * @param[out] outputs Compression status per block
  * @param[in] count Number of blocks to compress
  **/
-extern "C" __global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(64)
 snap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -350,8 +350,10 @@ snap_kernel(
 #define BATCH_SIZE (1 << LOG2_BATCH_SIZE)
 #define LOG2_BATCH_COUNT 2
 #define BATCH_COUNT (1 << LOG2_BATCH_COUNT)
-#define LOG2_PREFETCH_SIZE 9
+#define LOG2_PREFETCH_SIZE 10
 #define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 512B, in 32B chunks
+#define PREFETCH_SECTORS 8 // How many loads in flight when prefetching
+#define LITERAL_SECTORS 8 // How many loads in flight when processing the literal
 
 #define LOG_CYCLECOUNT 0
 
@@ -421,8 +423,8 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
     if (!t) {
       uint32_t minrdpos;
       s->q.prefetch_wrpos = pos;
-      minrdpos            = pos - min(pos, PREFETCH_SIZE - 32u);
-      blen                = (int)min(32u, end - pos);
+      minrdpos            = pos - min(pos, PREFETCH_SIZE - PREFETCH_SECTORS * 32u);
+      blen                = (int)min(PREFETCH_SECTORS * 32u, end - pos);
       for (;;) {
         uint32_t rdpos = s->q.prefetch_rdpos;
         if (rdpos >= minrdpos) break;
@@ -430,11 +432,22 @@ __device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
           blen = 0;
           break;
         }
-        NANOSLEEP(100);
+        NANOSLEEP(1600);
       }
     }
     blen = SHFL0(blen);
-    if (t < blen) { s->q.buf[(pos + t) & (PREFETCH_SIZE - 1)] = base[pos + t]; }
+    if (blen == PREFETCH_SECTORS * 32u) {
+      uint8_t vals[PREFETCH_SECTORS];
+      for(int i = 0; i < PREFETCH_SECTORS; ++i)
+        vals[i] = base[pos + t + i * 32u];
+      for(int i = 0; i < PREFETCH_SECTORS; ++i)
+        s->q.buf[(pos + t + i * 32u) & (PREFETCH_SIZE - 1)] = vals[i];
+    } else {
+#pragma unroll 1
+      for(int elem = t; elem < blen; elem += 32) {
+        s->q.buf[(pos + elem) & (PREFETCH_SIZE - 1)] = base[pos + elem];
+      }
+    }
     pos += blen;
   } while (blen > 0);
 }
@@ -608,7 +621,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
   int32_t batch       = 0;
 
   for (;;) {
-    int32_t batch_len;
+    int32_t batch_len = 0;
     volatile unsnap_batch_s *b;
 
     // Wait for prefetcher
@@ -901,21 +914,23 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
         if (32 + t < blen) { out[32 + t] = b1; }
       } else {
         // Literal
-        uint8_t b0, b1;
+        uint8_t b[LITERAL_SECTORS];
         dist = -dist;
-        while (blen >= 64) {
-          b0          = literal_base[dist + t];
-          b1          = literal_base[dist + 32 + t];
-          out[t]      = b0;
-          out[32 + t] = b1;
-          dist += 64;
-          out += 64;
-          blen -= 64;
+        while (blen >= LITERAL_SECTORS * 32u) {
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            b[i] = literal_base[dist + i * 32u + t];
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            out[i * 32u + t] = b[i];
+          dist += LITERAL_SECTORS * 32u;
+          out += LITERAL_SECTORS * 32u;
+          blen -= LITERAL_SECTORS * 32u;
         }
-        if (t < blen) { b0 = literal_base[dist + t]; }
-        if (32 + t < blen) { b1 = literal_base[dist + 32 + t]; }
-        if (t < blen) { out[t] = b0; }
-        if (32 + t < blen) { out[32 + t] = b1; }
+        for(int i = 0; i < LITERAL_SECTORS; ++i)
+          if (i * 32u + t < blen)
+            b[i] = literal_base[dist + i * 32u + t];
+        for(int i = 0; i < LITERAL_SECTORS; ++i)
+          if (i * 32u + t < blen)
+            out[i * 32u + t] = b[i];
       }
       out += blen;
     }
@@ -934,7 +949,7 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
  * @param[in] inputs Source & destination information per block
  * @param[out] outputs Decompression status per block
  **/
-extern "C" __global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(96)
 unsnap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -953,7 +968,7 @@ unsnap_kernel(
     s->in.srcDevice = device_in_ptr[strm_id];
     s->in.srcSize = device_in_bytes[strm_id];
     s->in.dstDevice = device_out_ptr[strm_id];
-    s->in.dstSize = device_out_available_bytes[strm_id];
+    s->in.dstSize = device_out_available_bytes ? device_out_available_bytes[strm_id] : 0;
   }
   if (t < BATCH_COUNT) { s->q.batch_len[t] = 0; }
   __syncthreads();
@@ -993,6 +1008,8 @@ unsnap_kernel(
       s->bytes_left        = uncompressed_size;
       s->base              = cur;
       s->end               = end;
+      if (s->in.dstSize == 0)
+        s->in.dstSize = uncompressed_size;
       if ((cur >= end && uncompressed_size != 0) || (uncompressed_size > s->in.dstSize)) {
         s->error = -1;
       }
@@ -1035,7 +1052,7 @@ cudaError_t gpu_snap(
   int count,
   cudaStream_t stream)
 {
-  dim3 dim_block(128, 1);  // 4 warps per stream, 1 stream per block
+  dim3 dim_block(64, 1);  // 2 warps per stream, 1 stream per block
   dim3 dim_grid(count, 1);
   if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
     device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
@@ -1054,7 +1071,7 @@ cudaError_t gpu_unsnap(
   cudaStream_t stream)
 {
   uint32_t count32 = (count > 0) ? count : 0;
-  dim3 dim_block(128, 1);     // 4 warps per stream, 1 stream per block
+  dim3 dim_block(96, 1);     // 3 warps per stream, 1 stream per block
   dim3 dim_grid(count32, 1);  // TODO: Check max grid dimensions vs max expected count
 
   unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(
