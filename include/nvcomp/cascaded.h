@@ -122,7 +122,7 @@ nvcompError_t nvcompCascadedCompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompLZ4QueryMetadataAsync(
+nvcompError_t nvcompCascadedQueryMetadataAsync(
     const void * compressed_ptr,
     size_t compressed_bytes,
     void * metadata_ptr,
@@ -154,18 +154,18 @@ void nvcompCascadedDestroyMetadata(void* metadata_ptr);
  * device synchronization, and this pointer is set to the extracted metadata.
  * @param metadata_bytes The size of the metadata.
  * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_bytes The required size of the output location in bytes (output).
+ * @param uncompressed_bytes The required size of the output location in bytes (output).
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedDecompressConifugre(
+nvcompError_t nvcompCascadedDecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
     size_t* metadata_bytes,
     size_t* temp_bytes,
-    size_t* out_bytes,
+    size_t* uncompressed_bytes,
     cudaStream_t stream);
 
 
@@ -270,6 +270,14 @@ nvcompError_t nvcompCascadedSelectorRun(
     size_t temp_bytes,
     nvcompCascadedFormatOpts* format_opts,
     double* est_ratio,
+    cudaStream_t stream);
+
+
+// TODO - remove refs to these and delete them
+nvcompError_t nvcompCascadedDecompressGetMetadata(
+    const void* in_ptr,
+    size_t in_bytes,
+    void** metadata_ptr,
     cudaStream_t stream);
 
 #ifdef __cplusplus

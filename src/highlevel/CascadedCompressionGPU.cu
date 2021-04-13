@@ -348,20 +348,10 @@ void packToOutput(
 
 template <typename valT, typename runT>
 void generateTypedOutputUpperBound(
-    const void* const /*in_ptr*/,
     const size_t in_bytes,
     const nvcompCascadedFormatOpts* const opts,
-    void* const temp_ptr,
-    const size_t temp_bytes,
     size_t* const out_bytes)
 {
-  if (temp_bytes > 0) {
-    CHECK_NOT_NULL(temp_ptr);
-
-    // only check if its non-null
-    checkAlignmentOf(temp_ptr, sizeof(size_t));
-  }
-
   CascadedMetadata metadata(*opts, getnvcompType<valT>(), in_bytes, 0);
 
   const int numRLEs = metadata.getNumRLEs();
@@ -731,6 +721,7 @@ void compressTypedAsync(
 
   // async copy output
   metadataOnGPU.setCompressedSizeFromGPU(offsetDevice, stream);
+
   CudaUtils::copy_async(out_bytes, offsetDevice, 1, DEVICE_TO_HOST, stream);
 }
 
@@ -741,7 +732,6 @@ void compressTypedAsync(
  *****************************************************************************/
 
 void nvcompCascadedCompressionGPU::computeWorkspaceSize(
-    const void* /*in_ptr*/,
     const size_t in_bytes,
     const nvcompType_t in_type,
     const nvcompCascadedFormatOpts* const opts,
@@ -782,19 +772,12 @@ void nvcompCascadedCompressionGPU::computeWorkspaceSize(
 }
 
 void nvcompCascadedCompressionGPU::generateOutputUpperBound(
-    const void* const in_ptr,
     const size_t in_bytes,
     const nvcompType_t in_type,
     const nvcompCascadedFormatOpts* const opts,
-    void* const temp_ptr,
-    const size_t temp_bytes,
     size_t* const out_bytes)
 {
-  CHECK_NOT_NULL(in_ptr);
   CHECK_NOT_NULL(opts);
-  if (temp_bytes > 0) {
-    CHECK_NOT_NULL(temp_ptr);
-  }
   CHECK_NOT_NULL(out_bytes);
 
   const nvcompType_t countType
@@ -804,11 +787,8 @@ void nvcompCascadedCompressionGPU::generateOutputUpperBound(
       in_type,
       countType,
       generateTypedOutputUpperBound,
-      in_ptr,
       in_bytes,
       opts,
-      temp_ptr,
-      temp_bytes,
       out_bytes);
 }
 

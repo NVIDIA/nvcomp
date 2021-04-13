@@ -87,33 +87,20 @@ int test_rle_delta(void)
 
   // Compress on the GPU
   size_t comp_temp_bytes;
-  status = nvcompCascadedCompressGetTempSize(
-      d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
+  size_t comp_out_bytes;
+  size_t metadata_bytes;
+  status = nvcompCascadedCompressConfigure(&comp_opts, type, in_bytes, &metadata_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-  size_t comp_out_bytes;
-  status = nvcompCascadedCompressGetOutputSize(
-      d_in_data,
-      in_bytes,
-      type,
-      &comp_opts,
-      d_comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      0);
-  REQUIRE(status == nvcompSuccess);
-
-  void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   status = nvcompCascadedCompressAsync(
+      &comp_opts,
+      type,
       d_in_data,
       in_bytes,
-      type,
-      &comp_opts,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
@@ -128,24 +115,30 @@ int test_rle_delta(void)
   // select compression algorithm
   // Get metadata
   void* metadata_ptr;
-  status = nvcompDecompressGetMetadata(
-      d_comp_out, comp_out_bytes, &metadata_ptr, stream);
+  cudaMallocHost(metadata_ptr, metadata_bytes);
+  status = nvcompCascadedQueryMetadataAsync(
+      d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
   REQUIRE(status == nvcompSuccess);
 
-  // get temp size
+
+// Perform Decompression using existing Metadata
+
+  // get temp and output size
   size_t temp_bytes;
-  status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-  REQUIRE(status == nvcompSuccess);
+  size_t output_bytes;
+
+  status = nvcompCascadedDecompressConfigure(
+      d_comp_out, 
+      comp_out_bytes, 
+      &metadata_ptr,
+      &metadata_bytes,
+      &temp_bytes,
+      &output_bytes,
+      stream);
 
   // allocate temp buffer
   void* temp_ptr;
   cudaMalloc(&temp_ptr, temp_bytes); // also can use RMM_ALLOC instead
-
-  // get output size
-  size_t output_bytes;
-  status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-  REQUIRE(status == nvcompSuccess);
-
   // allocate output buffer
   void* out_ptr;
   cudaMalloc(&out_ptr, output_bytes); // also can use RMM_ALLOC instead
@@ -154,9 +147,10 @@ int test_rle_delta(void)
   status = nvcompDecompressAsync(
       d_comp_out,
       comp_out_bytes,
+      metadata_ptr,
+      metadata_bytes,
       temp_ptr,
       temp_bytes,
-      metadata_ptr,
       out_ptr,
       output_bytes,
       stream);
@@ -180,6 +174,7 @@ int test_rle_delta(void)
 
   return 1;
 }
+
 
 int test_rle_delta_bp(void)
 {
@@ -211,33 +206,20 @@ int test_rle_delta_bp(void)
 
   // Compress on the GPU
   size_t comp_temp_bytes;
-  status = nvcompCascadedCompressGetTempSize(
-      d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
+  size_t comp_out_bytes;
+  size_t metadata_bytes;
+  status = nvcompCascadedCompressConfigure(&comp_opts, type, in_bytes, &metadata_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-  size_t comp_out_bytes;
-  status = nvcompCascadedCompressGetOutputSize(
-      d_in_data,
-      in_bytes,
-      type,
-      &comp_opts,
-      d_comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      0);
-  REQUIRE(status == nvcompSuccess);
-
-  void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   status = nvcompCascadedCompressAsync(
+      &comp_opts,
+      type,
       d_in_data,
       in_bytes,
-      type,
-      &comp_opts,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
@@ -249,26 +231,33 @@ int test_rle_delta_bp(void)
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
+  // select compression algorithm
   // Get metadata
   void* metadata_ptr;
-  status = nvcompDecompressGetMetadata(
-      d_comp_out, comp_out_bytes, &metadata_ptr, stream);
+  cudaMallocHost(metadata_ptr, metadata_bytes);
+  status = nvcompCascadedQueryMetadataAsync(
+      d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
   REQUIRE(status == nvcompSuccess);
 
-  // get temp size
+
+// Perform Decompression using existing Metadata
+
+  // get temp and output size
   size_t temp_bytes;
-  status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-  REQUIRE(status == nvcompSuccess);
+  size_t output_bytes;
+
+  status = nvcompCascadedDecompressConfigure(
+      d_comp_out, 
+      comp_out_bytes, 
+      &metadata_ptr,
+      &metadata_bytes,
+      &temp_bytes,
+      &output_bytes,
+      stream);
 
   // allocate temp buffer
   void* temp_ptr;
   cudaMalloc(&temp_ptr, temp_bytes); // also can use RMM_ALLOC instead
-
-  // get output size
-  size_t output_bytes;
-  status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-  REQUIRE(status == nvcompSuccess);
-
   // allocate output buffer
   void* out_ptr;
   cudaMalloc(&out_ptr, output_bytes); // also can use RMM_ALLOC instead
@@ -277,15 +266,16 @@ int test_rle_delta_bp(void)
   status = nvcompDecompressAsync(
       d_comp_out,
       comp_out_bytes,
+      metadata_ptr,
+      metadata_bytes,
       temp_ptr,
       temp_bytes,
-      metadata_ptr,
       out_ptr,
       output_bytes,
       stream);
   REQUIRE(status == nvcompSuccess);
 
-  CUDA_CHECK(cudaStreamSynchronize(stream));
+  CUDA_CHECK(cudaDeviceSynchronize());
 
   // Destory the metadata object and free memory
   nvcompDecompressDestroyMetadata(metadata_ptr);
@@ -340,34 +330,20 @@ int test_ones_init_data(void)
 
         // Compress on the GPU
         size_t comp_temp_bytes;
-        status = nvcompCascadedCompressGetTempSize(
-            d_in_data, in_bytes, type, &comp_opts, &comp_temp_bytes);
+        size_t comp_out_bytes;
+        size_t metadata_bytes;
+        status = nvcompCascadedCompressConfigure(&comp_opts, type, in_bytes, &metadata_bytes, &comp_temp_bytes, &comp_out_bytes);
         REQUIRE(status == nvcompSuccess);
-
+      
         void* d_comp_temp;
         CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-        size_t comp_out_bytes;
-        status = nvcompCascadedCompressGetOutputSize(
-            d_in_data,
-            in_bytes,
-            type,
-            &comp_opts,
-            d_comp_temp,
-            comp_temp_bytes,
-            &comp_out_bytes,
-            0);
-        REQUIRE(status == nvcompSuccess);
-
-        void* d_comp_out;
         CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
-        CUDA_CHECK(cudaMemset(d_comp_out, -1, comp_out_bytes));
-
+      
         status = nvcompCascadedCompressAsync(
+            &comp_opts,
+            type,
             d_in_data,
             in_bytes,
-            type,
-            &comp_opts,
             d_comp_temp,
             comp_temp_bytes,
             d_comp_out,
@@ -375,46 +351,54 @@ int test_ones_init_data(void)
             stream);
         REQUIRE(status == nvcompSuccess);
         CUDA_CHECK(cudaStreamSynchronize(stream));
-
+      
         cudaFree(d_comp_temp);
         cudaFree(d_in_data);
-
+      
+        // select compression algorithm
         // Get metadata
         void* metadata_ptr;
-        status = nvcompDecompressGetMetadata(
-            d_comp_out, comp_out_bytes, &metadata_ptr, stream);
+        cudaMallocHost(metadata_ptr, metadata_bytes);
+        status = nvcompCascadedQueryMetadataAsync(
+            d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
         REQUIRE(status == nvcompSuccess);
-
-        // get temp size
+      
+      
+      // Perform Decompression using existing Metadata
+      
+        // get temp and output size
         size_t temp_bytes;
-        status = nvcompDecompressGetTempSize(metadata_ptr, &temp_bytes);
-        REQUIRE(status == nvcompSuccess);
-
+        size_t output_bytes;
+      
+        status = nvcompCascadedDecompressConfigure(
+            d_comp_out, 
+            comp_out_bytes, 
+            &metadata_ptr,
+            &metadata_bytes,
+            &temp_bytes,
+            &output_bytes,
+            stream);
+      
         // allocate temp buffer
         void* temp_ptr;
         cudaMalloc(&temp_ptr, temp_bytes); // also can use RMM_ALLOC instead
-
-        // get output size
-        size_t output_bytes;
-        status = nvcompDecompressGetOutputSize(metadata_ptr, &output_bytes);
-        REQUIRE(status == nvcompSuccess);
-
         // allocate output buffer
         void* out_ptr;
         cudaMalloc(&out_ptr, output_bytes); // also can use RMM_ALLOC instead
-
+      
         // execute decompression (asynchronous)
         status = nvcompDecompressAsync(
             d_comp_out,
             comp_out_bytes,
+            metadata_ptr,
+            metadata_bytes,
             temp_ptr,
             temp_bytes,
-            metadata_ptr,
             out_ptr,
             output_bytes,
             stream);
         REQUIRE(status == nvcompSuccess);
-
+      
         CUDA_CHECK(cudaStreamSynchronize(stream));
 
         // Destory the metadata object and free memory

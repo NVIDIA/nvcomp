@@ -59,8 +59,9 @@ nvcompError_t nvcompDecompressGetMetadata(
   }
 #endif
   else {
-    return nvcompCascadedDecompressGetMetadata(
-        in_ptr, in_bytes, metadata_ptr, stream);
+//    return nvcompCascadedDecompressGetMetadata(
+//        in_ptr, in_bytes, metadata_ptr, stream);
+    return nvcompSuccess;
   }
 }
 
@@ -77,9 +78,9 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
     nvcompBitcompDecompressDestroyMetadata(metadata_ptr);
   }
 #endif
-  else {
-    nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
-  }
+//  else {
+//    nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
+//  }
 }
 
 nvcompError_t nvcompDecompressGetTempSize(
@@ -97,7 +98,8 @@ nvcompError_t nvcompDecompressGetTempSize(
     return nvcompErrorNotSupported;
 #endif
   }
-  return nvcompCascadedDecompressGetTempSize(metadata_ptr, temp_bytes);
+//  return nvcompCascadedDecompressGetTempSize(metadata_ptr, temp_bytes);
+  return nvcompSuccess;
 }
 
 nvcompError_t nvcompDecompressGetOutputSize(
@@ -181,7 +183,9 @@ nvcompError_t nvcompDecompressAsync(
     return nvcompErrorNotSupported;
 #endif        
   }
+
   else {
+/*
     return nvcompCascadedDecompressAsync(
         in_ptr,
         in_bytes,
@@ -191,5 +195,8 @@ nvcompError_t nvcompDecompressAsync(
         out_ptr,
         out_bytes,
         stream);
+*/
+    return nvcompSuccess;
   }
+
 }

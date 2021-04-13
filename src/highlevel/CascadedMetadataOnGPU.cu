@@ -97,6 +97,7 @@ enum OffsetType : unsigned int
  * DEVICE FUNCTIONS ***********************************************************
  *****************************************************************************/
 
+
 namespace
 {
 
@@ -557,6 +558,19 @@ void CascadedMetadataOnGPU::verifyIndex(const size_t index) const
         + std::to_string(m_numInputs));
   }
 }
+
+// Helper function
+__host__ size_t getCascadedMetadataBytes(
+    const nvcompCascadedFormatOpts format_opts, 
+    size_t uncompressed_bytes)
+{
+  size_t numLayers = format_opts.num_RLEs*2 + format_opts.num_deltas + 1;
+  if(numLayers < 2) numLayers = 2;
+
+  return OFFSET_HEADERS + sizeof(OFFSET_TYPE) * numLayers 
+         + sizeof(HEADER_TYPE) * numLayers; 
+}
+
 
 } // namespace highlevel
 } // namespace nvcomp
