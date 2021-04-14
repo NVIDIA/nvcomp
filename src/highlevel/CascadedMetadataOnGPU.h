@@ -41,7 +41,7 @@ namespace highlevel
 // Helper function
 __device__ __host__ size_t getCascadedMetadataBytes(
     const nvcompCascadedFormatOpts format_opts, 
-    size_t uncompressed_bytes);;
+    size_t uncompressed_bytes);
 
 class CascadedMetadataOnGPU
 {
@@ -109,6 +109,8 @@ public:
    * @return The metadata on the CPU.
    */
   CascadedMetadata copyToHost(cudaStream_t stream);
+
+  void copyToHost(void* ptr, cudaStream_t stream);
 
   /**
    * @brief Save the offset scalar stored on the device to the serialized

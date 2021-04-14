@@ -83,6 +83,20 @@ CascadedMetadata::CascadedMetadata(
  * PUBLIC METHODS *************************************************************
  *****************************************************************************/
 
+void CascadedMetadata::set_all(
+    const nvcompCascadedFormatOpts opts,
+    const nvcompType_t type,
+    const size_t uncompressedBytes,
+    const size_t compressedBytes)
+{
+  m_formatOpts = opts;
+  setUncompressedSize(uncompressedBytes);
+  setCompressedSize(compressedBytes);
+  setValueType(type);
+
+  initialize();
+}
+
 int CascadedMetadata::getNumRLEs() const
 {
   return m_formatOpts.num_RLEs;

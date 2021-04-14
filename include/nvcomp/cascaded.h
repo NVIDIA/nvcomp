@@ -280,6 +280,15 @@ nvcompError_t nvcompCascadedDecompressGetMetadata(
     void** metadata_ptr,
     cudaStream_t stream);
 
+/*
+nvcompError_t nvcompCascadedSelectorGetTempSize(
+    size_t,
+    nvcompType_t,
+    nvcompCascadedSelectorOpts,
+    size_t*);
+*/
+
+
 #ifdef __cplusplus
 }
 #endif

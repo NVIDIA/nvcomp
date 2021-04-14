@@ -1287,9 +1287,15 @@ nvcompError_t nvcompCascadedQueryMetadataAsync(
     CHECK_NOT_NULL(metadata_ptr);
 
     CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
-    gpuMetadata.copyToHost(stream);
 
-//    *metadata_ptr = new CascadedMetadata(gpuMetadata.copyToHost(stream));
+    gpuMetadata.copyToHost(metadata_ptr, stream);
+
+ //   metadata_ptr = (void*)(&gpuMetadata.copyToHost(stream));
+
+//    CascadedMetadata* temp_metadata = new CascadedMetadata(gpuMetadata.copyToHost(stream));
+//    cudaMemcpy(metadata_ptr, temp_metadata, metadata_bytes, cudaMemcpyHostToHost);
+//    delete temp_metadata;
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompCascadedQueryMetadataAsync()");
@@ -1298,7 +1304,7 @@ nvcompError_t nvcompCascadedQueryMetadataAsync(
   return nvcompSuccess;
 }
 
-void nvcompCascadedDecompressDestroyMetadata(void* const metadata_ptr)
+void nvcompCascadedDestroyMetadata(void* const metadata_ptr)
 {
   CascadedMetadata* metadata = static_cast<CascadedMetadata*>(metadata_ptr);
   ::operator delete(metadata);
@@ -1317,8 +1323,16 @@ nvcompError_t nvcompCascadedDecompressConfigure(
     CHECK_NOT_NULL(temp_bytes);
     CHECK_NOT_NULL(uncompressed_bytes);
 
-    CHECK_NOT_NULL(metadata_ptr); // TODO - allocate and copy metadata if its null
-    CascadedMetadata* metadata = (CascadedMetadata*)(*metadata_ptr);
+    CascadedMetadata* metadata;
+
+    if(*metadata_ptr == NULL) { // Extract metadata if not provided
+      CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
+      metadata = new CascadedMetadata(gpuMetadata.copyToHost(stream));
+      cudaStreamSynchronize(stream);
+    }
+    else {
+      metadata = (CascadedMetadata*)(*metadata_ptr);
+    }
 
     std::unique_ptr<nvcompIntConfig_t> c = generateConfig(metadata);
 
@@ -1333,11 +1347,12 @@ nvcompError_t nvcompCascadedDecompressConfigure(
       }
     }
 
-    // Return the required temp storage size
+    // Return the required temp and output sizes
     *temp_bytes = c->getWorkspaceBytes();
+    *uncompressed_bytes = metadata->getUncompressedSize();
 
-    *uncompressed_bytes = static_cast<const CascadedMetadata*>(*metadata_ptr)
-                        ->getUncompressedSize();
+    *metadata_ptr = (void*)metadata;
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompCascadedDecompressGetTempSize()");
@@ -1606,11 +1621,46 @@ nvcompError_t nvcompCascadedCompressAsync(
           "for compressed output.");
     }
 
+    nvcompCascadedFormatOpts final_opts;
+    if(format_opts == NULL) { // need to run auto-selector of NULL
+      nvcompCascadedSelectorOpts selector_opts;
+      selector_opts.sample_size = 1024;
+      selector_opts.num_samples = 100;
+      selector_opts.seed = 1;
+      size_t type_bytes = sizeOfnvcompType(in_type);
+
+      // Adjust sample size if input is too small
+      if (in_bytes < (selector_opts.sample_size * selector_opts.num_samples * type_bytes)) {
+        selector_opts.sample_size = in_bytes / (10 * type_bytes);
+        selector_opts.num_samples = 10;
+      }
+
+      double est_ratio;
+
+      nvcompError_t err = nvcompCascadedSelectorRun(
+                              &selector_opts,
+                              in_type,
+                              in_ptr,
+                              in_bytes,
+                              temp_ptr,
+                              temp_bytes,
+                              &final_opts,
+                              &est_ratio,
+                              stream);
+
+      
+    }
+    else {
+      final_opts.num_RLEs = format_opts->num_RLEs;
+      final_opts.num_deltas = format_opts->num_deltas;
+      final_opts.use_bp = format_opts->use_bp;
+    }
+
     nvcompCascadedCompressionGPU::compressAsync(
         in_ptr,
         in_bytes,
         in_type,
-        format_opts,
+        &final_opts,
         temp_ptr,
         temp_bytes,
         out_ptr,

@@ -98,6 +98,7 @@ TEST_CASE("Selector_CPP_constructor_getSize", "[small]")
   REQUIRE(temp_bytes == 120);
 }
 
+
 TEST_CASE("SelectorGetTempSize_C", "[small]")
 {
 
@@ -116,21 +117,27 @@ TEST_CASE("SelectorGetTempSize_C", "[small]")
   selector_opts.num_samples = 10;
   selector_opts.seed = 1;
 
-  nvcompError_t err = nvcompCascadedSelectorGetTempSize(
-      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+//  nvcompError_t err = nvcompCascadedSelectorGetTempSize(
+//      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+  nvcompError_t err = nvcompCascadedSelectorConfigure(
+      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 120);
 
   selector_opts.num_samples = 100;
-  err = nvcompCascadedSelectorGetTempSize(
-      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+//  err = nvcompCascadedSelectorGetTempSize(
+//      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+  err = nvcompCascadedSelectorConfigure(
+      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 840);
 
   selector_opts.sample_size = 1;
   selector_opts.num_samples = 1000;
-  err = nvcompCascadedSelectorGetTempSize(
-      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+//  err = nvcompCascadedSelectorGetTempSize(
+//      numBytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+  err = nvcompCascadedSelectorConfigure(
+      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 8040);
 
@@ -173,11 +180,23 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
   // Should throw exception if not enough temp workspace
 
   try {
+/*
     nvcompError_t err = nvcompCascadedSelectorSelectConfig(
         d_input,
         numBytes,
         getnvcompType<T>(),
         selector_opts,
+        d_temp,
+        temp_bytes,
+        &opts,
+        &est_ratio,
+        stream);
+*/
+    nvcompError_t err = nvcompCascadedSelectorRun(
+        &selector_opts,
+        getnvcompType<T>(),
+        d_input,
+        numBytes,
         d_temp,
         temp_bytes,
         &opts,
@@ -192,6 +211,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
 
   selector_opts.num_samples = 100;
   // Should run and get a good compression ratio estimate.
+/*
   nvcompError_t err = nvcompCascadedSelectorSelectConfig(
       d_input,
       numBytes,
@@ -202,6 +222,18 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
       &opts,
       &est_ratio,
       stream);
+*/
+  nvcompError_t err = nvcompCascadedSelectorRun(
+      &selector_opts,
+      getnvcompType<T>(),
+      d_input,
+      numBytes,
+      d_temp,
+      temp_bytes,
+      &opts,
+      &est_ratio,
+      stream);
+
   cudaStreamSynchronize(stream);
 
   REQUIRE(opts.num_RLEs == 2);

@@ -251,6 +251,21 @@ public:
     return minValue;
   }
 
+
+  /**
+   * @brief Set the main values of the Metadata object and call initialize()
+   *
+   * @param opts The format opts to set the metadata value to.
+   * @param index The type to be set.
+   * @param uncompressedBytes The uncompressed size to be set.
+   * @param compressedBytes The compressed bytes size to be set.
+   */
+  void set_all(
+      const nvcompCascadedFormatOpts opts,
+      const nvcompType_t type,
+      const size_t uncompressedBytes,
+      const size_t compressedBytes);
+
 private:
   /**
    * @brief The configuration of cascaded compression to be used/used.
