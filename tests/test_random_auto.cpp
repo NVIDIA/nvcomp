@@ -88,29 +88,10 @@ void test_auto_c(const std::vector<T>& data)
         NULL, // Null means to auto-select the best scheme
         nvcomp::getnvcompType<T>(),
         in_bytes,
-        &metadata_bytes, // Don't need metadata size
+        &metadata_bytes, 
         &comp_temp_bytes,
         &comp_out_bytes);
         
-/*
-    status = nvcompCascadedCompressAutoGetTempSize(
-        d_in_data,
-        in_bytes,
-        nvcomp::getnvcompType<T>(),
-        &comp_temp_bytes);
-    REQUIRE(status == nvcompSuccess);
-
-
-    status = nvcompCascadedCompressAutoGetOutputSize(
-        d_in_data,
-        in_bytes,
-        nvcomp::getnvcompType<T>(),
-        d_comp_temp,
-        comp_temp_bytes,
-        &comp_out_bytes);
-    REQUIRE(status == nvcompSuccess);
-*/
-
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
@@ -150,25 +131,10 @@ void test_auto_c(const std::vector<T>& data)
     size_t metadata_bytes;
     size_t decomp_temp_bytes;
     size_t decomp_out_bytes;
-printf("calling configure\n");
 
     nvcompError_t err = nvcompCascadedDecompressConfigure(
         d_comp_out, comp_out_bytes, &metadata, &metadata_bytes, &decomp_temp_bytes, &decomp_out_bytes, stream);
     REQUIRE(err == nvcompSuccess);
-
-/*
-    nvcompError_t err = nvcompDecompressGetMetadata(
-        d_comp_out, comp_out_bytes, &metadata, stream);
-    REQUIRE(err == nvcompSuccess);
-
-    // get temp size
-    err = nvcompDecompressGetTempSize(metadata, &decomp_temp_bytes);
-    REQUIRE(err == nvcompSuccess);
-
-    // get output buffer size
-    err = nvcompDecompressGetOutputSize(metadata, &decomp_out_bytes);
-    REQUIRE(err == nvcompSuccess);
-*/
 
     // allocate temp buffer
     void* d_decomp_temp;
@@ -181,7 +147,6 @@ printf("calling configure\n");
         &decomp_out_ptr, decomp_out_bytes)); // also can use RMM_ALLOC instead
 
     auto start = std::chrono::steady_clock::now();
-printf("calling decomp\n");
 
     // execute decompression (asynchronous)
     err = nvcompCascadedDecompressAsync(

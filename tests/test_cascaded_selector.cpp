@@ -84,7 +84,8 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   selector_opts.num_samples = num_samples;
   selector_opts.seed = 1;
 
-  nvcompError_t err = nvcompCascadedSelectorGetTempSize(in_bytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+//  nvcompError_t err = nvcompCascadedSelectorGetTempSize(in_bytes, getnvcompType<T>(), selector_opts, &temp_bytes);
+  nvcompError_t err = nvcompCascadedSelectorConfigure(&selector_opts, getnvcompType<T>(), in_bytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
 
   CUDA_CHECK( cudaMalloc(&d_temp, temp_bytes) );
@@ -93,11 +94,54 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   cudaStreamCreate(&stream);
   double est_ratio;
 
-  err = nvcompCascadedSelectorSelectConfig(
+  err = nvcompCascadedSelectorRun(
+           &selector_opts,
+           getnvcompType<T>(),
            d_in_data,
            in_bytes,
+           d_temp,
+           temp_bytes,
+           opts,
+           &est_ratio,
+           stream);
+
+  cudaStreamSynchronize(stream);
+  REQUIRE(err == nvcompSuccess);
+
+  cudaFree(d_temp);
+  cudaFree(d_in_data);
+  
+  return est_ratio;
+}
+
+// Run C API selector with NULL options (default) and return the estimated compression ratio
+template <typename T>
+double test_selector_default_c(const std::vector<T>& input, nvcompCascadedFormatOpts* opts)
+{
+  // create GPU only input buffer
+  T* d_in_data;
+  const size_t in_bytes = sizeof(T) * input.size();
+  CUDA_CHECK(cudaMalloc((void**)&d_in_data, in_bytes));
+  CUDA_CHECK(
+      cudaMemcpy(d_in_data, input.data(), in_bytes, cudaMemcpyHostToDevice));
+
+  size_t temp_bytes = 0;
+  void* d_temp;
+
+  nvcompError_t err = nvcompCascadedSelectorConfigure(NULL, getnvcompType<T>(), in_bytes, &temp_bytes);
+  REQUIRE(err == nvcompSuccess);
+
+  CUDA_CHECK( cudaMalloc(&d_temp, temp_bytes) );
+
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+  double est_ratio;
+
+  err = nvcompCascadedSelectorRun(
+           NULL,
            getnvcompType<T>(),
-           selector_opts,
+           d_in_data,
+           in_bytes,
            d_temp,
            temp_bytes,
            opts,
@@ -283,6 +327,9 @@ TEST_CASE("CascadedSelector all-big-int", "[nvcomp][big]")
     std::vector<T> input = buildRuns<T>(total, 1, 1);
 
     est_ratio = test_selector_c<T>(input, 1024, 100, &opts);
+    verify_selector_result(opts, est_ratio, 0, 1, 1, 32);
+
+    est_ratio = test_selector_default_c<T>(input, &opts);
     verify_selector_result(opts, est_ratio, 0, 1, 1, 32);
 
     est_ratio = test_selector_cpp<T>(input, 1024, 100, &opts);

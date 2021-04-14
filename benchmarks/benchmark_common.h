@@ -160,31 +160,30 @@ static void compress_chunk(
     const nvcompType_t type,
     const nvcompCascadedFormatOpts* const comp_opts,
     void* const d_comp_temp,
-    const size_t comp_temp_bytes,
+    size_t comp_temp_bytes,
     void* const d_comp_out,
     size_t* const comp_out_bytes,
     cudaStream_t stream)
 {
+  size_t metadata_bytes;
 
-  nvcompError_t status = nvcompCascadedCompressGetOutputSize(
-      d_in_data,
-      chunk_size,
-      type,
+  nvcompError_t status = nvcompCascadedCompressConfigure(
       comp_opts,
-      d_comp_temp,
-      comp_temp_bytes,
-      comp_out_bytes,
-      false);
+      type,
+      chunk_size,
+      &metadata_bytes,
+      &comp_temp_bytes,
+      comp_out_bytes);
 
   benchmark_assert(
       status == nvcompSuccess,
       "nvcompCascadedCompressGetMetadata not successful, chunk");
 
   status = nvcompCascadedCompressAsync(
+      comp_opts,
+      type,
       d_in_data,
       chunk_size,
-      type,
-      comp_opts,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,

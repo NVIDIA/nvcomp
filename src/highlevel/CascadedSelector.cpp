@@ -347,7 +347,7 @@ nvcompError_t nvcompCascadedSelectorSelectConfig(
 */
 
 nvcompError_t nvcompCascadedSelectorRun(
-    nvcompCascadedSelectorOpts* selector_opts,
+    nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
     const void* uncompressed_ptr,
     size_t uncompressed_bytes,
@@ -358,11 +358,25 @@ nvcompError_t nvcompCascadedSelectorRun(
     cudaStream_t stream)
 {
 
+  // temp selector opts in case opts are NULL and default needs to be used
+  nvcompCascadedSelectorOpts selector_opts;
+  if(opts == NULL) {
+    selector_opts.sample_size = 1024;
+    selector_opts.num_samples = 100;
+    selector_opts.seed = 1;
+  }
+  else {
+    selector_opts.sample_size = opts->sample_size;
+    selector_opts.num_samples = opts->num_samples;
+    selector_opts.seed = opts->seed;
+  }
+
+
   *format_opts = callSelectorSelectConfig(
       uncompressed_ptr,
       uncompressed_bytes,
       type,
-      *selector_opts,
+      selector_opts,
       temp_ptr,
       temp_bytes,
       est_ratio,

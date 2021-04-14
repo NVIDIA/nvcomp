@@ -130,35 +130,27 @@ void test(
 
     // Compress on the GPU
     size_t comp_temp_bytes;
-    status = nvcompCascadedCompressGetTempSize(
-        d_in_data,
-        in_bytes,
-        nvcomp::getnvcompType<T>(),
+    size_t metadata_bytes;
+
+    status = nvcompCascadedCompressConfigure(
         &comp_opts,
-        &comp_temp_bytes);
+        nvcomp::getnvcompType<T>(),
+        in_bytes,
+        &metadata_bytes,
+        &comp_temp_bytes,
+        &comp_out_bytes);
+
     REQUIRE(status == nvcompSuccess);
 
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-    status = nvcompCascadedCompressGetOutputSize(
-        d_in_data,
-        in_bytes,
-        nvcomp::getnvcompType<T>(),
-        &comp_opts,
-        d_comp_temp,
-        comp_temp_bytes,
-        &comp_out_bytes,
-        false);
-    REQUIRE(status == nvcompSuccess);
-
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
     status = nvcompCascadedCompressAsync(
+        &comp_opts,
+        nvcomp::getnvcompType<T>(),
         d_in_data,
         in_bytes,
-        nvcomp::getnvcompType<T>(),
-        &comp_opts,
         d_comp_temp,
         comp_temp_bytes,
         d_comp_out,
@@ -185,19 +177,19 @@ void test(
     cudaStreamCreate(&stream);
 
     // get metadata from compressed data
-    void* metadata;
-    nvcompError_t err = nvcompDecompressGetMetadata(
-        d_comp_out, comp_out_bytes, &metadata, stream);
-    REQUIRE(err == nvcompSuccess);
-
-    // get temp size
+    void* metadata = NULL;
+    size_t metadata_bytes;
     size_t decomp_temp_bytes;
-    err = nvcompDecompressGetTempSize(metadata, &decomp_temp_bytes);
-    REQUIRE(err == nvcompSuccess);
-
-    // get output buffer size
     size_t decomp_out_bytes;
-    err = nvcompDecompressGetOutputSize(metadata, &decomp_out_bytes);
+
+    nvcompError_t err = nvcompCascadedDecompressConfigure(
+        d_comp_out, 
+        comp_out_bytes, 
+        &metadata, 
+        &metadata_bytes, 
+        &decomp_temp_bytes, 
+        &decomp_out_bytes, 
+        stream);
     REQUIRE(err == nvcompSuccess);
 
     // allocate temp buffer
@@ -215,12 +207,13 @@ void test(
     nvcompError_t status;
 
     // execute decompression (asynchronous)
-    err = nvcompDecompressAsync(
+    err = nvcompCascadedDecompressAsync(
         d_comp_out,
         comp_out_bytes,
+        metadata,
+        metadata_bytes,
         d_decomp_temp,
         decomp_temp_bytes,
-        metadata,
         decomp_out_ptr,
         decomp_out_bytes,
         stream);
@@ -239,7 +232,6 @@ void test(
     cudaFree(d_decomp_temp);
     cudaFree(d_comp_out);
 
-    //  int* res = (int*)malloc(decomp_bytes);
     std::vector<T> res(decomp_out_bytes / sizeof(T));
     cudaMemcpy(
         &res[0], decomp_out_ptr, decomp_out_bytes, cudaMemcpyDeviceToHost);
