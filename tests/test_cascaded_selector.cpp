@@ -84,7 +84,6 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   selector_opts.num_samples = num_samples;
   selector_opts.seed = 1;
 
-//  nvcompError_t err = nvcompCascadedSelectorGetTempSize(in_bytes, getnvcompType<T>(), selector_opts, &temp_bytes);
   nvcompError_t err = nvcompCascadedSelectorConfigure(&selector_opts, getnvcompType<T>(), in_bytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
 

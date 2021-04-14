@@ -109,13 +109,12 @@ static void run_benchmark(
     std::cout << "compression output space (B): " << comp_out_bytes
               << std::endl;
   }
-
   
   auto start = std::chrono::steady_clock::now();
 
   // Launch compression
   status = nvcompCascadedCompressAsync(
-      NULL,
+      NULL, // Null format_opts causes Selector to run
       getnvcompType<T>(),
       d_in_data,
       in_bytes,

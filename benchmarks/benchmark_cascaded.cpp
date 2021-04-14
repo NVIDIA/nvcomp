@@ -107,8 +107,6 @@ static void run_benchmark(
   size_t comp_temp_bytes;
   size_t comp_out_bytes;
 
-  
-
   status = nvcompCascadedCompressConfigure(
       &comp_opts, getnvcompType<T>(), in_bytes, &metadata_bytes, &comp_temp_bytes, &comp_out_bytes);
   benchmark_assert(status == nvcompSuccess, "CompressConfigure not successful");

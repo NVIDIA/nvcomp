@@ -116,7 +116,8 @@ nvcompError_t nvcompCascadedCompressAsync(
  *
  * @param compressed_ptr The compressed data.
  * @param compressed_bytes The size of the compressed data in bytes.
- * @param metadata_ptr Pointer to the resulting metadata (output)
+ * @param metadata_ptr Pointer to the GPU-accessible data to store the Metadata.
+ *   Must be pre-allocated and accessible to the GPU, such as cudaMallocHost().
  * @param metadata_bytes The size of the resulting metadata.
  * @param stream The cuda stream to operate on.
  *
@@ -274,11 +275,13 @@ nvcompError_t nvcompCascadedSelectorRun(
 
 
 // TODO - remove refs to these and delete them
+/*
 nvcompError_t nvcompCascadedDecompressGetMetadata(
     const void* in_ptr,
     size_t in_bytes,
     void** metadata_ptr,
     cudaStream_t stream);
+*/
 
 /*
 nvcompError_t nvcompCascadedSelectorGetTempSize(

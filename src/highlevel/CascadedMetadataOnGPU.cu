@@ -604,7 +604,6 @@ void CascadedMetadataOnGPU::copyToHost(void* ptr, cudaStream_t stream)
 
   if (version == 1) {
         deserializeAndCopyMetadataFromGPUVersion1(ptr, m_ptr, m_maxSize, stream);
-//    m_numInputs = metadata.getNumInputs();
 
   } else {
     throw std::runtime_error(

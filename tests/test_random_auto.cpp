@@ -191,7 +191,7 @@ void test_auto_c(const std::vector<T>& data)
 
 }
 
-/*
+
 // Test method that takes an input data, compresses it (on the CPU),
 // decompresses it on the GPU, and verifies it is correct.
 // Uses C++ API Cascaded Compression with automatic format selector
@@ -315,7 +315,7 @@ void test_auto_cpp(const std::vector<T>& data)
   }
 
 }
-*/
+
 
 
 template <typename T>

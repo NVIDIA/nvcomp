@@ -326,8 +326,6 @@ inline void CascadedCompressor<T>::do_compress(
     cudaStream_t stream)
 {
 
-//  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-
   if (m_opts.num_RLEs == -1) { // If we need to run the selector
     nvcompError_t status = nvcompCascadedCompressAsync(
         NULL,
@@ -366,8 +364,6 @@ inline CascadedSelector<T>::CascadedSelector(
     opts(selector_opts)
 {
   size_t temp;
-//  nvcompError_t status = nvcompCascadedSelectorGetTempSize(
-//      input_byte_len, getnvcompType<T>(), opts, &temp);
 
   nvcompError_t status = nvcompCascadedSelectorConfigure(
       &opts, getnvcompType<T>(), input_byte_len, &temp);

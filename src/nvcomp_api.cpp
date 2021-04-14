@@ -59,6 +59,7 @@ nvcompError_t nvcompDecompressGetMetadata(
   }
 #endif
   else {
+// TODO - Restore generic Decompressor functionality in future PRs
 //    return nvcompCascadedDecompressGetMetadata(
 //        in_ptr, in_bytes, metadata_ptr, stream);
     return nvcompSuccess;

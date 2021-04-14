@@ -254,17 +254,6 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
 } // namespace nvcomp
 
 
-/*
-nvcompError_t nvcompCascadedSelectorGetTempSize(
-    size_t,
-    nvcompType_t,
-    nvcompCascadedSelectorOpts,
-    size_t*)
-{
-  return nvcompSuccess;
-}
-*/
-
 nvcompError_t nvcompCascadedSelectorConfigure(
     nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
@@ -312,7 +301,6 @@ nvcompCascadedFormatOpts callSelectorSelectConfig(
 {
 
   size_t required_bytes;
-//  nvcompCascadedSelectorGetTempSize(in_bytes, in_type, opts, &required_bytes);
   nvcompCascadedSelectorConfigure(&opts, in_type, in_bytes, &required_bytes);
 
   NVCOMP_TYPE_ONE_SWITCH_RETURN(
@@ -329,22 +317,6 @@ nvcompCascadedFormatOpts callSelectorSelectConfig(
       opts.seed,
       stream);
 }
-
-/*
-nvcompError_t nvcompCascadedSelectorSelectConfig(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    nvcompCascadedSelectorOpts selector_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
-    nvcompCascadedFormatOpts* format_opts,
-    double* est_ratio,
-    cudaStream_t stream)
-{
-  return nvcompSuccess;
-}
-*/
 
 nvcompError_t nvcompCascadedSelectorRun(
     nvcompCascadedSelectorOpts* opts,
