@@ -81,9 +81,9 @@ nvcompError_t nvcompCascadedCompressConfigure(
     size_t* compressed_bytes);
 
 /**
- * @brief Perform asynchronous compression. The pointer `out_bytes` must be to
- * pinned memory for this to be asynchronous.
- *
+ * @brief Perform asynchronous compression. The pointers `compressed_ptr` and 
+ * `compressed_bytes` must be to preallocated memory directly accessible by the GPU.
+ * 
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *
@@ -95,7 +95,8 @@ nvcompError_t nvcompCascadedCompressConfigure(
  * @param temp_bytes The size of the temporary workspace in bytes.
  * @param compressed_ptr The location to write compresesd data to on the device.
  * @param compressed_bytes The size of the output location on input, and the size of
- * the compressed data on output. **Must point to GPU-accessible memory**
+ * the compressed data on output. This pointer must be preallocated and directly 
+ * accessible by the GPU.
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -112,12 +113,14 @@ nvcompError_t nvcompCascadedCompressAsync(
     cudaStream_t stream);
 
 /**
- * @brief Extract the metadata from the compressed data.
+ * @brief Extract the metadata from the compressed data.  This function assumes
+ * that the memory to store the extracted metadata is preallocated and directly accessible
+ * by the GPU.  Runs asynchronously on the provided CUDA stream by extracting
+ * and copying the metadata to the GPU-accessible `metadata_ptr`.
  *
  * @param compressed_ptr The compressed data.
  * @param compressed_bytes The size of the compressed data in bytes.
- * @param metadata_ptr Pointer to the GPU-accessible data to store the Metadata.
- *   Must be pre-allocated and accessible to the GPU, such as cudaMallocHost().
+ * @param metadata_ptr Pointer to the preallocated memory directly accessible by the GPU.
  * @param metadata_bytes The size of the resulting metadata.
  * @param stream The cuda stream to operate on.
  *
@@ -141,10 +144,11 @@ void nvcompCascadedDestroyMetadata(void* metadata_ptr);
 
 /**
  * @brief Configure the decompression and get the output and temp sizes
- * needed to perform the decompression.  
+ * needed to perform the decompression.  If metadata is not explictly provided
+ * (i.e., `metadata_ptr` is null), this function synchronizes the provided CUDA
+ * stream and blocks CPU execution until the metadata is extract and copied
+ * from the `compressed_ptr`.
  *
- * NOTE: Is synchronoous if metadata is not explicitly given, as it needs
- * to be extracted from the compressed data.
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *

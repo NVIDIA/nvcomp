@@ -190,11 +190,11 @@ static void run_benchmark(
   // allocate temp buffer
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(
-      &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
+      &d_decomp_temp, decomp_temp_bytes)); 
   // allocate output buffer
   void* decomp_out_ptr;
   CUDA_CHECK(cudaMalloc(
-      &decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
+      &decomp_out_ptr, decomp_bytes)); 
 
   start = std::chrono::steady_clock::now();
 

@@ -254,7 +254,6 @@ inline size_t CascadedCompressor<T>::get_temp_size()
     nvcompError_t status = nvcompCascadedCompressConfigure(
         NULL,
         this->get_type(),
-//        this->get_uncompressed_data(),
         this->get_uncompressed_size(),
         &metadata_bytes,
         &comp_temp_bytes,
@@ -264,7 +263,6 @@ inline size_t CascadedCompressor<T>::get_temp_size()
     nvcompError_t status = nvcompCascadedCompressConfigure(
         &m_opts,
         this->get_type(),
- //       this->get_uncompressed_data(),
         this->get_uncompressed_size(),
         &metadata_bytes,
         &comp_temp_bytes,
@@ -296,7 +294,6 @@ inline size_t CascadedCompressor<T>::get_max_output_size(
     nvcompError_t status = nvcompCascadedCompressConfigure(
         NULL,
         this->get_type(),
-  //      this->get_uncompressed_data(),
         this->get_uncompressed_size(),
         &metadata_bytes,
         &comp_temp_bytes,
@@ -306,7 +303,6 @@ inline size_t CascadedCompressor<T>::get_max_output_size(
     nvcompError_t status = nvcompCascadedCompressConfigure(
         &m_opts,
         this->get_type(),
- //       this->get_uncompressed_data(),
         this->get_uncompressed_size(),
         &metadata_bytes,
         &comp_temp_bytes,

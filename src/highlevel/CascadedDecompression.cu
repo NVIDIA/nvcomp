@@ -1340,7 +1340,7 @@ nvcompError_t nvcompCascadedDecompressConfigure(
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(
-        e, "nvcompCascadedDecompressGetTempSize()");
+        e, "nvcompCascadedDecompressConfigure()");
   }
 
   return nvcompSuccess;
