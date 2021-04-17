@@ -1283,6 +1283,8 @@ nvcompError_t nvcompCascadedDecompressConfigure(
     cudaStream_t stream)
 {
   try {
+    CHECK_NOT_NULL(compressed_ptr);
+    CHECK_NOT_NULL(metadata_ptr);
     CHECK_NOT_NULL(temp_bytes);
     CHECK_NOT_NULL(uncompressed_bytes);
 
@@ -1296,7 +1298,9 @@ nvcompError_t nvcompCascadedDecompressConfigure(
 
     *metadata_ptr = (void*)metadata;
 
-    *metadata_bytes = sizeof(CascadedMetadata);
+    if(metadata_bytes) {
+      *metadata_bytes = sizeof(CascadedMetadata);
+    }
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(
@@ -1391,6 +1395,9 @@ nvcompError_t nvcompCascadedCompressConfigure(
     size_t* compressed_bytes)
 {
   try {
+    CHECK_NOT_NULL(temp_bytes);
+    CHECK_NOT_NULL(compressed_bytes);
+
     checkCompressSize(uncompressed_bytes);
 
     nvcompCascadedFormatOpts temp_opts;
@@ -1407,7 +1414,9 @@ nvcompError_t nvcompCascadedCompressConfigure(
       temp_opts.use_bp = format_opts->use_bp;
     }
 
-    *metadata_bytes = sizeof(CascadedMetadata);
+    if(metadata_bytes) {
+      *metadata_bytes = sizeof(CascadedMetadata);
+    }
 
     nvcompCascadedCompressionGPU::computeWorkspaceSize(
         uncompressed_bytes, type, &temp_opts, temp_bytes);
