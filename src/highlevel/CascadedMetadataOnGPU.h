@@ -38,11 +38,6 @@ namespace nvcomp
 namespace highlevel
 {
 
-// Helper function
-__device__ __host__ size_t getCascadedMetadataBytes(
-    const nvcompCascadedFormatOpts format_opts, 
-    size_t uncompressed_bytes);
-
 class CascadedMetadataOnGPU
 {
 public:

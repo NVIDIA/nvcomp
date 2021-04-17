@@ -255,80 +255,6 @@ size_t readFixedWidthData(
   return newOffset;
 }
 
-void deserializeAndCopyMetadataFromGPUVersion1(
-    void* outPtr, const void* const devicePtr, const size_t size, cudaStream_t stream)
-{
-  NUM_INPUTS_TYPE numInputs;
-  CudaUtils::copy_async(
-      &numInputs,
-      (const NUM_INPUTS_TYPE*)(static_cast<const uint8_t*>(devicePtr) + OFFSET_NUM_INPUTS),
-      1,
-      DEVICE_TO_HOST,
-      stream);
-  CudaUtils::sync(stream);
-
-  std::vector<uint8_t> localBuffer(serializedMetadataSize(numInputs));
-  if (size < localBuffer.size()) {
-    throw std::runtime_error(
-        "Insufficient space to deserialize metadata "
-        "from: "
-        + std::to_string(size) + " but require "
-        + std::to_string(localBuffer.size()));
-  }
-
-  CudaUtils::copy_async(
-      (uint8_t*)localBuffer.data(),
-      (const uint8_t*)devicePtr,
-      localBuffer.size(),
-      DEVICE_TO_HOST,
-      stream);
-  CudaUtils::sync(stream);
-
-  // here we convert to types of fixed width by the C++ standard rather than
-  // just doing a memcpy of the struct, to ensure portability.
-
-  nvcompCascadedFormatOpts format_opts;
-  format_opts.num_RLEs
-      = getField<NUM_RLES_TYPE, OFFSET_NUM_RLES>(localBuffer.data());
-  format_opts.num_deltas
-      = getField<NUM_DELTAS_TYPE, OFFSET_NUM_DELTAS>(localBuffer.data());
-  format_opts.use_bp = getField<USE_BITPACKING_TYPE, OFFSET_USE_BITPACKING>(
-      localBuffer.data());
-  const COMP_BYTES_TYPE comp_bytes
-      = getField<COMP_BYTES_TYPE, OFFSET_COMP_BYTES>(localBuffer.data());
-  const DECOMP_BYTES_TYPE decomp_bytes
-      = getField<DECOMP_BYTES_TYPE, OFFSET_DECOMP_BYTES>(localBuffer.data());
-  const IN_TYPE_TYPE in_type
-      = getField<IN_TYPE_TYPE, OFFSET_IN_TYPE>(localBuffer.data());
-
-  CascadedMetadata* metadata = (CascadedMetadata*)(outPtr);
-
-  metadata->set_all(format_opts, (nvcompType_t)in_type, decomp_bytes, comp_bytes);
-
-  if (numInputs != static_cast<int>(metadata->getNumInputs())) {
-    throw std::runtime_error(
-        "Mismatch in numInputs while deserializing "
-        "metadata: "
-        + std::to_string(numInputs) + " vs. "
-        + std::to_string(metadata->getNumInputs()));
-  }
-
-  std::vector<OFFSET_TYPE> hdrOffsets(metadata->getNumInputs());
-  std::vector<OFFSET_TYPE> dataOffsets(metadata->getNumInputs());
-
-  for (size_t i = 0; i < metadata->getNumInputs(); ++i) {
-    const HEADER_TYPE header
-        = getField<HEADER_TYPE, OFFSET_HEADERS>(localBuffer.data(), i);
-    metadata->setHeader(i, header);
-  }
-  for (size_t i = 0; i < metadata->getNumInputs(); ++i) {
-    const OFFSET_TYPE dataOffset
-        = getField<OFFSET_TYPE, static_cast<OffsetType>(0)>(
-            localBuffer.data() + getOffsetsOffset(metadata->getNumInputs()), i);
-    metadata->setDataOffset(i, dataOffset);
-  }
-}
-
 CascadedMetadata deserializeMetadataFromGPUVersion1(
     const void* const devicePtr, const size_t size, cudaStream_t stream)
 {
@@ -589,29 +515,6 @@ CascadedMetadata CascadedMetadataOnGPU::copyToHost(cudaStream_t stream)
   }
 }
 
-void CascadedMetadataOnGPU::copyToHost(void* ptr, cudaStream_t stream)
-{
-  // read the version of the serialized metadata.
-  VERSION_TYPE version;
-
-  CudaUtils::copy_async(
-      &version,
-      static_cast<const VERSION_TYPE*>(m_ptr),
-      1,
-      DEVICE_TO_HOST,
-      stream);
-  CudaUtils::sync(stream);
-
-  if (version == 1) {
-        deserializeAndCopyMetadataFromGPUVersion1(ptr, m_ptr, m_maxSize, stream);
-
-  } else {
-    throw std::runtime_error(
-        "Unsupported Metadata version: " + std::to_string(version));
-  }
-}
-
-
 CascadedMetadata::Header*
 CascadedMetadataOnGPU::getHeaderLocation(const size_t index)
 {
@@ -654,18 +557,6 @@ void CascadedMetadataOnGPU::verifyIndex(const size_t index) const
         "Invalid index to set header for: " + std::to_string(index) + " / "
         + std::to_string(m_numInputs));
   }
-}
-
-// Helper function
-__host__ size_t getCascadedMetadataBytes(
-    const nvcompCascadedFormatOpts format_opts, 
-    size_t uncompressed_bytes)
-{
-  size_t numLayers = format_opts.num_RLEs*2 + format_opts.num_deltas + 1;
-  if(numLayers < 2) numLayers = 2;
-
-  return OFFSET_HEADERS + sizeof(OFFSET_TYPE) * numLayers 
-         + sizeof(HEADER_TYPE) * numLayers; 
 }
 
 

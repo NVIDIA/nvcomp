@@ -97,7 +97,6 @@ TEST_CASE("AutoTempSize_OutputSize_C", "[small]")
       &compressed_bytes);
       
   REQUIRE(err == nvcompSuccess);
-  REQUIRE(metadata_bytes == 256);
   REQUIRE(temp_bytes == 12251072);
   REQUIRE(compressed_bytes == 12000256);
 

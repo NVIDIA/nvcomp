@@ -1407,7 +1407,7 @@ nvcompError_t nvcompCascadedCompressConfigure(
       temp_opts.use_bp = format_opts->use_bp;
     }
 
-    *metadata_bytes = getCascadedMetadataBytes(temp_opts, uncompressed_bytes);
+    *metadata_bytes = sizeof(CascadedMetadata);
 
     nvcompCascadedCompressionGPU::computeWorkspaceSize(
         uncompressed_bytes, type, &temp_opts, temp_bytes);
