@@ -54,6 +54,9 @@ constexpr int const NUM_SCHEMES = 5;
 // Maximum value allowed for sample_size
 constexpr int const MAX_SAMPLE_SIZE = 1024;
 
+// Default values of the Selector
+static constexpr nvcompCascadedSelectorOpts DEFAULT_SELECTOR = {1024, 100, 1};
+
 template <typename T>
 void get_workspace_size_internal(const size_t num_samples, size_t* temp_size)
 {
@@ -264,9 +267,7 @@ nvcompError_t nvcompCascadedSelectorConfigure(
   // temp selector opts in case opts are NULL and default needs to be used
   nvcompCascadedSelectorOpts selector_opts;
   if(opts == NULL) {
-    selector_opts.sample_size = 1024;
-    selector_opts.num_samples = 100;
-    selector_opts.seed = 1;
+    selector_opts = DEFAULT_SELECTOR;
   }
   else {
     selector_opts.sample_size = opts->sample_size;
@@ -333,9 +334,7 @@ nvcompError_t nvcompCascadedSelectorRun(
   // temp selector opts in case opts are NULL and default needs to be used
   nvcompCascadedSelectorOpts selector_opts;
   if(opts == NULL) {
-    selector_opts.sample_size = 1024;
-    selector_opts.num_samples = 100;
-    selector_opts.seed = 1;
+    selector_opts = DEFAULT_SELECTOR;
   }
   else {
     selector_opts.sample_size = opts->sample_size;
