@@ -97,6 +97,7 @@ enum OffsetType : unsigned int
  * DEVICE FUNCTIONS ***********************************************************
  *****************************************************************************/
 
+
 namespace
 {
 
@@ -557,6 +558,7 @@ void CascadedMetadataOnGPU::verifyIndex(const size_t index) const
         + std::to_string(m_numInputs));
   }
 }
+
 
 } // namespace highlevel
 } // namespace nvcomp

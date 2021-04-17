@@ -45,7 +45,6 @@ public:
    * @brief Compute the required temporary workspace on the GPU
    * required for the given compression configuration.
    *
-   * @param in_ptr The pointer to the input data on the GPU.
    * @param in_bytes The length in bytes of the input data.
    * @param in_type The input data type.
    * @param opts The compression configuration to use.
@@ -53,7 +52,6 @@ public:
    * (output).
    */
   static void computeWorkspaceSize(
-      const void* in_ptr,
       size_t in_bytes,
       nvcompType_t in_type,
       const nvcompCascadedFormatOpts* opts,
@@ -62,9 +60,8 @@ public:
   /**
    * @brief Generate the compression metadata information.
    *
-   * @param in_ptr The pointer to the input data on the GPU.
-   * @param in_bytes The length in bytes of the input data.
-   * @param in_type The input data type.
+   * @param uncompressed_bytes The length in bytes of the input data.
+   * @param type The input data type.
    * @param opts The compression configuration to use.
    * @param temp_ptr The allocated temporary workspace on the GPU.
    * @param temp_bytes The size of the allocated temporary workspace on the
@@ -73,12 +70,9 @@ public:
    * the compressed data (output).
    */
   static void generateOutputUpperBound(
-      const void* in_ptr,
-      size_t in_bytes,
-      nvcompType_t in_type,
+      size_t uncompressed_bytes,
+      nvcompType_t type,
       const nvcompCascadedFormatOpts* opts,
-      void* temp_ptr,
-      size_t temp_bytes,
       size_t* out_bytes);
 
   /**

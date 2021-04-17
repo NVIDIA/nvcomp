@@ -84,22 +84,22 @@ TEST_CASE("AutoTempSize_OutputSize_C", "[small]")
 
   CUDA_RT_CALL(cudaMalloc(&d_input, numBytes));
 
+  size_t metadata_bytes = 0;
   size_t temp_bytes = 0;
+  size_t compressed_bytes = 0;
 
-  nvcompError_t err = nvcompCascadedCompressAutoGetTempSize(
-      d_input, numBytes, getnvcompType<T>(), &temp_bytes);
+  nvcompError_t err = nvcompCascadedCompressConfigure(
+      NULL,
+      getnvcompType<T>(),
+      numBytes,
+      &metadata_bytes,
+      &temp_bytes,
+      &compressed_bytes);
+      
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 12251072);
+  REQUIRE(compressed_bytes == 12000256);
 
-  void* temp_ptr;
-  CUDA_RT_CALL(cudaMalloc(&temp_ptr, temp_bytes));
-  size_t out_bytes;
-
-  err = nvcompCascadedCompressAutoGetOutputSize(
-      d_input, numBytes, getnvcompType<T>(), temp_ptr, temp_bytes, &out_bytes);
-
-  REQUIRE(err == nvcompSuccess);
-  REQUIRE(out_bytes == 12000256);
 }
 
 // TODO - Add more unit tests of auto-run API calls

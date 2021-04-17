@@ -105,6 +105,8 @@ public:
    */
   CascadedMetadata copyToHost(cudaStream_t stream);
 
+  void copyToHost(void* ptr, cudaStream_t stream);
+
   /**
    * @brief Save the offset scalar stored on the device to the serialized
    * metadata.

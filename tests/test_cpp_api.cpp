@@ -47,6 +47,8 @@ using namespace nvcomp;
     REQUIRE(err == cudaSuccess);                                               \
   } while (false)
 
+/*
+
 TEST_CASE("comp/decomp RLE-Delta", "[nvcomp]")
 {
   using T = int;
@@ -383,3 +385,4 @@ TEST_CASE("max_size_test", "[nvcomp]")
     cudaFree(d_comp_out);
   }
 }
+*/

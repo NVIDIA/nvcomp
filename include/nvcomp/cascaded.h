@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,240 +60,132 @@ typedef struct
 } nvcompCascadedFormatOpts;
 
 /**
- * @brief Extracts the metadata from the input in_ptr on the device and copies
- * it to the host. This function synchronizes on the stream.
+ * @brief Configure the Cascaded compressor and return temp and output
+ * sizes needed to perform the compression.  If no format is provided (i.e., NULL),
+ * temporary and output size estimates are based on the format that would require
+ * the largest allocation.
  *
- * @param in_ptr The compressed memory on the device.
- * @param in_bytes The size of the compressed memory on the device.
- * @param metadata_ptr The metadata on the host to create from the compresesd
- * data.
- * @param stream The stream to use for copying from the device to the host.
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedDecompressGetMetadata(
-    const void* in_ptr,
-    size_t in_bytes,
-    void** metadata_ptr,
-    cudaStream_t stream);
-
-/**
- * @brief Destroys the metadata object and frees the associated memory.
- *
- * @param metadata_ptr The pointer to destroy.
- */
-void nvcompCascadedDecompressDestroyMetadata(void* metadata_ptr);
-
-/**
- * @brief Computes the temporary storage size needed to decompress.
- *
- * @param metadata_ptr The metadata.
- * @param temp_bytes The size of temporary workspace required to perform
- * decomrpession, in bytes (output).
+ * @param format_opts The cascaded format options.  If set to NULL, temporary storage
+ * sizes are allocated to enable running the CascadedSelector during compression.
+ * @param type The data type of the uncompressed data.
+ * @param uncompressed_bytes The size of the uncompressed data on the device.
+ * @param metadata_bytes The bytes needed to store the metadata (output)
+ * @param temp_bytes The temporary memory required for compression (output)
+ * @param compressed_bytes The estaimted size of the compressed result (output)
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedDecompressGetTempSize(
-    const void* metadata_ptr, size_t* temp_bytes);
-
-/**
- * @brief Computes the decompressed size of the data.
- *
- * @param metadata_ptr The metadata.
- * @param output_bytes The size of the decompressed data in bytes (output).
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedDecompressGetOutputSize(
-    const void* metadata_ptr, size_t* output_bytes);
-
-/**
- * @brief Perform the asynchronous decompression.
- *
- * @param in_ptr The compressed data on the device to decompress.
- * @param in_bytes The size of the compressed data.
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace.
- * @param metadata_ptr The metadata.
- * @param out_ptr The output location on the device.
- * @param out_bytes The size of the output location.
- * @param stream The cuda stream to operate on.
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedDecompressAsync(
-    const void* in_ptr,
-    size_t in_bytes,
-    void* temp_ptr,
-    size_t temp_bytes,
-    const void* metadata_ptr,
-    void* out_ptr,
-    size_t out_bytes,
-    cudaStream_t stream);
-
-/**
- * @brief Get the temporary workspace size required to perform compression.
- *
- * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
- * compress larger data, break it up into chunks.
- *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The type of the uncompressed data.
- * @param format_opts The cascaded format options.
- * @param temp_bytes The size of the required temporary workspace in bytes
- * (output).
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedCompressGetTempSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
+nvcompError_t nvcompCascadedCompressConfigure(
     const nvcompCascadedFormatOpts* format_opts,
-    size_t* temp_bytes);
+    nvcompType_t type,
+    size_t uncompressed_bytes,
+    size_t* metadata_bytes,
+    size_t* temp_bytes,
+    size_t* compressed_bytes);
 
 /**
- * @brief Get the required output size to perform compression.
- *
+ * @brief Perform asynchronous compression. The pointers `compressed_ptr` and 
+ * `compressed_bytes` must be to preallocated memory directly accessible by the GPU.
+ * If no format is provided (i.e., NULL), the CascadedSelector is also run to determine 
+ * the best compression format and the function synchronizes on the stream.
+ * 
+ * 
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The type of the uncompressed data.
- * @param format_opts The cascaded format options.
+ * @param format_opts The cascaded format options. If set to NULL, the format
+ * is automatically selected using the CascadedSelector.  In this case,
+ * the function runs synchronously on the CUDA stream.
+ * @param type The data type of the uncompressed data.
+ * @param uncompressed_ptr The uncompressed data on the device.
+ * @param uncompressed_bytes The size of the uncompressed data in bytes.
  * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_bytes The required size of the output location in bytes (output).
- * @param exact_out_bytes Whether or not to compute the exact number of bytes
- * needed, or quickly compute a loose upper bound.
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedCompressGetOutputSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    const nvcompCascadedFormatOpts* format_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
-    size_t* out_bytes,
-    int exact_out_bytes);
-
-/**
- * @brief Perform asynchronous compression. The pointer `out_bytes` must be to
- * pinned memory for this to be asynchronous.
- *
- * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
- * compress larger data, break it up into chunks.
- *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The data type of the uncompressed data.
- * @param format_opts The cascaded format options.
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_ptr The location to write compresesd data to on the device.
- * @param out_bytes The size of the output location on input, and the size of
- * the compressed data on output. If pinned memory, the stream must be
- * synchronized with, before reading.
+ * @param compressed_ptr The location to write compresesd data to on the device.
+ * @param compressed_bytes The size of the output location on input, and the size of
+ * the compressed data on output. This pointer must be preallocated and directly 
+ * accessible by the GPU.
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompCascadedCompressAsync(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
     const nvcompCascadedFormatOpts* format_opts,
+    nvcompType_t type,
+    const void* uncompressed_ptr,
+    size_t uncompressed_bytes,
     void* temp_ptr,
     size_t temp_bytes,
-    void* out_ptr,
-    size_t* out_bytes,
+    void* compressed_ptr,
+    size_t* compressed_bytes,
     cudaStream_t stream);
 
-/**************************************************************************
- *  Automatically configured API calls
- *************************************************************************/
 /**
- * @brief Get the temporary workspace size required to perform compression
- * (and the selector to determine the best configuration)..
+ * @brief Destroys the metadata object and frees the associated memory.  Must be used
+ * to destroy metadata that is generated from nvcompCascadedDecompressConfigure.
  *
- * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
- * compress larger data, break it up into chunks.
- *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The type of the uncompressed data.
- * @param temp_bytes The size of the required temporary workspace in bytes
- * (output).
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
+ * @param metadata_ptr The pointer to destroy.
  */
-nvcompError_t nvcompCascadedCompressAutoGetTempSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    size_t* temp_bytes);
+void nvcompCascadedDestroyMetadata(void* metadata_ptr);
+
 
 /**
- * @brief Get the required output size to perform compression using the
- * automatically selected best configuration..
+ * @brief Configure the decompression and get the output and temp sizes
+ * needed to perform the decompression. This function allocates host-side memory,
+ * synchronizes the provided CUDA stream, and blocks CPU execution until the 
+ * metadata is extract and copied from the `compressed_ptr`.
  *
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The type of the uncompressed data.
- * @param temp_ptr The temporary workspace on the device.
+ * @param compressed_ptr The compressed data on the device.
+ * @param compressed_bytes The size of the compressed data in bytes.
+ * @param metadata_ptr The pointer that is to be populated with the metadata
+ * needed to perform decompression.  This function allocates host-side memory and
+ * copies the metdata to it.
+ * @param metadata_bytes The size of the metadata that this function allocates.
  * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_bytes The required size of the output location in bytes (output).
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-nvcompError_t nvcompCascadedCompressAutoGetOutputSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    void* temp_ptr,
-    size_t temp_bytes,
-    size_t* out_bytes);
-
-/**
- * @brief Perform compression by first determining the best configuration for
- * the input.  Runs synchronously because we first find the configuration to
- * use. Random sampling is performed and selected using random numbers generated
- * using the seed provided.
- *
- * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
- * compress larger data, break it up into chunks.
- *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The data type of the uncompressed data.
- * @param temp_ptr The temporary workspace on the device.
- * @param temp_bytes The size of the temporary workspace in bytes.
- * @param out_ptr The location to write compresesd data to on the device.
- * @param out_bytes The size of the output location on input, and the size of
- * the compressed data on output. If pinned memory, the stream must be
- * synchronized with, before reading.
- * @param seed The seed used for the random generator used in sampling
+ * @param uncompressed_bytes The required size of the output location in bytes (output).
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedCompressAuto(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
+nvcompError_t nvcompCascadedDecompressConfigure(
+    const void* compressed_ptr,
+    size_t compressed_bytes,
+    void** metadata_ptr,
+    size_t* metadata_bytes,
+    size_t* temp_bytes,
+    size_t* uncompressed_bytes,
+    cudaStream_t stream);
+
+
+/**
+ * @brief Perform the asynchronous decompression.
+ *
+ * @param compressed_ptr The compressed data on the device to decompress.
+ * @param compressed_bytes The size of the compressed data.
+ * @param metadata_ptr The metadata (accessible by host).
+ * @param metadata_bytes The size of the metadata.
+ * @param temp_ptr The temporary workspace on the device.
+ * @param temp_bytes The size of the temporary workspace.
+ * @param uncompressed_ptr The output location on the device (output).
+ * @param uncompressed_bytes The size of the output location.
+ * @param stream The cuda stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompCascadedDecompressAsync(
+    const void* compressed_ptr,
+    size_t compressed_bytes,
+    const void* metadata_ptr,
+    size_t metadata_bytes,
     void* temp_ptr,
     size_t temp_bytes,
-    void* out_ptr,
-    size_t* out_bytes,
-    unsigned seed,
+    void* uncompressed_ptr,
+    size_t uncompressed_bytes,
     cudaStream_t stream);
+
 
 /**************************************************************************
  *  Cascaded Selector types and API calls
@@ -327,30 +219,30 @@ typedef struct
 } nvcompCascadedSelectorOpts;
 
 /**
- * @brief Get the required temporary workspace size needed to run the
- * cascaded selector.
+ * @brief Configure the cascaded selector and get the temp memory size needed
+ * to run the cascaded selector.
  *
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The data type of the uncompressed data.
- * @param opts The configuration options for the selector.
+ * @param opts The configuration options for the selector (if null, default values used).
+ * @param type The data type of the uncompressed data.
+ * @param uncompressed_bytes The size of the uncompressed data in bytes.
  * @param temp_bytes The size of the temporary workspace in bytes (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedSelectorGetTempSize(
-    size_t in_bytes,
-    nvcompType_t in_type,
-    nvcompCascadedSelectorOpts opts,
+nvcompError_t nvcompCascadedSelectorConfigure(
+    nvcompCascadedSelectorOpts* opts,
+    nvcompType_t type,
+    size_t uncompressed_bytes,
     size_t* temp_bytes);
 
 /**
  * @brief Run the cascaded selector to determine the best cascaded compression
  * configuration and estimated compression ratio.
  *
- * @param in_ptr The uncompressed data on the device.
- * @param in_bytes The size of the uncompressed data in bytes.
- * @param in_type The data type of the uncompressed data.
- * @param opts The configuration options for the selector.
+ * @param opts The configuration options for the selector (if null, default values are used).
+ * @param type The data type of the uncompressed data.
+ * @param uncompressed_ptr The uncompressed data on the device.
+ * @param uncompressed_bytes The size of the uncompressed data in bytes.
  * @param temp_ptr The temporary workspace memory on the device
  * @param temp_bytes The size of the temporary workspace in bytes
  * @param format_opts The best cascaded compression configuration (output)
@@ -360,16 +252,17 @@ nvcompError_t nvcompCascadedSelectorGetTempSize(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedSelectorSelectConfig(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    nvcompCascadedSelectorOpts opts,
+nvcompError_t nvcompCascadedSelectorRun(
+    nvcompCascadedSelectorOpts* opts,
+    nvcompType_t type,
+    const void* uncompressed_ptr,
+    size_t uncompressed_bytes,
     void* temp_ptr,
     size_t temp_bytes,
     nvcompCascadedFormatOpts* format_opts,
     double* est_ratio,
     cudaStream_t stream);
+
 
 #ifdef __cplusplus
 }

@@ -273,6 +273,8 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
       decomp_temp_bytes,
       input_data.ptrs(),
       stream);
+    
+  benchmark_assert(status == nvcompSuccess, "LZ4Decompress not successful");
 
   cudaEventRecord(end, stream);
 

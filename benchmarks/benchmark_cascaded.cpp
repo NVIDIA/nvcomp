@@ -103,55 +103,44 @@ static void run_benchmark(
   nvcompError_t status;
 
   // Get temp size needed for compression
+  size_t metadata_bytes;
   size_t comp_temp_bytes;
-  status = nvcompCascadedCompressGetTempSize(
-      d_in_data, in_bytes, getnvcompType<T>(), &comp_opts, &comp_temp_bytes);
-  benchmark_assert(status == nvcompSuccess, "CompressTempSize not successful");
+
+  // Allocate GPU-accessible memory for output size
+  size_t* comp_out_bytes;
+  CUDA_CHECK(cudaMallocHost(&comp_out_bytes, sizeof(size_t)));
+
+  status = nvcompCascadedCompressConfigure(
+      &comp_opts, getnvcompType<T>(), in_bytes, &metadata_bytes, &comp_temp_bytes, comp_out_bytes);
+  benchmark_assert(status == nvcompSuccess, "CompressConfigure not successful");
 
   // Allocate temp workspace
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-  // Get metadata for compression
-  size_t comp_out_bytes;
-  status = nvcompCascadedCompressGetOutputSize(
-      d_in_data,
-      in_bytes,
-      getnvcompType<T>(),
-      &comp_opts,
-      d_comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      false);
-
-  benchmark_assert(
-      status == nvcompSuccess,
-      "nvcompCascadedCompressGetMetadata not successful");
-
   // Allocate compressed output buffer
   void* d_comp_out;
-  CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
+  CUDA_CHECK(cudaMalloc(&d_comp_out, *comp_out_bytes));
 
   auto start = std::chrono::steady_clock::now();
 
   if (verbose_memory) {
     std::cout << "compression memory (input+output+temp) (B): "
-              << (in_bytes + comp_out_bytes + comp_temp_bytes) << std::endl;
+              << (in_bytes + *comp_out_bytes + comp_temp_bytes) << std::endl;
     std::cout << "compression temp space (B): " << comp_temp_bytes << std::endl;
-    std::cout << "compression output space (B): " << comp_out_bytes
+    std::cout << "compression output space (B): " << *comp_out_bytes
               << std::endl;
   }
 
   // Launch compression
   status = nvcompCascadedCompressAsync(
+      &comp_opts,
+      getnvcompType<T>(),
       d_in_data,
       in_bytes,
-      getnvcompType<T>(),
-      &comp_opts,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
-      &comp_out_bytes,
+      comp_out_bytes,
       stream);
 
   benchmark_assert(
@@ -163,61 +152,56 @@ static void run_benchmark(
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
-  std::cout << "comp_size: " << comp_out_bytes
+  std::cout << "comp_size: " << *comp_out_bytes
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
-            << (double)data.size() * sizeof(T) / comp_out_bytes << std::endl;
+            << (double)data.size() * sizeof(T) / *comp_out_bytes << std::endl;
   std::cout << "compression throughput (GB/s): "
             << gbs(start, end, data.size() * sizeof(T)) << std::endl;
 
-  void* metadata_ptr;
-
-  // get metadata from compressed data on GPU
-  status = nvcompDecompressGetMetadata(
-      d_comp_out, comp_out_bytes, &metadata_ptr, stream);
-  benchmark_assert(status == nvcompSuccess, "Failed to get metadata");
-
-  // get temp size
+  // get metadata, temp, and output sizes
+  void* metadata_ptr = NULL;
   size_t decomp_temp_bytes;
-  status = nvcompDecompressGetTempSize(metadata_ptr, &decomp_temp_bytes);
-  benchmark_assert(
-      status == nvcompSuccess, "Failed to get temp size for decompression");
-
-  // allocate temp buffer
-  void* d_decomp_temp;
-  CUDA_CHECK(cudaMalloc(
-      &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
-
-  // get output size
   size_t decomp_bytes;
-  status = nvcompDecompressGetOutputSize(metadata_ptr, &decomp_bytes);
+  status = nvcompCascadedDecompressConfigure(
+      d_comp_out,
+      *comp_out_bytes,
+      &metadata_ptr,
+      &metadata_bytes,
+      &decomp_temp_bytes,
+      &decomp_bytes,
+      stream);
+
   benchmark_assert(
-      status == nvcompSuccess, "Failed to get output size for decompression");
+      status == nvcompSuccess, "Failed to configure decompressor");
+
 
   if (verbose_memory) {
     std::cout << "decompression memory (input+output+temp) (B): "
-              << (decomp_bytes + comp_out_bytes + decomp_temp_bytes)
+              << (decomp_bytes + *comp_out_bytes + decomp_temp_bytes)
               << std::endl;
     std::cout << "decompression temp space (B): " << decomp_temp_bytes
               << std::endl;
   }
 
-  size_t free, total;
-  cudaMemGetInfo(&free, &total);
-
+  // allocate temp buffer
+  void* d_decomp_temp;
+  CUDA_CHECK(cudaMalloc(
+      &d_decomp_temp, decomp_temp_bytes)); 
   // allocate output buffer
   void* decomp_out_ptr;
   CUDA_CHECK(cudaMalloc(
-      &decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
+      &decomp_out_ptr, decomp_bytes)); 
 
   start = std::chrono::steady_clock::now();
 
   // execute decompression (asynchronous)
-  status = nvcompDecompressAsync(
+  status = nvcompCascadedDecompressAsync(
       d_comp_out,
-      comp_out_bytes,
+      *comp_out_bytes,
+      metadata_ptr,
+      metadata_bytes,
       d_decomp_temp,
       decomp_temp_bytes,
-      metadata_ptr,
       decomp_out_ptr,
       decomp_bytes,
       stream);
@@ -230,8 +214,7 @@ static void run_benchmark(
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
-  nvcompDecompressDestroyMetadata(metadata_ptr);
-
+  nvcompCascadedDestroyMetadata(metadata_ptr);
   cudaStreamDestroy(stream);
   cudaFree(d_decomp_temp);
   cudaFree(d_comp_out);

@@ -132,13 +132,18 @@ TEST_CASE("Metadata-fcns", "[small]")
   CUDA_RT_CALL(cudaMalloc(
       (void**)&d_meta, serialized_metadata_bytes)); // version number + metadata
 
+  // Copy to GPU
   CascadedMetadataOnGPU gpuMetadata(d_meta, serialized_metadata_bytes);
   gpuMetadata.copyToGPU(meta_in, 0);
 
   void* meta_out;
+  nvcompError_t err = nvcompSuccess;
 
-  nvcompError_t err = nvcompCascadedDecompressGetMetadata(
-      d_meta, serialized_metadata_bytes, &meta_out, stream);
+  // Get temp and output sizes from metadata
+  size_t temp_bytes;
+  size_t out_bytes;
+  size_t metadata_bytes;
+  err = nvcompCascadedDecompressConfigure(d_meta, serialized_metadata_bytes, &meta_out, &metadata_bytes, &temp_bytes, &out_bytes, stream);
   REQUIRE(err == nvcompSuccess);
 
   CHECK(
@@ -178,20 +183,10 @@ TEST_CASE("Metadata-fcns", "[small]")
         == meta_in.getDataOffset(i));
   }
 
-  // Check tempSize result
-  size_t temp_bytes;
-  err = nvcompCascadedDecompressGetTempSize(meta_out, &temp_bytes);
-  REQUIRE(err == nvcompSuccess);
-
   CHECK(temp_bytes == 4096);
-
-  // getOutputSize
-  size_t out_bytes;
-  err = nvcompCascadedDecompressGetOutputSize(meta_out, &out_bytes);
-  REQUIRE(err == nvcompSuccess);
-
   CHECK(out_bytes == sizeof(CascadedMetadata));
 
-  nvcompCascadedDecompressDestroyMetadata(meta_out);
-  CUDA_RT_CALL(cudaFree(d_meta));
+//  CUDA_RT_CALL(cudaFree(d_meta));
+  nvcompCascadedDestroyMetadata(meta_out);
+
 }

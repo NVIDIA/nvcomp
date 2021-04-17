@@ -36,6 +36,7 @@
 #include <string>
 
 #include <iostream>
+#include <memory>
 
 namespace nvcomp
 {
@@ -82,6 +83,20 @@ CascadedMetadata::CascadedMetadata(
 /******************************************************************************
  * PUBLIC METHODS *************************************************************
  *****************************************************************************/
+
+void CascadedMetadata::set_all(
+    const nvcompCascadedFormatOpts opts,
+    const nvcompType_t type,
+    const size_t uncompressedBytes,
+    const size_t compressedBytes)
+{
+  m_formatOpts = opts;
+  setUncompressedSize(uncompressedBytes);
+  setCompressedSize(compressedBytes);
+  setValueType(type);
+
+  initialize();
+}
 
 int CascadedMetadata::getNumRLEs() const
 {
@@ -213,6 +228,7 @@ nvcompType_t CascadedMetadata::getDataType(size_t index) const
 
   return m_dataType[index];
 }
+
 
 /******************************************************************************
  * PRIVATE METHODS ************************************************************

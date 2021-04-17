@@ -248,20 +248,25 @@ template <typename T>
 inline size_t CascadedCompressor<T>::get_temp_size()
 {
   size_t comp_temp_bytes;
+  size_t comp_out_bytes;
+  size_t metadata_bytes;
   if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressAutoGetTempSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
+    nvcompError_t status = nvcompCascadedCompressConfigure(
+        NULL,
         this->get_type(),
-        &comp_temp_bytes);
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &comp_temp_bytes,
+        &comp_out_bytes);
     throwExceptionIfError(status, "GetTempSize failed");
   } else {
-    nvcompError_t status = nvcompCascadedCompressGetTempSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        this->get_type(),
+    nvcompError_t status = nvcompCascadedCompressConfigure(
         &m_opts,
-        &comp_temp_bytes);
+        this->get_type(),
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &comp_temp_bytes,
+        &comp_out_bytes);
     throwExceptionIfError(status, "GetTempSize failed");
   }
 
@@ -270,55 +275,36 @@ inline size_t CascadedCompressor<T>::get_temp_size()
 
 template <typename T>
 inline size_t CascadedCompressor<T>::get_exact_output_size(
-    void* const comp_temp, const size_t comp_temp_bytes)
+    void* const /*comp_temp*/, const size_t /*comp_temp_bytes*/)
 {
-  size_t comp_out_bytes;
-  if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    throw "Exact output size not supported when using Auto Selector";
-    return 0;
-  }
-  nvcompError_t status = nvcompCascadedCompressGetOutputSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
-      comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      true);
-  throwExceptionIfError(
-      status, "nvcompCascadedCompressGetOutputSize() for exact failed");
-
-  return comp_out_bytes;
+  throw "Exact output size not currently supported";
+  return 0;
 }
 
 template <typename T>
 inline size_t CascadedCompressor<T>::get_max_output_size(
-    void* comp_temp, size_t comp_temp_bytes)
+    void* /*comp_temp*/, size_t comp_temp_bytes)
 {
   size_t comp_out_bytes;
+  size_t metadata_bytes;
   if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressAutoGetOutputSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
+    nvcompError_t status = nvcompCascadedCompressConfigure(
+        NULL,
         this->get_type(),
-        comp_temp,
-        comp_temp_bytes,
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &comp_temp_bytes,
         &comp_out_bytes);
-    throwExceptionIfError(
-        status, "nvcompCascadedCompressGetOutputSize() for in exact failed");
+    throwExceptionIfError(status, "GetOutputSize failed");
   } else {
-    nvcompError_t status = nvcompCascadedCompressGetOutputSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        this->get_type(),
+    nvcompError_t status = nvcompCascadedCompressConfigure(
         &m_opts,
-        comp_temp,
-        comp_temp_bytes,
-        &comp_out_bytes,
-        false);
-    throwExceptionIfError(
-        status, "nvcompCascadedCompressGetOutputSize() for in exact failed");
+        this->get_type(),
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &comp_temp_bytes,
+        &comp_out_bytes);
+    throwExceptionIfError(status, "GetOutputSize failed");
   }
 
   return comp_out_bytes;
@@ -333,26 +319,24 @@ inline void CascadedCompressor<T>::do_compress(
     cudaStream_t stream)
 {
 
-  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-
   if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressAuto(
+    nvcompError_t status = nvcompCascadedCompressAsync(
+        NULL,
+        this->get_type(),
         this->get_uncompressed_data(),
         this->get_uncompressed_size(),
-        this->get_type(),
         temp_ptr,
         temp_bytes,
         out_ptr,
         out_bytes,
-        seed,
         stream);
     throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
   } else {
     nvcompError_t status = nvcompCascadedCompressAsync(
+        &m_opts,
+        this->get_type(),
         this->get_uncompressed_data(),
         this->get_uncompressed_size(),
-        this->get_type(),
-        &m_opts,
         temp_ptr,
         temp_bytes,
         out_ptr,
@@ -373,8 +357,9 @@ inline CascadedSelector<T>::CascadedSelector(
     opts(selector_opts)
 {
   size_t temp;
-  nvcompError_t status = nvcompCascadedSelectorGetTempSize(
-      input_byte_len, getnvcompType<T>(), opts, &temp);
+
+  nvcompError_t status = nvcompCascadedSelectorConfigure(
+      &opts, getnvcompType<T>(), input_byte_len, &temp);
   throwExceptionIfError(status, "SelectorGetTempSize failed");
 
   this->max_temp_size = temp;
@@ -395,11 +380,11 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
     cudaStream_t stream)
 {
   nvcompCascadedFormatOpts cascadedOpts;
-  nvcompError_t status = nvcompCascadedSelectorSelectConfig(
+  nvcompError_t status = nvcompCascadedSelectorRun(
+      &opts,
+      getnvcompType<T>(),
       input_data,
       input_byte_len,
-      getnvcompType<T>(),
-      opts,
       d_workspace,
       workspace_size,
       &cascadedOpts,
