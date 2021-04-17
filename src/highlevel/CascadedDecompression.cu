@@ -1290,24 +1290,7 @@ nvcompError_t nvcompCascadedDecompressConfigure(
 
     CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
     metadata = new CascadedMetadata(gpuMetadata.copyToHost(stream));
-    cudaStreamSynchronize(stream);
-/*
-    std::unique_ptr<nvcompIntConfig_t> c = generateConfig(metadata);
 
-    // first - optimize the plan
-    c->optimizeLayers();
-    // assign pointers - at this point the nodes map is set
-    for (auto& layer : c->layers) {
-      layer.vals = &c->nodes[layer.valId];
-      layer.output = &c->nodes[layer.outputId];
-      if (layer.runId >= 0) {
-        layer.runs = &c->nodes[layer.runId];
-      }
-    }
-
-    // Return the required temp and output sizes
-    *temp_bytes = c->getWorkspaceBytes();
-*/
     *temp_bytes = metadata->getTempBytes();
     *uncompressed_bytes = metadata->getUncompressedSize();
 
