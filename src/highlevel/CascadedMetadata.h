@@ -251,6 +251,12 @@ public:
     return minValue;
   }
 
+  /**
+   *
+   *
+   */
+  size_t getTempBytes() const;
+
 
   /**
    * @brief Set the main values of the Metadata object and call initialize()

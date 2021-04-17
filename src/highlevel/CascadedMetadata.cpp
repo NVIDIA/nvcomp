@@ -36,6 +36,7 @@
 #include <string>
 
 #include <iostream>
+#include <memory>
 
 namespace nvcomp
 {
@@ -227,6 +228,7 @@ nvcompType_t CascadedMetadata::getDataType(size_t index) const
 
   return m_dataType[index];
 }
+
 
 /******************************************************************************
  * PRIVATE METHODS ************************************************************

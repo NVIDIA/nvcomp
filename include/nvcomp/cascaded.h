@@ -61,9 +61,12 @@ typedef struct
 
 /**
  * @brief Configure the Cascaded compressor and return temp and output
- * sizes needed to perform the compression.
+ * sizes needed to perform the compression.  If no format is provided (i.e., NULL),
+ * temporary and output size estimates are based on the format that would require
+ * the largest allocation.
  *
- * @param format_opts The cascaded format options.
+ * @param format_opts The cascaded format options.  If set to NULL, temporary storage
+ * sizes are allocated to enable running the CascadedSelector during compression.
  * @param type The data type of the uncompressed data.
  * @param uncompressed_bytes The size of the uncompressed data on the device.
  * @param metadata_bytes The bytes needed to store the metadata (output)
@@ -83,11 +86,16 @@ nvcompError_t nvcompCascadedCompressConfigure(
 /**
  * @brief Perform asynchronous compression. The pointers `compressed_ptr` and 
  * `compressed_bytes` must be to preallocated memory directly accessible by the GPU.
+ * If no format is provided (i.e., NULL), the CascadedSelector is also run to determine 
+ * the best compression format and the function synchronizes on the stream.
+ * 
  * 
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *
- * @param format_opts The cascaded format options.
+ * @param format_opts The cascaded format options. If set to NULL, the format
+ * is automatically selected using the CascadedSelector.  In this case,
+ * the function runs synchronously on the CUDA stream.
  * @param type The data type of the uncompressed data.
  * @param uncompressed_ptr The uncompressed data on the device.
  * @param uncompressed_bytes The size of the uncompressed data in bytes.
@@ -132,7 +140,7 @@ void nvcompCascadedDestroyMetadata(void* metadata_ptr);
  *
  * @param compressed_ptr The compressed data on the device.
  * @param compressed_bytes The size of the compressed data in bytes.
- * @param metadata_ptr The null pointer that is to be populated with the metadata
+ * @param metadata_ptr The pointer that is to be populated with the metadata
  * needed to perform decompression.  This function allocates host-side memory and
  * copies the metdata to it.
  * @param metadata_bytes The size of the metadata that this function allocates.

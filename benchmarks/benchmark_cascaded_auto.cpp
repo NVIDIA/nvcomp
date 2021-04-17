@@ -85,13 +85,14 @@ static void run_benchmark(
 
   nvcompError_t status;
 
-  // Get temp size needed for compression
+  // Get temp size, output size, and metadata size needed for compression
   size_t metadata_bytes;
   size_t comp_temp_bytes;
-  size_t comp_out_bytes;
+  size_t* comp_out_bytes;
+  CUDA_CHECK(cudaMallocHost(&comp_out_bytes, sizeof(size_t)));
 
   status = nvcompCascadedCompressConfigure(
-      NULL, getnvcompType<T>(), in_bytes, &metadata_bytes, &comp_temp_bytes, &comp_out_bytes);
+      NULL, getnvcompType<T>(), in_bytes, &metadata_bytes, &comp_temp_bytes, comp_out_bytes);
   benchmark_assert(status == nvcompSuccess, "CompressConfigure not successful");
 
   // Allocate temp workspace
@@ -100,13 +101,13 @@ static void run_benchmark(
 
   // Allocate compressed output buffer
   void* d_comp_out;
-  CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
+  CUDA_CHECK(cudaMalloc(&d_comp_out, *comp_out_bytes));
 
   if (verbose_memory) {
     std::cout << "compression memory (input+output+temp) (B): "
-              << (in_bytes + comp_out_bytes + comp_temp_bytes) << std::endl;
+              << (in_bytes + *comp_out_bytes + comp_temp_bytes) << std::endl;
     std::cout << "compression temp space (B): " << comp_temp_bytes << std::endl;
-    std::cout << "compression output space (B): " << comp_out_bytes
+    std::cout << "compression output space (B): " << *comp_out_bytes
               << std::endl;
   }
   
@@ -121,7 +122,7 @@ static void run_benchmark(
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
-      &comp_out_bytes,
+      comp_out_bytes,
       stream);
 
   benchmark_assert(
@@ -133,9 +134,9 @@ static void run_benchmark(
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
-  std::cout << "comp_size: " << comp_out_bytes
+  std::cout << "comp_size: " << *comp_out_bytes
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
-            << (double)data.size() * sizeof(T) / comp_out_bytes << std::endl;
+            << (double)data.size() * sizeof(T) / *comp_out_bytes << std::endl;
   std::cout << "compression throughput (GB/s): "
             << gbs(start, end, data.size() * sizeof(T)) << std::endl;
 
@@ -146,7 +147,7 @@ static void run_benchmark(
 
   status = nvcompCascadedDecompressConfigure(
       d_comp_out,
-      comp_out_bytes,
+      *comp_out_bytes,
       &metadata_ptr,
       &metadata_bytes,
       &decomp_temp_bytes,
@@ -158,7 +159,7 @@ static void run_benchmark(
 
   if (verbose_memory) {
     std::cout << "decompression memory (input+output+temp) (B): "
-              << (decomp_bytes + comp_out_bytes + decomp_temp_bytes)
+              << (decomp_bytes + *comp_out_bytes + decomp_temp_bytes)
               << std::endl;
     std::cout << "decompression temp space (B): " << decomp_temp_bytes
               << std::endl;
@@ -179,7 +180,7 @@ static void run_benchmark(
   // execute decompression (asynchronous)
   status = nvcompCascadedDecompressAsync(
       d_comp_out,
-      comp_out_bytes,
+      *comp_out_bytes,
       metadata_ptr,
       metadata_bytes,
       d_decomp_temp,

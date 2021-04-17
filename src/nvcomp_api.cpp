@@ -27,6 +27,7 @@
  */
 
 #include "highlevel/BitcompMetadata.h"
+#include "highlevel/CascadedMetadata.h"
 #include "highlevel/Metadata.h"
 
 #include "nvcomp.h"
@@ -59,10 +60,18 @@ nvcompError_t nvcompDecompressGetMetadata(
   }
 #endif
   else {
-// TODO - Restore generic Decompressor functionality in future PRs
-//    return nvcompCascadedDecompressGetMetadata(
-//        in_ptr, in_bytes, metadata_ptr, stream);
-    return nvcompSuccess;
+    size_t temp_bytes;
+    size_t out_bytes;
+    size_t metadata_bytes;
+
+    return nvcompCascadedDecompressConfigure(
+               in_ptr, 
+               in_bytes, 
+               metadata_ptr, 
+               &metadata_bytes, 
+               &temp_bytes, 
+               &out_bytes, 
+               stream);
   }
 }
 
@@ -79,9 +88,9 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
     nvcompBitcompDecompressDestroyMetadata(metadata_ptr);
   }
 #endif
-//  else {
-//    nvcompCascadedDecompressDestroyMetadata(metadata_ptr);
-//  }
+  else {
+    nvcompCascadedDestroyMetadata(metadata_ptr);
+  }
 }
 
 nvcompError_t nvcompDecompressGetTempSize(
@@ -99,7 +108,11 @@ nvcompError_t nvcompDecompressGetTempSize(
     return nvcompErrorNotSupported;
 #endif
   }
-//  return nvcompCascadedDecompressGetTempSize(metadata_ptr, temp_bytes);
+  else {
+    *temp_bytes = static_cast<const CascadedMetadata*>(metadata_ptr)->getTempBytes();
+    return nvcompSuccess;
+
+  }
   return nvcompSuccess;
 }
 
@@ -186,18 +199,17 @@ nvcompError_t nvcompDecompressAsync(
   }
 
   else {
-/*
+    size_t metadata_bytes = 0;
     return nvcompCascadedDecompressAsync(
         in_ptr,
         in_bytes,
+        metadata_ptr,
+        metadata_bytes,
         temp_ptr,
         temp_bytes,
-        metadata_ptr,
         out_ptr,
         out_bytes,
         stream);
-*/
-    return nvcompSuccess;
   }
 
 }

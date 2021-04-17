@@ -277,10 +277,7 @@ template <typename T>
 inline size_t CascadedCompressor<T>::get_exact_output_size(
     void* const /*comp_temp*/, const size_t /*comp_temp_bytes*/)
 {
-  if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    throw "Exact output size not currently supported";
-    return 0;
-  }
+  throw "Exact output size not currently supported";
   return 0;
 }
 
