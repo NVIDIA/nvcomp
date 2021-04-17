@@ -1267,28 +1267,6 @@ using namespace nvcomp;
 using namespace nvcomp::highlevel;
 
 
-nvcompError_t nvcompCascadedQueryMetadataAsync(
-    const void * compressed_ptr,
-    size_t compressed_bytes,
-    void * metadata_ptr,
-    size_t metadata_bytes,
-    cudaStream_t stream) {
-
-  try {
-    CHECK_NOT_NULL(compressed_ptr);
-    CHECK_NOT_NULL(metadata_ptr);
-
-    CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
-    gpuMetadata.copyToHost(metadata_ptr, stream);
-
-  } catch (const std::exception& e) {
-    return Check::exception_to_error(
-        e, "nvcompCascadedQueryMetadataAsync()");
-  }
-
-  return nvcompSuccess;
-}
-
 void nvcompCascadedDestroyMetadata(void* const metadata_ptr)
 {
   CascadedMetadata* metadata = static_cast<CascadedMetadata*>(metadata_ptr);
@@ -1310,14 +1288,9 @@ nvcompError_t nvcompCascadedDecompressConfigure(
 
     CascadedMetadata* metadata;
 
-    if(*metadata_ptr == NULL) { // Extract metadata if not provided
-      CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
-      metadata = new CascadedMetadata(gpuMetadata.copyToHost(stream));
-      cudaStreamSynchronize(stream);
-    }
-    else {
-      metadata = (CascadedMetadata*)(*metadata_ptr);
-    }
+    CascadedMetadataOnGPU gpuMetadata((void*)compressed_ptr, compressed_bytes);
+    metadata = new CascadedMetadata(gpuMetadata.copyToHost(stream));
+    cudaStreamSynchronize(stream);
 
     std::unique_ptr<nvcompIntConfig_t> c = generateConfig(metadata);
 
@@ -1337,6 +1310,8 @@ nvcompError_t nvcompCascadedDecompressConfigure(
     *uncompressed_bytes = metadata->getUncompressedSize();
 
     *metadata_ptr = (void*)metadata;
+
+    *metadata_bytes = sizeof(CascadedMetadata);
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(

@@ -113,19 +113,11 @@ int test_rle_delta(void)
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
-  // select compression algorithm
-  // Get metadata
-  void* metadata_ptr;
-  cudaMallocHost(&metadata_ptr, metadata_bytes);
-  status = nvcompCascadedQueryMetadataAsync(
-      d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
-  REQUIRE(status == nvcompSuccess);
-
-// Perform Decompression using existing Metadata
 
   // get temp and output size
   size_t temp_bytes;
   size_t output_bytes;
+  void* metadata_ptr = NULL;
 
   status = nvcompCascadedDecompressConfigure(
       d_comp_out, 
@@ -135,6 +127,7 @@ int test_rle_delta(void)
       &temp_bytes,
       &output_bytes,
       stream);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate temp buffer
   void* temp_ptr;
@@ -158,7 +151,7 @@ int test_rle_delta(void)
 
   CUDA_CHECK(cudaDeviceSynchronize());
 
-  cudaFree(metadata_ptr);
+  nvcompCascadedDestroyMetadata(metadata_ptr);
 
   // Copy result back to host
   int res[16];
@@ -232,13 +225,6 @@ int test_rle_delta_bp(void)
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
-  // select compression algorithm
-  // Get metadata
-  void* metadata_ptr;
-  cudaMallocHost(&metadata_ptr, metadata_bytes);
-  status = nvcompCascadedQueryMetadataAsync(
-      d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
-  REQUIRE(status == nvcompSuccess);
 
 
 // Perform Decompression using existing Metadata
@@ -246,6 +232,7 @@ int test_rle_delta_bp(void)
   // get temp and output size
   size_t temp_bytes;
   size_t output_bytes;
+  void* metadata_ptr = NULL;
 
   status = nvcompCascadedDecompressConfigure(
       d_comp_out, 
@@ -255,6 +242,7 @@ int test_rle_delta_bp(void)
       &temp_bytes,
       &output_bytes,
       stream);
+  REQUIRE(status == nvcompSuccess);
 
   // allocate temp buffer
   void* temp_ptr;
@@ -357,13 +345,6 @@ int test_ones_init_data(void)
         cudaFree(d_comp_temp);
         cudaFree(d_in_data);
       
-        // select compression algorithm
-        // Get metadata
-        void* metadata_ptr;
-        cudaMallocHost(&metadata_ptr, metadata_bytes);
-        status = nvcompCascadedQueryMetadataAsync(
-            d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
-        REQUIRE(status == nvcompSuccess);
       
       
       // Perform Decompression using existing Metadata
@@ -371,6 +352,7 @@ int test_ones_init_data(void)
         // get temp and output size
         size_t temp_bytes;
         size_t output_bytes;
+        void* metadata_ptr = NULL;
       
         status = nvcompCascadedDecompressConfigure(
             d_comp_out, 
@@ -380,6 +362,7 @@ int test_ones_init_data(void)
             &temp_bytes,
             &output_bytes,
             stream);
+        REQUIRE(status == nvcompSuccess);
       
         // allocate temp buffer
         void* temp_ptr;

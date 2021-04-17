@@ -155,15 +155,8 @@ static void run_benchmark(
   std::cout << "compression throughput (GB/s): "
             << gbs(start, end, data.size() * sizeof(T)) << std::endl;
 
-  void* metadata_ptr;
-  cudaMallocHost(&metadata_ptr, metadata_bytes);
-
-  // get metadata from compressed data on GPU
-  status = nvcompCascadedQueryMetadataAsync(
-      d_comp_out, comp_out_bytes, metadata_ptr, metadata_bytes, stream);
-  benchmark_assert(status == nvcompSuccess, "Failed to get metadata");
-
-  // get temp size
+  // get metadata, temp, and output sizes
+  void* metadata_ptr = NULL;
   size_t decomp_temp_bytes;
   size_t decomp_bytes;
   status = nvcompCascadedDecompressConfigure(
@@ -218,7 +211,7 @@ static void run_benchmark(
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
-  cudaFree(metadata_ptr);
+  nvcompCascadedDestroyMetadata(metadata_ptr);
   cudaStreamDestroy(stream);
   cudaFree(d_decomp_temp);
   cudaFree(d_comp_out);
