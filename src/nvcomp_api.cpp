@@ -62,8 +62,17 @@ nvcompError_t nvcompDecompressGetMetadata(
   }
 #ifdef ENABLE_BITCOMP
   else if (nvcompIsBitcompData(in_ptr, in_bytes)) {
-    return nvcompBitcompDecompressGetMetadata(
-        in_ptr, in_bytes, metadata_ptr, stream);
+    size_t temp_bytes;
+    size_t out_bytes;
+    size_t metadata_bytes;
+    return nvcompBitcompDecompressConfigure(
+        in_ptr,
+        in_bytes,
+        metadata_ptr,
+        &metadata_bytes,
+        &temp_bytes,
+        &out_bytes,
+        stream);
   }
 #endif
   else {
@@ -92,7 +101,7 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
   }
 #ifdef ENABLE_BITCOMP
   else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
-    nvcompBitcompDecompressDestroyMetadata(metadata_ptr);
+    nvcompBitcompDestroyMetadata(metadata_ptr);
   }
 #endif
   else {
@@ -122,10 +131,10 @@ nvcompError_t nvcompDecompressGetTempSize(
     return nvcompSuccess;
   }
   else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
-#ifdef ENABLE_BITCOMP
-    return nvcompBitcompDecompressGetTempSize (metadata_ptr, temp_bytes);
-#else
     *temp_bytes = 0;
+#ifdef ENABLE_BITCOMP
+    return nvcompSuccess;
+#else
     return nvcompErrorNotSupported;
 #endif
   }
@@ -134,7 +143,6 @@ nvcompError_t nvcompDecompressGetTempSize(
     return nvcompSuccess;
 
   }
-  return nvcompSuccess;
 }
 
 nvcompError_t nvcompDecompressGetOutputSize(
@@ -206,12 +214,14 @@ nvcompError_t nvcompDecompressAsync(
   }
   else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
 #ifdef ENABLE_BITCOMP
+    const size_t metadata_bytes = sizeof(BitcompMetadata);
     return nvcompBitcompDecompressAsync(
         in_ptr,
         in_bytes,
+        metadata_ptr,
+        metadata_bytes,
         temp_ptr,
         temp_bytes,
-        metadata_ptr,
         out_ptr,
         out_bytes,
         stream);

@@ -49,71 +49,54 @@
 using namespace nvcomp;
 using namespace nvcomp::highlevel;
 
-nvcompError_t nvcompBitcompDecompressGetMetadata(
-    const void* const in_ptr,
-    const size_t in_bytes,
-    void** const metadata_ptr,
-    cudaStream_t stream)
-{
-  if (cudaStreamSynchronize(stream) != cudaSuccess) {
-    return nvcompErrorCudaError;
-  }
-  try {
-    CHECK_NOT_NULL(metadata_ptr);
-    *metadata_ptr = new BitcompMetadata(in_ptr, in_bytes);
-  } catch (std::exception& e) {
-    return Check::exception_to_error(e, "nvcompBitcompDecompressGetMetadata()");
-  }
-  return nvcompSuccess;
-}
-
-void nvcompBitcompDecompressDestroyMetadata(void* const metadata_ptr)
+void nvcompBitcompDestroyMetadata(void* const metadata_ptr)
 {
   delete static_cast<BitcompMetadata*>(metadata_ptr);
 }
 
-nvcompError_t
-nvcompBitcompDecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes)
-{
-  // Unused variables kept for consistency. Silence unused warnings
-  (void)metadata_ptr;
-  *temp_bytes = 0;
-  return nvcompSuccess;
-}
-
-nvcompError_t nvcompBitcompDecompressGetOutputSize(
-    const void* metadata_ptr, size_t* output_bytes)
+nvcompError_t nvcompBitcompDecompressConfigure(
+    const void* compressed_ptr,
+    size_t compressed_bytes,
+    void** metadata_ptr,
+    size_t* metadata_bytes,
+    size_t* temp_bytes,
+    size_t* uncompressed_bytes,
+    cudaStream_t stream)
 {
   try {
     CHECK_NOT_NULL(metadata_ptr);
-    CHECK_NOT_NULL(output_bytes);
-    const BitcompMetadata* metadata
-        = static_cast<const BitcompMetadata*>(metadata_ptr);
-    *output_bytes = metadata->getUncompressedSize();
+
+    // as Bitcomp pulls the metadata from the default stream, sync the
+    // current stream first.
+    CudaUtils::sync(stream);
+    *metadata_ptr = new BitcompMetadata(compressed_ptr, compressed_bytes);
+    *metadata_bytes = sizeof(BitcompMetadata);
+
+    *temp_bytes = 0;
+    *uncompressed_bytes = reinterpret_cast<BitcompMetadata*>(*metadata_ptr)
+                              ->getUncompressedSize();
   } catch (std::exception& e) {
-    return Check::exception_to_error(
-        e, "nvcompBitcompDecompressGetOutputSize()");
+    return Check::exception_to_error(e, "nvcompBitcompDecompressConfigure()");
   }
   return nvcompSuccess;
 }
 
 nvcompError_t nvcompBitcompDecompressAsync(
-    const void* in_ptr,
+    const void* const in_ptr,
     size_t in_bytes,
-    void* temp_ptr,
-    size_t temp_bytes,
-    void* metadata_ptr,
-    void* out_ptr,
+    void* const metadata_ptr,
+    const size_t /* metadata_bytes */,
+    void* const /* temp_ptr */,
+    const size_t /* temp_bytes */,
+    void* const out_ptr,
     size_t out_bytes,
     cudaStream_t stream)
 {
-  // Unused variables kept for consistency. Silence unused warnings
-  (void)temp_ptr;
-  (void)temp_bytes;
   try {
     CHECK_NOT_NULL(in_ptr);
     CHECK_NOT_NULL(out_ptr);
     CHECK_NOT_NULL(metadata_ptr);
+
     BitcompMetadata* metadata = static_cast<BitcompMetadata*>(metadata_ptr);
     if (metadata->getCompressedSize() > in_bytes
         || metadata->getUncompressedSize() > out_bytes) {
@@ -127,62 +110,45 @@ nvcompError_t nvcompBitcompDecompressAsync(
         != BITCOMP_SUCCESS)
       return nvcompErrorInternal;
   } catch (std::exception& e) {
-    return Check::exception_to_error(
-        e, "nvcompBitcompDecompressGetOutputSize()");
+    return Check::exception_to_error(e, "nvcompBitcompDecompressAsync()");
   }
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBitcompCompressGetTempSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    size_t* temp_bytes)
+nvcompError_t nvcompBitcompCompressConfigure(
+    const nvcompBitcompFormatOpts* const /* opts */,
+    const nvcompType_t /* in_type */,
+    const size_t in_bytes,
+    size_t* const metadata_bytes,
+    size_t* const temp_bytes,
+    size_t* const max_compressed_bytes)
 {
-  // Unused variables kept for consistency. Silence unused warnings
-  (void)in_ptr;
-  (void)in_bytes;
-  (void)in_type;
-  *temp_bytes = 0;
-  return nvcompSuccess;
-}
+  try {
+    CHECK_NOT_NULL(metadata_bytes);
+    CHECK_NOT_NULL(temp_bytes);
+    CHECK_NOT_NULL(max_compressed_bytes);
 
-nvcompError_t nvcompBitcompCompressGetOutputSize(
-    const void* in_ptr,
-    size_t in_bytes,
-    nvcompType_t in_type,
-    const nvcompBitcompFormatOpts* format_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
-    size_t* out_bytes,
-    int exact_out_bytes)
-{
-  // Unused variables kept for consistency. Silence unused warnings
-  (void)in_ptr;
-  (void)in_type;
-  (void)format_opts;
-  (void)temp_ptr;
-  (void)temp_bytes;
-  if (exact_out_bytes)
-    return nvcompErrorNotSupported;
-  *out_bytes = bitcompMaxBuflen(in_bytes);
+    *metadata_bytes = sizeof(BitcompMetadata);
+    *temp_bytes = 0;
+    *max_compressed_bytes = bitcompMaxBuflen(in_bytes);
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(e, "nvcompBitcompCompressConfigure()");
+  }
+
   return nvcompSuccess;
 }
 
 nvcompError_t nvcompBitcompCompressAsync(
+    const nvcompBitcompFormatOpts* format_opts,
+    nvcompType_t in_type,
     const void* in_ptr,
     size_t in_bytes,
-    nvcompType_t in_type,
-    const nvcompBitcompFormatOpts* format_opts,
-    void* temp_ptr,
-    size_t temp_bytes,
+    void* /* temp_ptr */,
+    size_t /* temp_bytes */,
     void* out_ptr,
     size_t* out_bytes,
     cudaStream_t stream)
 {
-  // Unused variables kept for consistency. Silence unused warnings
-  (void)temp_ptr;
-  (void)temp_bytes;
   bitcompDataType_t dataType;
   switch (in_type) {
   case NVCOMP_TYPE_CHAR:

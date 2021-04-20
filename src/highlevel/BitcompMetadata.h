@@ -30,7 +30,7 @@
 #define NVCOMP_BITCOMPMETADATA_H
 
 #ifdef ENABLE_BITCOMP
-#include "bitcomp.h"
+#include <bitcomp.h>
 #else
 typedef int bitcompHandle_t;
 #endif
