@@ -191,6 +191,9 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t comp_temp_bytes;
   status = nvcompBatchedLZ4CompressGetTempSize(
       chunk_size, input_data.size(), &comp_temp_bytes);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4CompressGetTempSize() failed.");
+  }
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -198,6 +201,10 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t max_out_bytes;
   status = nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
       chunk_size, &max_out_bytes);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4GetMaxOutputChunkSize() failed.");
+  }
+
   BatchData compress_data(max_out_bytes, input_data.size());
 
   cudaStream_t stream;
@@ -218,6 +225,9 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
       compress_data.ptrs(),
       compress_data.sizes(),
       stream);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4CompressAsync() failed.");
+  }
 
   cudaEventRecord(end, stream);
 
@@ -257,6 +267,9 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   size_t decomp_temp_bytes;
   status = nvcompBatchedLZ4DecompressGetTempSize(
       compress_data.size(), chunk_size, &decomp_temp_bytes);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4DecompressGetTempSize() failed.");
+  }
 
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
@@ -273,8 +286,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
       decomp_temp_bytes,
       input_data.ptrs(),
       stream);
-    
-  benchmark_assert(status == nvcompSuccess, "LZ4Decompress not successful");
+  benchmark_assert(status == nvcompSuccess, "nvcompBatchedLZ4DecompressAsync() not successful");
 
   cudaEventRecord(end, stream);
 

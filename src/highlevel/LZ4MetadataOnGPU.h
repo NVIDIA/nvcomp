@@ -49,6 +49,16 @@ public:
   static size_t getSerializedSizeOf(const LZ4Metadata& metadata);
 
   /**
+   * @brief Get the serialized size a metadata object with the given number of
+   * chunks would occupy on the GPU.
+   *
+   * @param num_chunks The number of chunks in the metadata.
+   *
+   * @return The size in bytes that would be occupied.
+   */
+  static size_t getSerializedSizeBasedOnChunks(size_t num_chunks);
+
+  /**
    * @brief Get the offset from the start of the metadata, to where the first
    * chunk of compressed data is stored.
    *
@@ -83,6 +93,8 @@ public:
 
   const size_t* compressed_prefix_ptr() const;
 
+  void save_output_size(size_t* device_size, cudaStream_t stream) const;
+
   /**
    * @brief Get a copy of the metadata on the CPU. This syncs with this stream.
    *
@@ -97,11 +109,13 @@ protected:
 
   void set_serialized_size(const size_t size);
 
+  void set_num_chunks(const size_t chunks);
+
 private:
   const void* m_ptr;
-  size_t m_maxSize;
-  size_t m_numChunks;
-  size_t m_serializedSize;
+  size_t m_max_size;
+  size_t m_num_chunks;
+  size_t m_serialized_size;
 };
 
 } // namespace highlevel

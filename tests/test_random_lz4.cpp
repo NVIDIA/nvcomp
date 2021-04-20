@@ -86,10 +86,15 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
         = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
+    size_t* comp_out_bytes_ptr;
+    CUDA_CHECK(cudaMallocHost(
+        (void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr)));
+
     compressor.compress_async(
-        d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
+        d_comp_temp, comp_temp_bytes, d_comp_out, comp_out_bytes_ptr, stream);
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
+    comp_out_bytes = *comp_out_bytes_ptr;
 
     cudaFree(d_comp_temp);
     cudaFree(d_in_data);

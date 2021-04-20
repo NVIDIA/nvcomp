@@ -28,7 +28,9 @@
 
 #include "highlevel/BitcompMetadata.h"
 #include "highlevel/CascadedMetadata.h"
+#include "highlevel/LZ4Metadata.h"
 #include "highlevel/Metadata.h"
+#include "Check.h"
 
 #include "nvcomp.h"
 #include "nvcomp/cascaded.h"
@@ -36,8 +38,6 @@
 #include "nvcomp/bitcomp.h"
 
 #include <iostream>
-
-// TODO: these all assume cascaded is being used
 
 using namespace nvcomp;
 using namespace nvcomp::highlevel;
@@ -50,8 +50,15 @@ nvcompError_t nvcompDecompressGetMetadata(
 {
   cudaStreamSynchronize(stream);
   if (LZ4IsData(in_ptr, in_bytes, stream)) {
-    return nvcompLZ4DecompressGetMetadata(
-        in_ptr, in_bytes, metadata_ptr, stream);
+    size_t metadata_bytes, temp_bytes, uncompressed_bytes;
+    return nvcompLZ4DecompressConfigure(
+        in_ptr,
+        in_bytes,
+        metadata_ptr,
+        &metadata_bytes,
+        &temp_bytes,
+        &uncompressed_bytes,
+        stream);
   }
 #ifdef ENABLE_BITCOMP
   else if (nvcompIsBitcompData(in_ptr, in_bytes)) {
@@ -81,7 +88,7 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
 #endif
   if (LZ4IsMetadata(metadata_ptr)) {
-    nvcompLZ4DecompressDestroyMetadata(metadata_ptr);
+    nvcompLZ4DestroyMetadata(metadata_ptr);
   }
 #ifdef ENABLE_BITCOMP
   else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
@@ -98,7 +105,21 @@ nvcompError_t nvcompDecompressGetTempSize(
 {
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
   if (LZ4IsMetadata(metadata_ptr)) {
-    return nvcompLZ4DecompressGetTempSize(metadata_ptr, temp_bytes);
+    try {
+      size_t metadata_bytes = sizeof(LZ4Metadata);
+      size_t uncompressed_bytes;
+      CHECK_API_CALL(nvcompLZ4DecompressConfigure(
+          nullptr,
+          metadata_bytes,
+          (void**)&metadata_ptr,
+          &metadata_bytes,
+          temp_bytes,
+          &uncompressed_bytes,
+          0));
+    } catch (const std::exception& e) {
+      return Check::exception_to_error(e, "nvcompDecompressGetTempSize()");
+    }
+    return nvcompSuccess;
   }
   else if (metadata->getCompressionType() == BitcompMetadata::COMPRESSION_ID) {
 #ifdef ENABLE_BITCOMP
@@ -175,9 +196,10 @@ nvcompError_t nvcompDecompressAsync(
     return nvcompLZ4DecompressAsync(
         in_ptr,
         in_bytes,
+        metadata_ptr,
+        0,
         temp_ptr,
         temp_bytes,
-        metadata_ptr,
         out_ptr,
         out_bytes,
         stream);

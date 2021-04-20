@@ -60,6 +60,12 @@ public:
     *ptr = reinterpret_cast<T*>(reserve(alignof(T), num, sizeof(T)));
   }
 
+  void reserve(void** ptr, const size_t num)
+  {
+    // Make sure we still align to 8 bytes
+    *ptr = reserve(alignof(size_t), num, 1);
+  }
+
   /**
    * @brief Get the number of bytes remaining in this temp space.
    *

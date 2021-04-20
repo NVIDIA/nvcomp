@@ -31,36 +31,19 @@ namespace nvcomp
 namespace lowlevel
 {
 
-// Deprecated
 /**
  * @brief Compress a batch of memory locations.
  *
  * @param decomp_data The batch items to compress.
  * @param decomp_sizes The size of each batch item to compress.
  * @param batch_size The number of items in the batch.
- * @param max_chunk_size The number of uncompressed bytes per LZ4 compressed
- * chunk.
  * @param temp_data The temporary memory to use.
  * @param temp_bytes The size of the temporary memory.
  * @param comp_data The output location of each batch item.
- * @param comp_prefixes The size of each compressed chunk (output).
- * @param comp_prefix_offset_host
+ * @param comp_sizes
  * @param stream The stream to operate on.
  */
-void lz4CompressBatch(
-    const uint8_t* const* decomp_data_device,
-    const size_t* decomp_sizes_device,
-    const size_t* decomp_sizes_host,
-    const size_t batch_size,
-    const size_t max_chunk_size,
-    uint8_t* temp_data,
-    size_t temp_bytes,
-    uint8_t* const* comp_data_device,
-    size_t* const* comp_prefixes_device,
-    const size_t* const comp_prefix_offset_device,
-    cudaStream_t stream);
-
-void lz4CompressBatch(
+void lz4BatchCompress(
     const uint8_t* const* decomp_data_device,
     const size_t* decomp_sizes_device,
     const size_t batch_size,
@@ -68,18 +51,6 @@ void lz4CompressBatch(
     size_t temp_bytes,
     uint8_t* const* comp_data_device,
     size_t* const comp_sizes_device,
-    cudaStream_t stream);
-
-// Deprecated
-void lz4DecompressBatches(
-    void* const temp_space,
-    const size_t temp_size,
-    void* const* decompData,
-    const uint8_t* const* compData,
-    int batch_size,
-    const size_t* const* compPrefix,
-    int chunk_size,
-    const int* chunks_in_item,
     cudaStream_t stream);
 
 void lz4BatchDecompress(
@@ -96,10 +67,6 @@ size_t lz4ComputeChunksInBatch(
     const size_t* const decomp_data_size,
     const size_t batch_size,
     const size_t chunk_size);
-
-// Deprecated
-size_t lz4CompressComputeTempSize(
-    const size_t max_chunks_in_batch, const size_t chunk_size);
 
 size_t lz4BatchCompressComputeTempSize(
     const size_t max_chunk_size, const size_t batch_size);

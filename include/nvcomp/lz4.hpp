@@ -107,8 +107,8 @@ private:
    * @param temp_ptr The temporary workspace on the device.
    * @param temp_bytes The size of the temporary workspace.
    * @param out_ptr The output location the the device (for compressed data).
-   * @param out_bytes The size of the output location on the device on input,
-   * and the size of the compressed data on output.
+   * @param out_bytes The size of the compressed data (output). Must be device
+   * accessible.
    * @param stream The stream to operate on.
    *
    * @throw NVCompException If compression fails to launch on the stream.
@@ -139,13 +139,14 @@ inline LZ4Compressor<T>::LZ4Compressor(
 template <typename T>
 inline size_t LZ4Compressor<T>::get_temp_size()
 {
-  size_t comp_temp_bytes;
-  nvcompError_t status = nvcompLZ4CompressGetTempSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
+  size_t comp_temp_bytes, metadata_bytes, out_bytes;
+  nvcompError_t status = nvcompLZ4CompressConfigure(
       &m_opts,
-      &comp_temp_bytes);
+      this->get_type(),
+      this->get_uncompressed_size(),
+      &metadata_bytes,
+      &comp_temp_bytes,
+      &out_bytes);
   throwExceptionIfError(status, "GetTempSize failed");
 
   return comp_temp_bytes;
@@ -153,41 +154,26 @@ inline size_t LZ4Compressor<T>::get_temp_size()
 
 template <typename T>
 inline size_t LZ4Compressor<T>::get_exact_output_size(
-    void* const comp_temp, const size_t comp_temp_bytes)
+    void* const /* comp_temp */, const size_t /* comp_temp_bytes */)
 {
-  size_t comp_out_bytes;
-  nvcompError_t status = nvcompLZ4CompressGetOutputSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
-      comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      true);
-  throwExceptionIfError(status, "LZ4CompressGetOutputSize() for exact failed");
-
-  return comp_out_bytes;
+  throw NVCompException(nvcompErrorNotSupported, "Unimplemented");
 }
 
 template <typename T>
 inline size_t LZ4Compressor<T>::get_max_output_size(
-    void* const comp_temp, const size_t comp_temp_bytes)
+    void* const /* comp_temp */, const size_t /* comp_temp_bytes */)
 {
-  size_t comp_out_bytes;
-  nvcompError_t status = nvcompLZ4CompressGetOutputSize(
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
-      this->get_type(),
+  size_t comp_temp_bytes, metadata_bytes, out_bytes;
+  nvcompError_t status = nvcompLZ4CompressConfigure(
       &m_opts,
-      comp_temp,
-      comp_temp_bytes,
-      &comp_out_bytes,
-      false);
-  throwExceptionIfError(
-      status, "LZ4CompressGetOutputSize() for in exact failed");
+      this->get_type(),
+      this->get_uncompressed_size(),
+      &metadata_bytes,
+      &comp_temp_bytes,
+      &out_bytes);
+  throwExceptionIfError(status, "get_mx_output_size failed");
 
-  return comp_out_bytes;
+  return out_bytes;
 }
 
 template <typename T>
@@ -199,10 +185,10 @@ inline void LZ4Compressor<T>::do_compress(
     cudaStream_t stream)
 {
   nvcompError_t status = nvcompLZ4CompressAsync(
+      &m_opts,
+      this->get_type(),
       this->get_uncompressed_data(),
       this->get_uncompressed_size(),
-      this->get_type(),
-      &m_opts,
       temp_ptr,
       temp_bytes,
       out_ptr,

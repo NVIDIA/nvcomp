@@ -67,7 +67,7 @@ LZ4Metadata::LZ4Metadata(
     m_version(0),
     m_chunkOffsets()
 {
-  // TODO - error checking for byte sizes
+  check();
 }
 
 LZ4Metadata::LZ4Metadata(const void* const memPtr, size_t compressedBytes) :
@@ -120,6 +120,26 @@ size_t LZ4Metadata::getMetadataSize() const
 size_t* LZ4Metadata::getOffsetArray()
 {
   return m_chunkOffsets.data();
+}
+
+void LZ4Metadata::check() const
+{
+  // verify everything makes sense
+  if (getNumChunks() > 0) {
+    if ((getNumChunks() - 1) * getUncompChunkSize() > getUncompressedSize()
+        || getNumChunks() * getUncompChunkSize() < getUncompressedSize()) {
+      throw std::runtime_error(
+          "Invalid LZ4Metadata: The uncompressed size of "
+          + std::to_string(getUncompressedSize()) + " and "
+          + std::to_string(getNumChunks()) + " chunks of size "
+          + std::to_string(getUncompChunkSize()) + " does not match.");
+    }
+  } else if (getUncompressedSize() != 0) {
+    throw std::runtime_error(
+        "Invalid LZ4Metadata: When there are zero "
+        "chunks, the uncompressed size must also be zero, but found "
+        + std::to_string(getUncompressedSize()));
+  }
 }
 
 } // namespace highlevel
