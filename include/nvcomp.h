@@ -39,9 +39,9 @@ extern "C" {
  * CONSTANTS ******************************************************************
  *****************************************************************************/
 
-#define NVCOMP_MAJOR_VERSION 1
-#define NVCOMP_MINOR_VERSION 2
-#define NVCOMP_PATCH_VERSION 3
+#define NVCOMP_MAJOR_VERSION 2
+#define NVCOMP_MINOR_VERSION 0
+#define NVCOMP_PATCH_VERSION 0
 
 typedef enum nvcompError_t
 {
