@@ -77,12 +77,18 @@ public:
   size_t get_temp_size() override
   {
     size_t temp_bytes;
-    nvcompError_t status = nvcompBitcompCompressGetTempSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
+    size_t max_out_bytes;
+    size_t metadata_bytes;
+    nvcompBitcompFormatOpts opts{m_algorithm};
+
+    nvcompError_t status = nvcompBitcompCompressConfigure(
+        &opts,
         this->get_type(),
-        &temp_bytes);
-    throwExceptionIfError(status, "get_temp_size failed");
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &temp_bytes,
+        &max_out_bytes);
+    throwExceptionIfError(status, "nvcompBitcompCompressConfigure() failed");
     return temp_bytes;
   }
 
@@ -103,22 +109,12 @@ public:
    *
    * @throw NVCompressionException will always be thrown.
    */
-  size_t get_exact_output_size(void* comp_temp, size_t comp_temp_bytes) override
+  size_t get_exact_output_size(
+      void* /*comp_temp*/, size_t /*comp_temp_bytes*/) override
   {
-    nvcompBitcompFormatOpts opts;
-    opts.algorithm_type = m_algorithm;
-    size_t out_bytes;
-    nvcompError_t status = nvcompBitcompCompressGetOutputSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        this->get_type(),
-        &opts,
-        comp_temp,
-        comp_temp_bytes,
-        &out_bytes,
-        1);
-    throwExceptionIfError(status, "get_exact_output_size failed");
-    return out_bytes;
+    throwExceptionIfError(nvcompErrorNotSupported, "get_exact_output_size");
+    // should be unreachable
+    return nvcompErrorNotSupported;
   }
 
   /**
@@ -131,22 +127,23 @@ public:
    *
    * @return The maximum size in bytes.
    */
-  size_t get_max_output_size(void* comp_temp, size_t comp_temp_bytes) override
+  size_t
+  get_max_output_size(void* /*comp_temp*/, size_t /*comp_temp_bytes*/) override
   {
-    nvcompBitcompFormatOpts opts;
-    opts.algorithm_type = m_algorithm;
-    size_t out_bytes;
-    nvcompError_t status = nvcompBitcompCompressGetOutputSize(
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        this->get_type(),
+    size_t temp_bytes;
+    size_t max_out_bytes;
+    size_t metadata_bytes;
+    nvcompBitcompFormatOpts opts{m_algorithm};
+
+    nvcompError_t status = nvcompBitcompCompressConfigure(
         &opts,
-        comp_temp,
-        comp_temp_bytes,
-        &out_bytes,
-        0);
-    throwExceptionIfError(status, "get_max_output_size failed");
-    return out_bytes;
+        this->get_type(),
+        this->get_uncompressed_size(),
+        &metadata_bytes,
+        &temp_bytes,
+        &max_out_bytes);
+    throwExceptionIfError(status, "nvcompBitcompCompressConfigure() failed");
+    return max_out_bytes;
   }
 
 private:
@@ -172,10 +169,10 @@ private:
     nvcompBitcompFormatOpts opts;
     opts.algorithm_type = m_algorithm;
     nvcompError_t status = nvcompBitcompCompressAsync(
+        &opts,
+        this->get_type(),
         this->get_uncompressed_data(),
         this->get_uncompressed_size(),
-        this->get_type(),
-        &opts,
         temp_ptr,
         temp_bytes,
         out_ptr,
