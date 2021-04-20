@@ -73,15 +73,16 @@ int LZ4IsData(const void* const in_ptr, size_t in_bytes, cudaStream_t stream);
 int LZ4IsMetadata(const void* const metadata_ptr);
 
 /**
- * @brief Configure an LZ4 compressor.
+ * @brief Configure an LZ4 compressor and return temp and output sizes needed
+ * to perform the compression. If no format is provided (i.e., NULL),
+ * the default options will be used.
  *
- * @param format_opts The LZ4 options to use, can be null to use default
- * options.
- * @param in_type The type being compressed.
- * @param uncompressed_bytes The size of the input in bytes.
- * @param metadata_bytes The size of the metadata (output).
- * @param temp_bytes The temporary workspace required (output).
- * @param max_compressed_bytes The output space required (output).
+ * @param format_opts The LZ4 format options, may be NULL to use defaults.
+ * @param type The data type of the uncompressed data.
+ * @param uncompressed_bytes The size of the uncompressed data on the device.
+ * @param metadata_bytes The bytes needed to store the metadata (output)
+ * @param temp_bytes The temporary memory required for compression (output)
+ * @param compressed_bytes The estaimted size of the compressed result (output)
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
@@ -94,12 +95,14 @@ nvcompError_t nvcompLZ4CompressConfigure(
     size_t* max_compressed_bytes);
 
 /**
- * @brief Perform the asynchronous decompression.
+ * @brief Perform asynchronous compression. The pointers `compressed_ptr` and
+ * `compressed_bytes` must be to preallocated memory directly accessible by the
+ * GPU. If no format is provided (i.e., NULL), the default options will be used.
  *
  * @param format_opts The LZ4 options to use, must match those passed to
  * nvcompLZ4CompressConfigure(). This can be null to use the default options.
  * @param in_type The type being compressed.
- * @param uncompressed_ptr The uncompressed data on the device to compress.
+ * @param uncompressed_ptr The uncompressed data on the device.
  * @param uncompressed_bytes The size of the compressed data in bytes.
  * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace in bytes.
@@ -122,19 +125,21 @@ nvcompError_t nvcompLZ4CompressAsync(
     cudaStream_t stream);
 
 /**
- * @brief Get the configuration for decompressing the given data. This function
- * will synchronize with the given stream, and copy the metadata from the
- * compressed data on the GPU to the CPU. The resulting metadata will need to
- * be freed with nvcompLZ4DestroyMetadata().
+ * @brief Configure the decompression and get the output and temp sizes
+ * needed to perform the decompression. This function allocates host-side
+ * memory, synchronizes the provided CUDA stream, and blocks CPU execution until
+ * the metadata is extracted and copied from the `compressed_ptr`.
  *
- * @param compressed_ptr The compressed data on the GPU.
- * @param compressed_bytes The size of the compressed data.
- * @param metadata_ptr The pointer to the location of the metadata (output).
- * @param metadata_bytes The size of the metadata object in bytes (output).
- * @param temp_bytes The size of the temporary workspace required (output).
- * @param uncompressed_bytes The size of the uncompressed data (output).
- * @param stream The cuda stream to operate on, if the metadata must be fetched.
- * Otherwise, if the metadata is provided, this is unused.
+ * @param compressed_ptr The compressed data on the device.
+ * @param compressed_bytes The size of the compressed data in bytes.
+ * @param metadata_ptr The pointer that is to be populated with the metadata
+ * needed to perform decompression.  This function allocates host-side memory
+ * and copies the metdata to it.
+ * @param metadata_bytes The size of the metadata that this function allocates.
+ * @param temp_bytes The size of the temporary workspace in bytes.
+ * @param uncompressed_bytes The required size of the output location in bytes
+ * (output).
+ * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
@@ -148,15 +153,16 @@ nvcompError_t nvcompLZ4DecompressConfigure(
     cudaStream_t stream);
 
 /**
- * @brief Decompress the data on the GPU asynchronously.
+ * @brief Perform the asynchronous decompression.
  *
- * @param compressed_ptr The compressed data on the GPU.
+ * @param compressed_ptr The compressed data on the device.
  * @param compressed_bytes The size of the compressed data.
- * @param metadata_ptr The metadata.
+ * @param metadata_ptr The metadata (accessible by host).
  * @param metadata_bytes The size of the metadata.
- * @param temp_ptr The temporary workspace on the GPU.
+ * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace.
- * @param uncompressed_ptr The location to decompress data to on the GPU.
+ * @param uncompressed_ptr The location to decompress data to on the GPU
+ * (output).
  * @param uncompressed_bytes The size of the uncompressed data as returned by
  * `nvcompLZ4DecompressConfigure()`.
  * @param stream THe stream to decompress on.
@@ -175,9 +181,10 @@ nvcompError_t nvcompLZ4DecompressAsync(
     cudaStream_t stream);
 
 /**
- * @brief Desotry the metadata object.
+ * @brief Destroys the metadata object and frees the associated memory.  Must be
+ * used to destroy metadata that is generated from nvcompLZ4DecompressConfigure.
  *
- * @param metadata_ptr The metadata.
+ * @param metadata_ptr The pointer to destroy.
  */
 void nvcompLZ4DestroyMetadata(void* metadata_ptr);
 

@@ -110,7 +110,8 @@ static void run_benchmark(char* fname, int verbose_memory)
 
   // Launch compression
   size_t* d_comp_out_bytes;
-  CUDA_CHECK(cudaMallocHost((void**)&d_comp_out_bytes, sizeof(*d_comp_out_bytes)));
+  CUDA_CHECK(
+      cudaMallocHost((void**)&d_comp_out_bytes, sizeof(*d_comp_out_bytes)));
   compressor.compress_async(
       d_comp_temp, comp_temp_bytes, d_comp_out, d_comp_out_bytes, stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));

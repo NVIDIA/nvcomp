@@ -121,19 +121,10 @@ nvcompError_t nvcompCascadedCompressAsync(
     cudaStream_t stream);
 
 /**
- * @brief Destroys the metadata object and frees the associated memory.  Must be used
- * to destroy metadata that is generated from nvcompCascadedDecompressConfigure.
- *
- * @param metadata_ptr The pointer to destroy.
- */
-void nvcompCascadedDestroyMetadata(void* metadata_ptr);
-
-
-/**
  * @brief Configure the decompression and get the output and temp sizes
- * needed to perform the decompression. This function allocates host-side memory,
- * synchronizes the provided CUDA stream, and blocks CPU execution until the 
- * metadata is extract and copied from the `compressed_ptr`.
+ * needed to perform the decompression. This function allocates host-side
+ * memory, synchronizes the provided CUDA stream, and blocks CPU execution until
+ * the metadata is extracted and copied from the `compressed_ptr`.
  *
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
@@ -141,11 +132,12 @@ void nvcompCascadedDestroyMetadata(void* metadata_ptr);
  * @param compressed_ptr The compressed data on the device.
  * @param compressed_bytes The size of the compressed data in bytes.
  * @param metadata_ptr The pointer that is to be populated with the metadata
- * needed to perform decompression.  This function allocates host-side memory and
- * copies the metdata to it.
+ * needed to perform decompression.  This function allocates host-side memory
+ * and copies the metdata to it.
  * @param metadata_bytes The size of the metadata that this function allocates.
  * @param temp_bytes The size of the temporary workspace in bytes.
- * @param uncompressed_bytes The required size of the output location in bytes (output).
+ * @param uncompressed_bytes The required size of the output location in bytes
+ * (output).
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -159,18 +151,18 @@ nvcompError_t nvcompCascadedDecompressConfigure(
     size_t* uncompressed_bytes,
     cudaStream_t stream);
 
-
 /**
  * @brief Perform the asynchronous decompression.
  *
- * @param compressed_ptr The compressed data on the device to decompress.
+ * @param compressed_ptr The compressed data on the device.
  * @param compressed_bytes The size of the compressed data.
  * @param metadata_ptr The metadata (accessible by host).
  * @param metadata_bytes The size of the metadata.
  * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace.
  * @param uncompressed_ptr The output location on the device (output).
- * @param uncompressed_bytes The size of the output location.
+ * @param uncompressed_bytes The size of the uncompressed data as returned by
+ * `nvcompLZ4DecompressConfigure()`.
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -186,6 +178,14 @@ nvcompError_t nvcompCascadedDecompressAsync(
     size_t uncompressed_bytes,
     cudaStream_t stream);
 
+/**
+ * @brief Destroys the metadata object and frees the associated memory.  Must be
+ * used to destroy metadata that is generated from
+ * nvcompCascadedDecompressConfigure.
+ *
+ * @param metadata_ptr The pointer to destroy.
+ */
+void nvcompCascadedDestroyMetadata(void* metadata_ptr);
 
 /**************************************************************************
  *  Cascaded Selector types and API calls
