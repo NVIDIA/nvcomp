@@ -26,11 +26,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "Check.h"
 #include "highlevel/BitcompMetadata.h"
 #include "highlevel/CascadedMetadata.h"
 #include "highlevel/LZ4Metadata.h"
 #include "highlevel/Metadata.h"
-#include "Check.h"
 
 #include "nvcomp.h"
 #include "nvcomp/cascaded.h"

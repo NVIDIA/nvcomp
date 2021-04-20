@@ -88,9 +88,9 @@ size_t LZ4Decompressor::calculate_workspace_size(
       num_chunks, chunk_size, &c_api_space));
 
   // we need an input and output pointer for each chunk
-  const size_t pointer_bytes = sizeof(void*)*num_chunks*2;
+  const size_t pointer_bytes = sizeof(void*) * num_chunks * 2;
   // we need input and output sizes for each chunk
-  const size_t size_bytes = sizeof(size_t)*num_chunks*2;
+  const size_t size_bytes = sizeof(size_t) * num_chunks * 2;
 
   return c_api_space + pointer_bytes + size_bytes;
 }
