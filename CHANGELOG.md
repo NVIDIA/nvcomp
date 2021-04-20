@@ -1,3 +1,9 @@
+# nvcomp 2.0.0-rc0 (2021-04-20)
+
+- Changed interfaces for LZ4 and Cascaded compressors.
+- Added Snappy compression.
+- Added support for using Bitcomp and GDeflate external compressors.
+
 # nvcomp 1.2.3 (2021-04-07)
 
 - Fix bug in LZ4 compression kernel for the Pascal architecture.
@@ -50,3 +56,4 @@ internal compiler error.
 # nvcomp 1.0.0 (2020-07-31)
 
 - Initial public release.
+
