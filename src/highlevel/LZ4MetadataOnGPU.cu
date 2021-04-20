@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "LZ4MetadataOnGPU.h"
+#include "Check.h"
 #include "CudaUtils.h"
+#include "LZ4MetadataOnGPU.h"
 
 #include <cassert>
 #include <stdexcept>
@@ -38,13 +39,34 @@ namespace highlevel
 {
 
 /******************************************************************************
+ * CUDA KERNELS ***************************************************************
+ *****************************************************************************/
+
+namespace
+{
+
+__global__ void computeTotalSize(
+    const size_t metadata_size,
+    const size_t* const compressed_data_size,
+    size_t* const output_size)
+{
+  *output_size = metadata_size + *compressed_data_size;
+}
+
+} // namespace
+
+/******************************************************************************
  * PUBLIC STATIC METHODS ******************************************************
  *****************************************************************************/
 
 size_t LZ4MetadataOnGPU::getSerializedSizeOf(const LZ4Metadata& metadata)
 {
-  return (LZ4Metadata::OffsetAddr + metadata.getNumChunks() + 1)
-         * sizeof(size_t);
+  return getSerializedSizeBasedOnChunks(metadata.getNumChunks());
+}
+
+size_t LZ4MetadataOnGPU::getSerializedSizeBasedOnChunks(const size_t num_chunks)
+{
+  return (LZ4Metadata::OffsetAddr + num_chunks + 1) * sizeof(size_t);
 }
 
 size_t LZ4MetadataOnGPU::getCompressedDataOffset(const LZ4Metadata& metadata)
@@ -59,9 +81,9 @@ size_t LZ4MetadataOnGPU::getCompressedDataOffset(const LZ4Metadata& metadata)
 LZ4MetadataOnGPU::LZ4MetadataOnGPU(
     const void* const ptr, const size_t maxSize) :
     m_ptr(ptr),
-    m_maxSize(maxSize),
-    m_numChunks(-1),
-    m_serializedSize(0)
+    m_max_size(maxSize),
+    m_num_chunks(0),
+    m_serialized_size(0)
 {
   if (ptr == nullptr) {
     throw std::runtime_error("Cannot have nullptr for metadata location.");
@@ -69,10 +91,10 @@ LZ4MetadataOnGPU::LZ4MetadataOnGPU(
 }
 
 LZ4MetadataOnGPU::LZ4MetadataOnGPU(const LZ4MetadataOnGPU& other) :
-    LZ4MetadataOnGPU(other.m_ptr, other.m_maxSize)
+    LZ4MetadataOnGPU(other.m_ptr, other.m_max_size)
 {
-  m_numChunks = other.m_numChunks;
-  m_serializedSize = other.m_serializedSize;
+  m_num_chunks = other.m_num_chunks;
+  m_serialized_size = other.m_serialized_size;
 }
 
 /******************************************************************************
@@ -82,21 +104,24 @@ LZ4MetadataOnGPU::LZ4MetadataOnGPU(const LZ4MetadataOnGPU& other) :
 LZ4MetadataOnGPU& LZ4MetadataOnGPU::operator=(const LZ4MetadataOnGPU& other)
 {
   m_ptr = other.m_ptr;
-  m_maxSize = other.m_maxSize;
-  m_numChunks = other.m_numChunks;
-  m_serializedSize = other.m_serializedSize;
+  m_max_size = other.m_max_size;
+  m_num_chunks = other.m_num_chunks;
+  m_serialized_size = other.m_serialized_size;
 
   return *this;
 }
 
 size_t LZ4MetadataOnGPU::getSerializedSize() const
 {
-  if (m_serializedSize == 0) {
+  if (m_serialized_size == 0) {
     throw std::runtime_error("Serialized size has not been set.");
   }
-  assert(m_numChunks > 0);
+  assert(m_num_chunks > 0);
+  CHECK_EQ(
+      m_serialized_size,
+      (LZ4Metadata::OffsetAddr + m_num_chunks + 1) * sizeof(size_t));
 
-  return m_serializedSize;
+  return m_serialized_size;
 }
 
 const size_t* LZ4MetadataOnGPU::compressed_prefix_ptr() const
@@ -115,11 +140,11 @@ LZ4Metadata LZ4MetadataOnGPU::copyToHost(cudaStream_t stream)
       stream);
   CudaUtils::sync(stream);
 
-  if (metadata_bytes > m_maxSize) {
+  if (metadata_bytes > m_max_size) {
     throw std::runtime_error(
         "Compressed data is too small to contain "
         "metadata of size "
-        + std::to_string(metadata_bytes) + " / " + std::to_string(m_maxSize));
+        + std::to_string(metadata_bytes) + " / " + std::to_string(m_max_size));
   }
 
   std::vector<uint8_t> metadata_buffer(metadata_bytes);
@@ -140,18 +165,30 @@ LZ4Metadata LZ4MetadataOnGPU::copyToHost(cudaStream_t stream)
   return metadata;
 }
 
+void LZ4MetadataOnGPU::save_output_size(
+    size_t* const device_size, cudaStream_t stream) const
+{
+  computeTotalSize<<<1, 1, 0, stream>>>(
+      getSerializedSize(), compressed_prefix_ptr() + m_num_chunks, device_size);
+}
+
 /******************************************************************************
  * PROTECTED METHODS **********************************************************
  *****************************************************************************/
 
 size_t LZ4MetadataOnGPU::max_size() const
 {
-  return m_maxSize;
+  return m_max_size;
 }
 
 void LZ4MetadataOnGPU::set_serialized_size(const size_t size)
 {
-  m_serializedSize = size;
+  m_serialized_size = size;
+}
+
+void LZ4MetadataOnGPU::set_num_chunks(const size_t chunks)
+{
+  m_num_chunks = chunks;
 }
 
 } // namespace highlevel

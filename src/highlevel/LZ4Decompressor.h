@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,14 +26,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVCOMP_MUTABLEBATCHEDLZ4METADATAONGPU_H
-#define NVCOMP_MUTABLEBATCHEDLZ4METADATAONGPU_H
-
-#include "LZ4Metadata.h"
+#pragma once
 
 #include "cuda_runtime.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace nvcomp
@@ -41,37 +39,58 @@ namespace nvcomp
 namespace highlevel
 {
 
-class MutableBatchedLZ4MetadataOnGPU
+class LZ4Decompressor
 {
 public:
-  MutableBatchedLZ4MetadataOnGPU(
-      void* const* out_ptrs,
-      const size_t* const max_out_sizes,
-      size_t batch_size);
+  static size_t calculate_workspace_size(size_t chunk_size, size_t num_chunks);
 
-  MutableBatchedLZ4MetadataOnGPU(const MutableBatchedLZ4MetadataOnGPU& other)
-      = delete;
-  MutableBatchedLZ4MetadataOnGPU&
-  operator=(const MutableBatchedLZ4MetadataOnGPU& other)
-      = delete;
+  LZ4Decompressor(
+      const uint8_t* in_ptr,
+      const size_t* in_prefix,
+      size_t in_size,
+      size_t chunk_size,
+      size_t num_chunks);
 
-  void copyToGPU(
-      const std::vector<LZ4Metadata>& metadata,
-      void* temp_space,
-      size_t temp_size,
-      size_t* serialized_sizes,
-      cudaStream_t stream);
+  LZ4Decompressor(const LZ4Decompressor& other) = delete;
+  LZ4Decompressor& operator=(const LZ4Decompressor& other) = delete;
 
-  size_t* compressed_prefix_ptr(const size_t index);
+  /**
+   * @brief Get the size of the workspace required.
+   *
+   * @return The size of the workspace in bytes.
+   */
+  size_t get_workspace_size() const;
+
+  /**
+   * @brief Set the allocated workspace.
+   *
+   * @param workspace The workspace.
+   * @param size The size of the workspace in bytes.
+   */
+  void configure_workspace(void* workspace, size_t size);
+
+  void configure_output(uint8_t* out_ptr, size_t out_size);
+
+  void decompress_async(cudaStream_t stream);
 
 private:
-  std::vector<uint8_t*> m_buffer;
-  size_t m_batch_size;
-  void* const* m_out_ptrs;
-  const size_t* m_max_out_sizes;
+  size_t m_input_size;
+  size_t m_chunk_size;
+  size_t m_num_chunks;
+  const uint8_t* m_input_ptr;
+  const size_t* m_input_prefix;
+  uint8_t* m_output_ptr;
+  size_t m_output_size;
+
+  void* m_workspace;
+  size_t m_workspace_size;
+
+  bool m_output_configured;
+
+  bool is_workspace_configured() const;
+
+  bool is_output_configured() const;
 };
 
 } // namespace highlevel
 } // namespace nvcomp
-
-#endif

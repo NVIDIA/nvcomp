@@ -83,6 +83,8 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
 
   size_t comp_temp_bytes = 0;
   size_t comp_out_bytes = 0;
+  size_t* comp_out_bytes_ptr;
+  cudaMallocHost((void**)&comp_out_bytes_ptr, sizeof(size_t));
   void* d_comp_temp;
   void* d_comp_out;
 
@@ -102,9 +104,11 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
+      d_comp_temp, comp_temp_bytes, d_comp_out, comp_out_bytes_ptr, stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
+  comp_out_bytes = *comp_out_bytes_ptr;
+  cudaFreeHost(comp_out_bytes_ptr);
 
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
@@ -127,6 +131,7 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   size_t decomp_out_bytes = decompressor.get_output_size();
 
   cudaMalloc(&out_ptr, decomp_out_bytes);
+  cudaMemset(out_ptr, 0, decomp_out_bytes);
 
   decompressor.decompress_async(
       d_decomp_temp, decomp_temp_bytes, out_ptr, decomp_out_bytes, stream);

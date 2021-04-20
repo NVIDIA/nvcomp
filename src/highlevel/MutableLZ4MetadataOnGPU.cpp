@@ -97,6 +97,7 @@ void MutableLZ4MetadataOnGPU::copyToGPU(
       stream);
 
   set_serialized_size(required_size);
+  set_num_chunks(metadata.getNumChunks());
 }
 
 size_t* MutableLZ4MetadataOnGPU::compressed_prefix_ptr()

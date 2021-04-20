@@ -111,6 +111,8 @@ public:
 
   size_t* getOffsetArray();
 
+  void check() const;
+
 private:
   size_t m_uncompChunkBytes;
   size_t m_metadataBytes;

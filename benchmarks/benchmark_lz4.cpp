@@ -109,13 +109,16 @@ static void run_benchmark(char* fname, int verbose_memory)
   }
 
   // Launch compression
+  size_t* d_comp_out_bytes;
+  CUDA_CHECK(cudaMallocHost((void**)&d_comp_out_bytes, sizeof(*d_comp_out_bytes)));
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
-
+      d_comp_temp, comp_temp_bytes, d_comp_out, d_comp_out_bytes, stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
+  comp_out_bytes = *d_comp_out_bytes;
 
   auto end = std::chrono::steady_clock::now();
 
+  cudaFree(d_comp_out_bytes);
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 

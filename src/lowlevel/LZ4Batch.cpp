@@ -148,7 +148,7 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
   // they are not finding the maximum size.
 
   try {
-    lz4CompressBatch(
+    lz4BatchCompress(
         CudaUtils::device_pointer(
             reinterpret_cast<const uint8_t* const*>(device_in_ptrs)),
         CudaUtils::device_pointer(device_in_bytes),
