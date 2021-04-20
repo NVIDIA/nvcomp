@@ -69,6 +69,8 @@ nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
   (void)num_chunks;
   (void)max_uncompressed_chunk_size;
   (void)temp_bytes;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
 #endif
 }
@@ -108,6 +110,8 @@ nvcompError_t nvcompBatchedGdeflateDecompressAsync(
     (void)temp_bytes;
     (void)device_out_ptrs;
     (void)stream;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
 #endif
 }
@@ -132,6 +136,8 @@ nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
   (void)batch_size;
   (void)max_chunk_size;
   (void)temp_bytes;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
 #endif
 }
@@ -153,6 +159,8 @@ nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
 #else
   (void)max_chunk_size;
   (void)max_compressed_size;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
 #endif
 }
@@ -187,6 +195,8 @@ nvcompError_t nvcompBatchedGdeflateCompressAsync(
   (void)device_out_ptrs;
   (void)device_out_bytes;
   (void)stream;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
 #endif
 }
