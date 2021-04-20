@@ -304,7 +304,7 @@ int main(int argc, char* argv[])
       gpu_num = atoi(optarg);
       continue;
     }
-    if (strcmp(arg, "--size") == 0 || strcmp(arg, "-gpu") == 0) {
+    if (strcmp(arg, "--size") == 0 || strcmp(arg, "-z") == 0) {
       size = atoll(optarg);
       continue;
     }
