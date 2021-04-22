@@ -11,7 +11,7 @@ Snappy and LZ4 methods can achieve up to 100 GB/s compression and decompression
 throughput depending on the dataset, and show good compression ratios for
 arbitrary byte streams.
 
-Below are performance vs. compression ratio scatter plots for a few numerical columns from TPC-H and Fanny Mae’s Mortgage datasets for Cascaded compression (R1D1B1), and string columns from TPC-H for LZ4 compression. For the TPC-H dataset we used SF10 lineitem table, and the following columns: column 0 (L_ORDERKEY) as 8B integers, and columns 8, 9, 13, 14, 15 as byte streams. From the Mortgage dataset we used 2009 Q2 performance table: column 0 (LOAN_ID) as 8B integers and column 10 (CURRENT_LOAN_DELINQUENCY_STATUS) as 4B integers. The numbers were collected on a Tesla V100 PCIe card (with ECC on). Note that you can tune the Cascaded format settings (e.g. the number of RLE layers) for even better compression ratio for some of these datasets.  We also provide a fast auto-selector that can be used to quickly determine the best Cascaded format settings to use for your dataset (details are in the [Cascaded Selector Guide](doc/selector-quickstart.md)).
+Below are performance vs. compression ratio scatter plots for a few numerical columns from TPC-H and Fanny Mae’s Mortgage datasets for Cascaded compression (R1D1B1), and string columns from TPC-H for LZ4 compression. For the TPC-H dataset we used SF10 lineitem table, and the following columns: column 0 (L_ORDERKEY) as 8B integers, and columns 8, 9, 13, 14, 15 as byte streams. From the Mortgage dataset we used 2009 Q2 performance table: column 0 (LOAN_ID) as 8B integers and column 10 (CURRENT_LOAN_DELINQUENCY_STATUS) as 4B integers. The numbers were collected on a Ampere A100 80GB  card (with ECC on). Note that you can tune the Cascaded format settings (e.g. the number of RLE layers) for even better compression ratio for some of these datasets.  We also provide a fast auto-selector that can be used to quickly determine the best Cascaded format settings to use for your dataset (details are in the [Cascaded Selector Guide](doc/selector-quickstart.md)).
 
 ![compression ratio](/doc/compression_ratio.png)
 
@@ -33,9 +33,27 @@ This preview release of nvCOMP introduces new interfaces and compression methods
 operate. Current workaround is to compress/decompress large datasets in pieces,
 re-using temporary workspace for each piece.
 
-# Building the library
+# Building the library, with nvCOMP extensions
+To configure nvCOMP extensions, simply define the `NVCOMP_EXTS` variable
+to allow CMake to find the library
+
+First, download nvCOMP extensions from the [DevZone](https://developer.nvidia.com/nvcomp).
+There two available extensions.
+1. Bitcomp
+2. GDeflate
+```
+git clone https://github.com/NVIDIA/nvcomp.git
+cd nvcomp
+mkdir build
+cd build
+cmake -DNVCOMP_EXTS_ROOT=/path/to/nvcomp_exts/${CUDA_VERSION} ..
+make -j4
+```
+
+# Building the library, without nvCOMP extensions
 nvCOMP uses CMake for building. Generally, it is best to do an out of source build:
 ```
+git clone https://github.com/NVIDIA/nvcomp.git
 mkdir build/
 cd build
 cmake ..
