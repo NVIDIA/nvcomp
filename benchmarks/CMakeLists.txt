@@ -1,18 +1,10 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.cu)
 
-find_package(Threads REQUIRED)
-
 foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   # cut off suffixes
   string(REPLACE ".cpp" "" EXAMPLE_NAME ${EXAMPLE_SOURCE})
   string(REPLACE ".cu" "" EXAMPLE_NAME ${EXAMPLE_NAME})
   get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
-  target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::cudart)
-  if(THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(${BARE_NAME} PUBLIC "-pthread")
-  endif()
-  if(CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(${BARE_NAME} PRIVATE "${CMAKE_THREAD_LIBS_INIT}" CUDA::nvml)
-  endif()
+  target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::cudart CUDA::nvml)
 endforeach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
