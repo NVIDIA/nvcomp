@@ -30,6 +30,7 @@
 #include "nvcomp.hpp"
 #include "nvcomp/cascaded.h"
 
+#include "CascadedCommon.h"
 #include "CascadedCompressionGPU.h"
 #include "CascadedDecompressionKernels.cuh"
 #include "CascadedMetadata.h"
@@ -44,6 +45,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <vector>
 

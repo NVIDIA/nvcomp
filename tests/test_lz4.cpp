@@ -88,23 +88,25 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   void* d_comp_temp;
   void* d_comp_out;
 
-  // Get comptess temp size
-  LZ4Compressor<T> compressor(d_in_data, input.size(), chunk_size);
-  comp_temp_bytes = compressor.get_temp_size();
+  LZ4Compressor compressor(chunk_size);
+  compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(comp_temp_bytes > 0);
+  REQUIRE(comp_out_bytes > 0);
 
   // allocate temp buffer
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-  // Get compressed output size
-  comp_out_bytes = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
-  REQUIRE(comp_out_bytes > 0);
 
   // Allocate output buffer
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, comp_out_bytes_ptr, stream);
+      d_in_data,
+      in_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      comp_out_bytes_ptr,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
   comp_out_bytes = *comp_out_bytes_ptr;
@@ -113,8 +115,6 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
-  T* out_ptr;
-
   // Test to make sure copying the compressed file is ok
   void* copied = 0;
   CUDA_CHECK(cudaMalloc(&copied, comp_out_bytes));
@@ -122,20 +122,35 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   cudaFree(d_comp_out);
   d_comp_out = copied;
 
-  Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
+  LZ4Decompressor decompressor;
 
-  size_t decomp_temp_bytes = decompressor.get_temp_size();
+  size_t decomp_temp_bytes;
+  size_t decomp_out_bytes;
+  decompressor.configure(
+      d_comp_out,
+      comp_out_bytes,
+      &decomp_temp_bytes,
+      &decomp_out_bytes,
+      stream);
+
   void* d_decomp_temp;
   cudaMalloc(&d_decomp_temp, decomp_temp_bytes);
 
-  size_t decomp_out_bytes = decompressor.get_output_size();
-
+  T* out_ptr;
   cudaMalloc(&out_ptr, decomp_out_bytes);
+
+  // make sure the data won't match input if not written to, so we can verify
+  // correctness
   cudaMemset(out_ptr, 0, decomp_out_bytes);
 
   decompressor.decompress_async(
-      d_decomp_temp, decomp_temp_bytes, out_ptr, decomp_out_bytes, stream);
-
+      d_comp_out,
+      comp_out_bytes,
+      d_decomp_temp,
+      decomp_temp_bytes,
+      out_ptr,
+      decomp_out_bytes,
+      stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // Copy result back to host

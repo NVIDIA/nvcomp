@@ -31,7 +31,8 @@
 
 #include "cascaded.h"
 #include "nvcomp.hpp"
-#include <chrono>
+
+#include <cuda_runtime.h>
 
 namespace nvcomp
 {
@@ -41,13 +42,9 @@ namespace nvcomp
  * Compression and decompression run asynchronously, but compress() requires
  * that the compressed size (*out_btyes) is known and buffers allocated. Can
  * define synchronous wrapper that includes size estimation kernel + allocation.
- *
- * @tparam T The type to compress.
  */
-template <typename T>
-class CascadedCompressor : public Compressor<T>
+class CascadedCompressor : public Compressor
 {
-
 public:
   /**
    * @brief Create a new CascadedCompressor.
@@ -55,97 +52,130 @@ public:
    * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
    * compress larger data, break it up into chunks.
    *
-   * @param in_ptr The input data on the GPU to compress.
-   * @param num_elements The number of elements to compress.
+   * @param type The data type being compressed.
    * @param num_RLEs The number of Run Length encodings to perform.
    * @param num_deltas The number of Deltas to perform.
    * @param use_bp Whether or not to bitpack the end result.
    */
   CascadedCompressor(
-      const T* in_ptr,
-      const size_t num_elements,
-      int num_RLEs,
-      int num_deltas,
-      bool use_bp);
+      nvcompType_t type, int num_RLEs, int num_deltas, bool use_bp);
 
   /**
    * @brief Create a new CascadedCompressor without defining the configuration
    * (RLE, delta, bp). Runs the cascaded selector before compression to
    * determine the configuration.
    *
-   * NOTE: This the do_compress call synchronous on the CUDA stream.  For
-   * Asynchronous execution, you must select the configuration manually.
+   * NOTE: This results in the compress_async() synchronizing with the input
+   * stream.
    *
    * @param in_ptr The input data on the GPU to compress.
    * @param num_elements The number of elements to compress.
    */
-  CascadedCompressor(const T* in_ptr, const size_t num_elements);
+  explicit CascadedCompressor(nvcompType_t type);
 
   // disable copying
   CascadedCompressor(const CascadedCompressor&) = delete;
   CascadedCompressor& operator=(const CascadedCompressor&) = delete;
 
   /**
-   * @brief Get size of the temporary worksace in bytes, required to perform
-   * compression.
+   * @brief Configure the compressor for the given input, and get the necessary
+   * spaces.
    *
-   * @return The size in bytes.
+   * @param in_bytes The size of the input in bytes.
+   * @param temp_bytes The temporary workspace required (output).
+   * @param out_bytes The maximum possible output size (output).
    */
-  size_t get_temp_size() override;
+  void configure(
+      const size_t in_bytes, size_t* temp_bytes, size_t* out_bytes) override;
 
-  /**
-   * @brief Get the exact size the data will compress to. This can be used in
-   * place of `get_max_output_size()` to get the minimum size of the
-   * allocation that should be passed to `compress()`. This however, may take
-   * similar amount of time to compression itself, and may execute synchronously
-   * on the device.
-   *
-   * For Cascaded compression, this is not yet implemented, and will always
-   * throw an exception.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes THe size of the temporary workspace.
-   *
-   * @return The exact size in bytes.
-   *
-   * @throw NVCompressionException Will always be thrown.
-   */
-  size_t
-  get_exact_output_size(void* comp_temp, size_t comp_temp_bytes) override;
-
-  /**
-   * @brief Get the maximum size the data could compressed to. This is the
-   * upper bound of the minimum size of the allocation that should be
-   * passed to `compress()`.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes THe size of the temporary workspace.
-   *
-   * @return The maximum size in bytes.
-   */
-  size_t get_max_output_size(void* comp_temp, size_t comp_temp_bytes) override;
-
-private:
   /**
    * @brief Perform compression asynchronously.
    *
-   * @param temp_ptr The temporary workspace on the device.
+   * NOTE: If the the Cascded configuration was not specified, that is the
+   * constructor wiht only one argument is used, then this method will
+   * synchronize with the stream while determining the proper configuration to
+   * run with. It will then launch compression asynchronously on the stream and
+   * return.
+   *
+   * @param in_ptr The uncompressed input data (GPU accessible).
+   * @param in_bytes The length of the uncompressed input data.
+   * @param temp_ptr The temporary workspace (GPU accessible).
    * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The output location the the device (for compressed data).
-   * @param out_bytes The size of the output location on the device on input,
-   * and the size of the compressed data on output.
+   * @param out_ptr The location to output data to (GPU accessible).
+   * @param out_bytes The size of the output location on input, and the size of
+   * the compressed data on output (CPU accessible, but must be pinned or
+   * managed memory for this function to be asynchronous).
    * @param stream The stream to operate on.
    *
    * @throw NVCompException If compression fails to launch on the stream.
    */
-  void do_compress(
+  void compress_async(
+      const void* in_ptr,
+      const size_t in_bytes,
       void* temp_ptr,
-      size_t temp_bytes,
+      const size_t temp_bytes,
       void* out_ptr,
       size_t* out_bytes,
       cudaStream_t stream) override;
 
+private:
+  nvcompType_t m_type;
   nvcompCascadedFormatOpts m_opts;
+};
+
+class CascadedDecompressor : public Decompressor
+{
+public:
+  CascadedDecompressor();
+
+  ~CascadedDecompressor();
+
+  // disable copying
+  CascadedDecompressor(const CascadedDecompressor&) = delete;
+  CascadedDecompressor& operator=(const CascadedDecompressor&) = delete;
+
+  /**
+   * @brief Configure the decompressor. This synchronizes with the stream.
+   *
+   * @param in_ptr The compressed data on the device.
+   * @param in_bytes The size of the compressed data.
+   * @param temp_bytes The temporary space required for decompression (output).
+   * @param out_bytes The size of the uncompressed data (output).
+   * @param stream The stream to operate on for copying data from the device to
+   * the host.
+   */
+  void configure(
+      const void* in_ptr,
+      const size_t in_bytes,
+      size_t* temp_bytes,
+      size_t* out_bytes,
+      cudaStream_t stream) override;
+
+  /**
+   * @brief Decompress the given data asynchronously.
+   *
+   * @param temp_ptr The temporary workspace on the device to use.
+   * @param temp_bytes The size of the temporary workspace.
+   * @param out_ptr The location to write the uncompressed data to on the
+   * device.
+   * @param out_num_elements The size of the output location in number of
+   * elements.
+   * @param stream The stream to operate on.
+   *
+   * @throw NVCompException If decompression fails to launch on the stream.
+   */
+  void decompress_async(
+      const void* in_ptr,
+      const size_t in_bytes,
+      void* temp_ptr,
+      const size_t temp_bytes,
+      void* out_ptr,
+      const size_t out_bytes,
+      cudaStream_t stream) override;
+
+private:
+  void* m_metadata_ptr;
+  size_t m_metadata_bytes;
 };
 
 /******************************************************************************
@@ -222,128 +252,103 @@ public:
  * METHOD IMPLEMENTATIONS *****************************************************
  *****************************************************************************/
 
-template <typename T>
-inline CascadedCompressor<T>::CascadedCompressor(
-    const T* const in_ptr,
-    const size_t num_elements,
-    const int num_RLEs,
-    const int num_deltas,
-    const bool use_bp) :
-    Compressor<T>(in_ptr, num_elements),
+inline CascadedCompressor::CascadedCompressor(
+    nvcompType_t type, int num_RLEs, int num_deltas, bool use_bp) :
+    m_type(type),
     m_opts{num_RLEs, num_deltas, use_bp}
 {
   // do nothing
 }
 
-template <typename T>
-inline CascadedCompressor<T>::CascadedCompressor(
-    const T* const in_ptr, const size_t num_elements) :
-    Compressor<T>(in_ptr, num_elements),
-    m_opts{-1, -1, -1} // Use -1 as a special maker to run selector
+inline CascadedCompressor::CascadedCompressor(nvcompType_t type) :
+    CascadedCompressor(type, -1, -1, false)
 {
   // do nothing
 }
 
-template <typename T>
-inline size_t CascadedCompressor<T>::get_temp_size()
+inline void CascadedCompressor::configure(
+    const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
 {
-  size_t comp_temp_bytes;
-  size_t comp_out_bytes;
   size_t metadata_bytes;
-  if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressConfigure(
-        NULL,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &comp_temp_bytes,
-        &comp_out_bytes);
-    throwExceptionIfError(status, "GetTempSize failed");
-  } else {
-    nvcompError_t status = nvcompCascadedCompressConfigure(
-        &m_opts,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &comp_temp_bytes,
-        &comp_out_bytes);
-    throwExceptionIfError(status, "GetTempSize failed");
-  }
-
-  return comp_temp_bytes;
+  nvcompError_t status = nvcompCascadedCompressConfigure(
+      &m_opts, m_type, in_bytes, &metadata_bytes, temp_bytes, out_bytes);
+  throwExceptionIfError(status, "nvcompCascadedCompressConfigure() failed");
 }
 
-template <typename T>
-inline size_t CascadedCompressor<T>::get_exact_output_size(
-    void* const /*comp_temp*/, const size_t /*comp_temp_bytes*/)
-{
-  throw "Exact output size not currently supported";
-  return 0;
-}
-
-template <typename T>
-inline size_t CascadedCompressor<T>::get_max_output_size(
-    void* /*comp_temp*/, size_t comp_temp_bytes)
-{
-  size_t comp_out_bytes;
-  size_t metadata_bytes;
-  if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressConfigure(
-        NULL,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &comp_temp_bytes,
-        &comp_out_bytes);
-    throwExceptionIfError(status, "GetOutputSize failed");
-  } else {
-    nvcompError_t status = nvcompCascadedCompressConfigure(
-        &m_opts,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &comp_temp_bytes,
-        &comp_out_bytes);
-    throwExceptionIfError(status, "GetOutputSize failed");
-  }
-
-  return comp_out_bytes;
-}
-
-template <typename T>
-inline void CascadedCompressor<T>::do_compress(
-    void* temp_ptr,
-    size_t temp_bytes,
-    void* out_ptr,
-    size_t* out_bytes,
+inline void CascadedCompressor::compress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    void* const out_ptr,
+    size_t* const out_bytes,
     cudaStream_t stream)
 {
+  nvcompError_t status = nvcompCascadedCompressAsync(
+      &m_opts,
+      m_type,
+      in_ptr,
+      in_bytes,
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
+}
 
-  if (m_opts.num_RLEs == -1) { // If we need to run the selector
-    nvcompError_t status = nvcompCascadedCompressAsync(
-        NULL,
-        this->get_type(),
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        temp_ptr,
-        temp_bytes,
-        out_ptr,
-        out_bytes,
-        stream);
-    throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
-  } else {
-    nvcompError_t status = nvcompCascadedCompressAsync(
-        &m_opts,
-        this->get_type(),
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        temp_ptr,
-        temp_bytes,
-        out_ptr,
-        out_bytes,
-        stream);
-    throwExceptionIfError(status, "nvcompCascadedCompressAsync() failed");
+inline CascadedDecompressor::CascadedDecompressor() :
+    m_metadata_ptr(nullptr),
+    m_metadata_bytes(0)
+{
+  // do nothing
+}
+
+inline CascadedDecompressor::~CascadedDecompressor()
+{
+  if (m_metadata_ptr) {
+    nvcompCascadedDestroyMetadata(m_metadata_ptr);
   }
+}
+
+inline void CascadedDecompressor::configure(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    size_t* const temp_bytes,
+    size_t* const out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompCascadedDecompressConfigure(
+      in_ptr,
+      in_bytes,
+      &m_metadata_ptr,
+      &m_metadata_bytes,
+      temp_bytes,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompCascadedConfigure() failed");
+}
+
+inline void CascadedDecompressor::decompress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    void* const out_ptr,
+    const size_t out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompCascadedDecompressAsync(
+      in_ptr,
+      in_bytes,
+      m_metadata_ptr,
+      m_metadata_bytes,
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompCascadedQeueryMetadataAsync() failed");
 }
 
 template <typename T>

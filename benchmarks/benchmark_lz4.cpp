@@ -77,28 +77,24 @@ static void run_benchmark(char* fname, int verbose_memory)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-  LZ4Compressor<T> compressor(d_in_data, in_bytes, 1 << 16);
+  LZ4Compressor compressor(1 << 16);
+
+  size_t comp_temp_bytes;
+  size_t comp_out_bytes;
+  compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
+  benchmark_assert(
+      comp_out_bytes > 0, "Output size must be greater than zero.");
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-
-  // Get temp size needed for compression
-  const size_t comp_temp_bytes = compressor.get_temp_size();
 
   // Allocate temp workspace
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
-  size_t comp_out_bytes
-      = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
-  benchmark_assert(
-      comp_out_bytes > 0, "Output size must be greater than zero.");
-
   // Allocate compressed output buffer
   void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
-
-  auto start = std::chrono::steady_clock::now();
 
   if (verbose_memory) {
     std::cout << "compression memory (input+output+temp) (B): "
@@ -112,12 +108,20 @@ static void run_benchmark(char* fname, int verbose_memory)
   size_t* d_comp_out_bytes;
   CUDA_CHECK(
       cudaMallocHost((void**)&d_comp_out_bytes, sizeof(*d_comp_out_bytes)));
-  compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, d_comp_out_bytes, stream);
-  CUDA_CHECK(cudaStreamSynchronize(stream));
-  comp_out_bytes = *d_comp_out_bytes;
 
+  auto start = std::chrono::steady_clock::now();
+  compressor.compress_async(
+      d_in_data,
+      in_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      d_comp_out_bytes,
+      stream);
+  CUDA_CHECK(cudaStreamSynchronize(stream));
   auto end = std::chrono::steady_clock::now();
+
+  comp_out_bytes = *d_comp_out_bytes;
 
   cudaFree(d_comp_out_bytes);
   cudaFree(d_comp_temp);
@@ -130,17 +134,24 @@ static void run_benchmark(char* fname, int verbose_memory)
             << gbs(start, end, data.size() * sizeof(T)) << std::endl;
 
   // get metadata from compressed data on GPU
-  Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
+  LZ4Decompressor decompressor;
+
+  size_t decomp_temp_bytes;
+  size_t decomp_bytes;
+  decompressor.configure(
+      d_comp_out, comp_out_bytes, &decomp_temp_bytes, &decomp_bytes, stream);
 
   // allocate temp buffer
-  const size_t decomp_temp_bytes = decompressor.get_temp_size();
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(
       &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
 
-  // get output size
-  const size_t decomp_bytes = decompressor.get_output_size();
+  // allocate output buffer
+  T* decomp_out_ptr;
+  CUDA_CHECK(cudaMalloc(
+      (void**)&decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
 
+  // get output size
   if (verbose_memory) {
     std::cout << "decompression memory (input+output+temp) (B): "
               << (decomp_bytes + comp_out_bytes + decomp_temp_bytes)
@@ -149,24 +160,21 @@ static void run_benchmark(char* fname, int verbose_memory)
               << std::endl;
   }
 
-  size_t free, total;
-  cudaMemGetInfo(&free, &total);
-
-  // allocate output buffer
-  T* decomp_out_ptr;
-  CUDA_CHECK(cudaMalloc(
-      (void**)&decomp_out_ptr, decomp_bytes)); // also can use RMM_ALLOC instead
-
   start = std::chrono::steady_clock::now();
 
   // execute decompression (asynchronous)
   decompressor.decompress_async(
-      d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_bytes, stream);
+      d_comp_out,
+      comp_out_bytes,
+      d_decomp_temp,
+      decomp_temp_bytes,
+      decomp_out_ptr,
+      decomp_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
-
-  // stop timing and the profiler
   end = std::chrono::steady_clock::now();
+
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "nvcomp.h"
+#include "nvcomp.hpp"
 
 #include <cassert>
 #include <chrono>

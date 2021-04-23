@@ -54,9 +54,8 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
   // these two items will be the only forms of communication between
   // compression and decompression
-  void* d_comp_out;
-  size_t comp_out_bytes;
-
+  void* d_comp_out = nullptr;
+  size_t comp_out_bytes = 0;
   {
     // this block handles compression, and we scope it to ensure only
     // serialized metadata and compressed data, are the only things passed
@@ -76,14 +75,13 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
     nvcompError_t status;
 
-    LZ4Compressor<T> compressor((T*)d_in_data, data.size(), chunk_size);
-    size_t comp_temp_bytes = compressor.get_temp_size();
+    LZ4Compressor compressor(chunk_size);
+    size_t comp_temp_bytes;
+    size_t comp_out_bytes;
+    compressor.configure(data.size(), &comp_temp_bytes, &comp_out_bytes);
 
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-    comp_out_bytes
-        = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
     size_t* comp_out_bytes_ptr;
@@ -91,7 +89,13 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
         (void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr)));
 
     compressor.compress_async(
-        d_comp_temp, comp_temp_bytes, d_comp_out, comp_out_bytes_ptr, stream);
+        d_in_data,
+        data.size(),
+        d_comp_temp,
+        comp_temp_bytes,
+        d_comp_out,
+        comp_out_bytes_ptr,
+        stream);
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
     comp_out_bytes = *comp_out_bytes_ptr;
@@ -115,20 +119,27 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
       cudaStream_t stream;
       cudaStreamCreate(&stream);
 
-      Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
+      LZ4Decompressor decompressor;
+      size_t temp_bytes;
+      size_t decomp_out_bytes;
+      decompressor.configure(
+          d_comp_out, comp_out_bytes, &temp_bytes, &decomp_out_bytes, stream);
 
-      const size_t temp_bytes = decompressor.get_temp_size();
       void* temp_ptr;
       cudaMalloc(&temp_ptr, temp_bytes);
-
-      const size_t decomp_out_bytes = decompressor.get_output_size();
       T* out_ptr = NULL;
-      cudaMalloc(&out_ptr, decomp_out_bytes);
+      cudaMalloc((void**)&out_ptr, decomp_out_bytes);
 
       auto start = std::chrono::steady_clock::now();
 
       decompressor.decompress_async(
-          temp_ptr, temp_bytes, out_ptr, decomp_out_bytes, stream);
+          d_comp_out,
+          comp_out_bytes,
+          temp_ptr,
+          temp_bytes,
+          out_ptr,
+          decomp_out_bytes,
+          stream);
 
       CUDA_CHECK(cudaStreamSynchronize(stream));
 

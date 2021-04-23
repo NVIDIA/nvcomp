@@ -78,40 +78,46 @@ void run_benchmark(const std::vector<uint8_t>& data)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), num_bytes, cudaMemcpyHostToDevice));
 
-  LZ4Compressor<uint8_t> compressor(d_in_data, num_bytes, CHUNK_SIZE);
+  LZ4Compressor compressor(CHUNK_SIZE);
+
+  size_t comp_temp_bytes;
+  size_t comp_out_bytes;
+  compressor.configure(num_bytes, &comp_temp_bytes, &comp_out_bytes);
+  benchmark_assert(
+      comp_out_bytes > 0, "Output size must be greater than zero.");
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
   // Get temp size needed for compression
-  const size_t comp_temp_bytes = compressor.get_temp_size();
 
   // Allocate temp workspace
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
-  size_t comp_out_bytes
-      = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
-  benchmark_assert(
-      comp_out_bytes > 0, "Output size must be greater than zero.");
-
   // Allocate compressed output buffer
   void* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
-
-  auto start = std::chrono::steady_clock::now();
 
   // Launch compression
   size_t* d_comp_out_bytes;
   CUDA_CHECK(
       cudaMallocHost((void**)&d_comp_out_bytes, sizeof(*d_comp_out_bytes)));
+
+  auto start = std::chrono::steady_clock::now();
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, d_comp_out_bytes, stream);
+      d_in_data,
+      num_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      d_comp_out_bytes,
+      stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
+  auto end = std::chrono::steady_clock::now();
+
   comp_out_bytes = *d_comp_out_bytes;
   cudaFreeHost(d_comp_out_bytes);
-
-  auto end = std::chrono::steady_clock::now();
 
   cudaFree(d_comp_out_bytes);
   cudaFree(d_comp_temp);
@@ -124,19 +130,17 @@ void run_benchmark(const std::vector<uint8_t>& data)
             << std::endl;
 
   // get metadata from compressed data on GPU
-  Decompressor<uint8_t> decompressor(d_comp_out, comp_out_bytes, stream);
+  LZ4Decompressor decompressor;
+
+  size_t decomp_temp_bytes;
+  size_t decomp_bytes;
+  decompressor.configure(
+      d_comp_out, comp_out_bytes, &decomp_temp_bytes, &decomp_bytes, stream);
 
   // allocate temp buffer
-  const size_t decomp_temp_bytes = decompressor.get_temp_size();
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(
       &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
-
-  // get output size
-  const size_t decomp_bytes = decompressor.get_output_size();
-
-  size_t free, total;
-  cudaMemGetInfo(&free, &total);
 
   // allocate output buffer
   uint8_t* decomp_out_ptr;
@@ -147,7 +151,13 @@ void run_benchmark(const std::vector<uint8_t>& data)
 
   // execute decompression (asynchronous)
   decompressor.decompress_async(
-      d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_bytes, stream);
+      d_comp_out,
+      comp_out_bytes,
+      d_decomp_temp,
+      decomp_temp_bytes,
+      decomp_out_ptr,
+      decomp_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 

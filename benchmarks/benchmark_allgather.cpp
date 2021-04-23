@@ -125,12 +125,12 @@ static void load_chunks_to_devices(
   size_t offset;
 
   for (int i = 0; i < gpus; i++) {
-    cudaSetDevice(i);
+    CUDA_CHECK(cudaSetDevice(i));
 
     // Make sure dataset fits on GPU to benchmark total compression
     size_t freeMem;
     size_t totalMem;
-    cudaMemGetInfo(&freeMem, &totalMem);
+    CUDA_CHECK(cudaMemGetInfo(&freeMem, &totalMem));
     if (freeMem < chunk_size * chunks_per_gpu * sizeof(T)) {
       std::cout << "Insufficient GPU memory to perform compression."
                 << std::endl;
@@ -188,7 +188,7 @@ static void create_gpu_streams(
 {
   streams->resize(gpus);
   for (int i = 0; i < gpus; ++i) {
-    cudaSetDevice(i);
+    CUDA_CHECK(cudaSetDevice(i));
     (*streams)[i].resize(STREAMS_PER_GPU);
     for (int j = 0; j < STREAMS_PER_GPU; ++j) {
       cudaStreamCreateWithFlags(&((*streams)[i][j]), cudaStreamNonBlocking);
@@ -227,7 +227,7 @@ static void run_uncompressed_benchmark(
 
   std::vector<std::vector<T*>> dest_ptrs(gpus);
   for (int i = 0; i < gpus; ++i) { // Allocate full data size on each GPU
-    cudaSetDevice(i);
+    CUDA_CHECK(cudaSetDevice(i));
     dest_ptrs[i].resize(gpus);
     for (int j = 0; j < chunks; ++j) {
       CUDA_CHECK(cudaMalloc(&dest_ptrs[i][j], chunk_sizes[j] * sizeof(T)));
@@ -277,253 +277,32 @@ static void run_uncompressed_benchmark(
   check_output<T>(outputs.data(), h_data->data(), gpus, chunks, chunk_sizes);
 
   for (int i = 0; i < gpus; ++i) { // Allocate full data size on each GPU
-    cudaSetDevice(i);
+    CUDA_CHECK(cudaSetDevice(i));
     for (int j = 0; j < chunks; ++j) {
       CUDA_CHECK(cudaFree(dest_ptrs[i][j]));
     }
   }
 }
 
-// Benchmark the performance of the All-gather operation using LZ4
-// compression/decompression to reduce data transfers
-static void run_lz4_benchmark(
-    const int gpus,
-    const int chunks,
-    uint8_t** dev_ptrs,
-    size_t* chunk_sizes,
-    std::vector<uint8_t>* h_data)
-{
-  using T = uint8_t;
-
-  const int chunks_per_gpu = chunks / gpus;
-  const int STREAMS_PER_GPU = std::min(chunks_per_gpu, MAX_STREAMS);
-
-  size_t total_comp_bytes = 0;
-
-  std::vector<std::vector<T*>> dest_ptrs(gpus);
-  for (int i = 0; i < gpus; ++i) { // Allocate full data size on each GPU
-    cudaSetDevice(i);
-    dest_ptrs[i].resize(chunks);
-    for (int j = 0; j < chunks; ++j) {
-      CUDA_CHECK(cudaMalloc(&dest_ptrs[i][j], chunk_sizes[j] * sizeof(T)));
-    }
-  }
-
-  // Create a compressor for each chunk
-  size_t* comp_out_bytes;
-  CUDA_CHECK(cudaMallocHost(&comp_out_bytes, chunks * sizeof(size_t)));
-
-  std::vector<std::vector<cudaStream_t>> streams;
-  create_gpu_streams(&streams, gpus, STREAMS_PER_GPU);
-
-  // Create temp buffers for each GPU to use for compression and decompression
-  std::vector<size_t> temp_bytes;
-  temp_bytes.reserve(gpus);
-
-  std::vector<std::vector<T*>> d_temp(gpus);
-  std::vector<void*> d_comp_out(chunks);
-  LZ4Compressor<T>** compressors = new LZ4Compressor<T>*[gpus * chunks_per_gpu];
-  // Allocate all memory buffers necessary for compression of each chunk
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
-
-    temp_bytes[gpu] = 0;
-    // Create compressor each chunk
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx] = new LZ4Compressor<T>(dev_ptrs[idx], chunk_sizes[idx], 1 << 16);
-
-      // Find largest temp buffer needed for any chunk
-      if (compressors[idx]->get_temp_size() > temp_bytes[gpu]) {
-        temp_bytes[gpu] = compressors[idx]->get_temp_size();
-      }
-    }
-
-    // Use one temp buffer for each stream on each gpu
-    d_temp[gpu].resize(STREAMS_PER_GPU);
-    for (int j = 0; j < STREAMS_PER_GPU; ++j) {
-      CUDA_CHECK(cudaMalloc(&d_temp[gpu][j], temp_bytes[gpu]));
-    }
-
-    // Allocate output buffers for each chunk on the GPU
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      comp_out_bytes[idx] = compressors[idx]->get_max_output_size(
-          d_temp[gpu][0], temp_bytes[gpu]);
-      CUDA_CHECK(cudaMalloc(&d_comp_out[idx], comp_out_bytes[idx]));
-      total_comp_bytes += comp_out_bytes[idx];
-    }
-  }
-
-  // Allocate all memory buffers for decompression
-  std::vector<size_t> decomp_out_bytes;
-  decomp_out_bytes.reserve(chunks * gpus);
-  // output buffers for each chunk on each gpu
-  std::vector<T**> d_decomp_out;
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    d_decomp_out.push_back(new T*[gpus]);
-    cudaSetDevice(gpu);
-    for (int chunkId = 0; chunkId < chunks; ++chunkId) {
-      CUDA_CHECK(cudaMalloc(
-          &d_decomp_out[gpu][chunkId], chunk_sizes[chunkId] * sizeof(T)));
-    }
-  }
-
-  auto start = std::chrono::steady_clock::now();
-
-  // Issue compression calls
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx]->compress_async(
-          d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
-          temp_bytes[gpu],
-          d_comp_out[idx],
-          &comp_out_bytes[idx],
-          streams[gpu][chunkIdx % STREAMS_PER_GPU]);
-    }
-  }
-
-  sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
-
-  total_comp_bytes = 0;
-  for (int i = 0; i < gpus * chunks_per_gpu; ++i) {
-    total_comp_bytes += comp_out_bytes[i];
-  }
-
-  //  Copy compressed data to all GPUs
-  copy_to_all<T>(
-      gpus,
-      chunks,
-      (T**)(d_comp_out.data()),
-      comp_out_bytes,
-      dest_ptrs.data(),
-      streams,
-      STREAMS_PER_GPU);
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    CUDA_CHECK(cudaMemcpyAsync(
-        d_decomp_out[gpu][gpu],
-        dev_ptrs[gpu],
-        chunk_sizes[gpu] * sizeof(T),
-        cudaMemcpyDeviceToDevice,
-        streams[gpu][gpu % STREAMS_PER_GPU]));
-  }
-
-  // Create decompressors for each chunk on each gpu
-  Decompressor<T>** decompressors = new Decompressor<T>*[chunks * gpus];
-
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      // Create compressor for the chunk and allocate necessary memory
-      if (chunkIdx != gpu) {
-        decompressors[idx] = new Decompressor<T>(
-            dest_ptrs[gpu][chunkIdx],
-            comp_out_bytes[chunkIdx],
-            streams[gpu][chunkIdx % STREAMS_PER_GPU]);
-        decomp_out_bytes[idx] = decompressors[idx]->get_output_size();
-
-        // Check that temp space is sufficient
-        if (temp_bytes[gpu] < decompressors[idx]->get_temp_size()) {
-          std::cout << "Insufficient temp storage - size:" << temp_bytes[gpu]
-                    << ", needed:" << decompressors[idx]->get_temp_size()
-                    << std::endl;
-          exit(1);
-        }
-      } else {
-        decomp_out_bytes[idx] = chunk_sizes[idx];
-      }
-    }
-  }
-
-  // Issue decompression
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      if (chunkIdx != gpu) {
-        const int idx = gpu * chunks + chunkIdx;
-        decompressors[idx]->decompress_async(
-            d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
-            temp_bytes[gpu],
-            d_decomp_out[gpu][chunkIdx],
-            decomp_out_bytes[idx],
-            streams[gpu][chunkIdx % STREAMS_PER_GPU]);
-      }
-    }
-  }
-
-  sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
-
-  auto end = std::chrono::steady_clock::now();
-
-  // Test for correctness
-  check_output<T>(
-      d_decomp_out.data(), h_data->data(), gpus, chunks, chunk_sizes);
-
-  // Clean up
-  for (int i = 0; i < gpus; ++i) {
-    for (int j = 0; j < chunks; ++j) {
-      CUDA_CHECK(cudaFree(d_decomp_out[i][j]));
-      CUDA_CHECK(cudaFree(dest_ptrs[i][j]));
-    }
-    for (int j = 0; j < STREAMS_PER_GPU; ++j) {
-      CUDA_CHECK(cudaFree(d_temp[i][j]));
-    }
-  }
-  CUDA_CHECK(cudaFreeHost(comp_out_bytes));
-
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      delete compressors[idx];
-    }
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      delete decompressors[idx];
-    }
-    delete[] d_decomp_out[gpu];
-  }
-  delete[] compressors;
-  delete[] decompressors;
-
-  std::cout << "Full data size (B): " << h_data->size() * sizeof(T) << std::endl
-            << "Per-GPU benchmark throughput (GB/s): "
-            << gbs(start,
-                   end,
-                   h_data->size() * (((double)gpus - 1.0) / (double)gpus)
-                       * sizeof(T))
-            << std::endl;
-  std::cout << "Compressed data size (B): " << total_comp_bytes
-            << ", compression ratio: "
-            << (double)h_data->size() * sizeof(T) / (double)total_comp_bytes
-            << std::endl;
-  std::cout << "Total data distributed across system (B): "
-            << h_data->size() * (gpus - 1) * sizeof(T) << std::endl
-            << "Total system throughput (GB/s): "
-            << gbs(start, end, h_data->size() * (gpus - 1) * sizeof(T))
-            << std::endl;
-}
-
-// Benchmark the performance of the All-gather operation using LZ4
-// compression/decompression to reduce data transfers
 template <typename T>
-static void run_cascaded_benchmark(
+static void run_nvcomp_benchmark(
     int gpus,
     int chunks,
     T** dev_ptrs,
     size_t* chunk_sizes,
     std::vector<T>* h_data,
-    int RLEs,
-    int deltas,
-    int bitPacking)
+    Compressor** compressors,
+    Decompressor** decompressors)
 {
-
   const int chunks_per_gpu = chunks / gpus;
   const int STREAMS_PER_GPU = std::min(chunks_per_gpu, MAX_STREAMS);
 
   int total_comp_bytes = 0;
+
+  std::vector<size_t> chunk_bytes(chunks, 0);
+  for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+    chunk_bytes[chunkIdx] = chunk_sizes[chunkIdx] * sizeof(T);
+  }
 
   // Create a compressor for each chunk
   std::vector<size_t> temp_bytes(gpus);
@@ -535,49 +314,39 @@ static void run_cascaded_benchmark(
 
   // Allocate all memory buffers necessary for compression of each chunk
   std::vector<std::vector<T*>> d_temp(gpus);
-  CascadedCompressor<T>** compressors = new CascadedCompressor<T>*[gpus];
   for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
 
     // Create compressor for the chunk and allocate necessary memory
+    temp_bytes[gpu] = 0;
+    d_temp[gpu].resize(STREAMS_PER_GPU);
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx] = new CascadedCompressor<T>(
-          dev_ptrs[idx], chunk_sizes[idx], RLEs, deltas, bitPacking);
-    }
 
-    // Use one temp buffer for each stream on each gpu
-    //    streams.push_back(new cudaStream_t[STREAMS_PER_GPU]);
-    d_temp[gpu].resize(STREAMS_PER_GPU);
+      size_t temp_size;
+      size_t out_size;
+      compressors[idx]->configure(chunk_bytes[idx], &temp_size, &out_size);
 
-    // biggest temp buffer requirement
-    temp_bytes[gpu] = 0;
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const size_t req_bytes = std::max(
-          5 * chunk_sizes[gpu * chunks_per_gpu + chunkIdx] * sizeof(T),
-          compressors[gpu * chunks_per_gpu + chunkIdx]->get_temp_size());
-      if (temp_bytes[gpu] < req_bytes) {
-        temp_bytes[gpu] = req_bytes;
+      // Allocate output buffers for each chunk on the GPU
+      comp_out_bytes[idx] = out_size;
+      CUDA_CHECK(cudaMalloc(&d_comp_out[idx], comp_out_bytes[idx]));
+      total_comp_bytes += comp_out_bytes[idx];
+
+      // biggest temp buffer requirement
+      if (temp_size > temp_bytes[gpu]) {
+        temp_bytes[gpu] = temp_size;
       }
     }
 
+    // Use one temp buffer for each stream on each gpu
     for (int j = 0; j < STREAMS_PER_GPU; ++j) {
       CUDA_CHECK(cudaMalloc(&d_temp[gpu][j], temp_bytes[gpu]));
-    }
-
-    // Allocate output buffers for each chunk on the GPU
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      comp_out_bytes[idx] = compressors[idx]->get_max_output_size(
-          d_temp[gpu][0], temp_bytes[gpu]);
-      CUDA_CHECK(cudaMalloc(&d_comp_out[idx], comp_out_bytes[idx]));
-      total_comp_bytes += comp_out_bytes[idx];
     }
   }
 
   std::vector<std::vector<T*>> dest_ptrs(gpus);
   for (int gpu = 0; gpu < gpus; ++gpu) { // Allocate full data size on each GPU
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
     dest_ptrs[gpu].resize(chunks);
     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
       CUDA_CHECK(
@@ -593,10 +362,9 @@ static void run_cascaded_benchmark(
   std::vector<T**> d_decomp_out;
   for (int gpu = 0; gpu < gpus; ++gpu) {
     d_decomp_out.push_back(new T*[chunks]);
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkId = 0; chunkId < chunks; ++chunkId) {
-      CUDA_CHECK(cudaMalloc(
-          &d_decomp_out[gpu][chunkId], chunk_sizes[chunkId] * sizeof(T)));
+      CUDA_CHECK(cudaMalloc(&d_decomp_out[gpu][chunkId], chunk_bytes[chunkId]));
     }
   }
 
@@ -604,10 +372,12 @@ static void run_cascaded_benchmark(
 
   // Issue compression calls
   for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
       compressors[idx]->compress_async(
+          dev_ptrs[idx],
+          chunk_bytes[idx],
           d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
           temp_bytes[gpu],
           d_comp_out[idx],
@@ -636,50 +406,48 @@ static void run_cascaded_benchmark(
     CUDA_CHECK(cudaMemcpyAsync(
         d_decomp_out[gpu][gpu],
         dev_ptrs[gpu],
-        chunk_sizes[gpu] * sizeof(T),
+        chunk_bytes[gpu],
         cudaMemcpyDeviceToDevice,
         streams[gpu][gpu % STREAMS_PER_GPU]));
   }
 
   // Create decompressors for each chunk on each gpu
-  Decompressor<T>** decompressors = new Decompressor<T>*[chunks * gpus];
   for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
       const int idx = gpu * chunks + chunkIdx;
       if (gpu != chunkIdx) {
-        // Create compressor for the chunk and allocate necessary memory
-        decompressors[idx] = new Decompressor<T>(
+        size_t temp_size;
+        size_t out_size;
+        decompressors[idx]->configure(
             dest_ptrs[gpu][chunkIdx],
             comp_out_bytes[chunkIdx],
+            &temp_size,
+            &out_size,
             streams[gpu][chunkIdx % STREAMS_PER_GPU]);
-        decomp_out_bytes[idx] = decompressors[idx]->get_output_size();
-      } else {
-        decomp_out_bytes[idx] = chunk_sizes[chunkIdx] * sizeof(T);
-      }
-    }
 
-    // find biggest temp buffer requirement
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      if (chunkIdx != gpu
-          && temp_bytes[gpu] < decompressors[idx]->get_temp_size()) {
-        std::cerr << "Insufficient temp storage size for gpu " << gpu
-                  << ", chunk " << chunkIdx << ": " << temp_bytes[gpu]
-                  << ", needed:" << decompressors[idx]->get_temp_size()
-                  << std::endl;
-        exit(1);
+        decomp_out_bytes[idx] = out_size;
+        if (temp_size > temp_bytes[gpu]) {
+          std::cerr << "Insufficient temp storage size for gpu " << gpu
+                    << ", chunk " << chunkIdx << ": " << temp_bytes[gpu]
+                    << ", needed:" << temp_size << std::endl;
+          exit(1);
+        }
+      } else {
+        decomp_out_bytes[idx] = chunk_bytes[chunkIdx];
       }
     }
   }
 
   // Issue decompression calls
   for (int gpu = 0; gpu < gpus; ++gpu) {
-    cudaSetDevice(gpu);
+    CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
       if (gpu != chunkIdx) {
         const int idx = gpu * chunks + chunkIdx;
         decompressors[idx]->decompress_async(
+            dest_ptrs[gpu][chunkIdx],
+            comp_out_bytes[chunkIdx],
             d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
             temp_bytes[gpu],
             d_decomp_out[gpu][chunkIdx],
@@ -717,18 +485,8 @@ static void run_cascaded_benchmark(
   CUDA_CHECK(cudaFreeHost(comp_out_bytes));
 
   for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      delete compressors[idx];
-    }
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      delete decompressors[idx];
-    }
     delete[] d_decomp_out[gpu];
   }
-  delete[] compressors;
-  delete[] decompressors;
 
   std::cout << "Full data size (B): " << h_data->size() * sizeof(T) << std::endl
             << "Per-GPU benchmark throughput (GB/s): "
@@ -746,6 +504,116 @@ static void run_cascaded_benchmark(
             << "Total system throughput (GB/s): "
             << gbs(start, end, h_data->size() * (gpus - 1) * sizeof(T))
             << std::endl;
+}
+
+// Benchmark the performance of the All-gather operation using LZ4
+// compression/decompression to reduce data transfers
+static void run_lz4_benchmark(
+    const int gpus,
+    const int chunks,
+    uint8_t** dev_ptrs,
+    size_t* chunk_sizes,
+    std::vector<uint8_t>* h_data)
+{
+  using T = uint8_t;
+
+  const int chunks_per_gpu = chunks / gpus;
+
+  Compressor** compressors = new Compressor*[gpus * chunks_per_gpu];
+  // Allocate all memory buffers necessary for compression of each chunk
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    // Create compressor each chunk
+    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+      const int idx = gpu * chunks_per_gpu + chunkIdx;
+      compressors[idx] = new LZ4Compressor(1 << 16);
+    }
+  }
+
+  // Create decompressors for each chunk on each gpu
+  Decompressor** decompressors = new Decompressor*[chunks * gpus];
+
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+      const int idx = gpu * chunks + chunkIdx;
+      // Create compressor for the chunk and allocate necessary memory
+      if (chunkIdx != gpu) {
+        decompressors[idx] = new LZ4Decompressor;
+      }
+    }
+  }
+
+  run_nvcomp_benchmark<T>(
+      gpus, chunks, dev_ptrs, chunk_sizes, h_data, compressors, decompressors);
+
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+      const int idx = gpu * chunks_per_gpu + chunkIdx;
+      delete compressors[idx];
+    }
+    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+      const int idx = gpu * chunks + chunkIdx;
+      if (gpu != chunkIdx) {
+        delete decompressors[idx];
+      }
+    }
+  }
+  delete[] compressors;
+  delete[] decompressors;
+}
+
+// Benchmark the performance of the All-gather operation using LZ4
+// compression/decompression to reduce data transfers
+template <typename T>
+static void run_cascaded_benchmark(
+    int gpus,
+    int chunks,
+    T** dev_ptrs,
+    size_t* chunk_sizes,
+    std::vector<T>* h_data,
+    int RLEs,
+    int deltas,
+    int bitPacking)
+{
+  const int chunks_per_gpu = chunks / gpus;
+
+  Compressor** compressors = new Compressor*[gpus];
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+      const int idx = gpu * chunks_per_gpu + chunkIdx;
+      compressors[idx] = new CascadedCompressor(
+          getnvcompType<T>(), RLEs, deltas, bitPacking);
+    }
+  }
+
+  // Create decompressors for each chunk on each gpu
+  Decompressor** decompressors = new Decompressor*[chunks * gpus];
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+      const int idx = gpu * chunks + chunkIdx;
+      if (gpu != chunkIdx) {
+        // Create compressor for the chunk and allocate necessary memory
+        decompressors[idx] = new CascadedDecompressor;
+      }
+    }
+  }
+
+  run_nvcomp_benchmark<T>(
+      gpus, chunks, dev_ptrs, chunk_sizes, h_data, compressors, decompressors);
+
+  for (int gpu = 0; gpu < gpus; ++gpu) {
+    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+      const int idx = gpu * chunks_per_gpu + chunkIdx;
+      delete compressors[idx];
+    }
+    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+      const int idx = gpu * chunks + chunkIdx;
+      if (gpu != chunkIdx) {
+        delete decompressors[idx];
+      }
+    }
+  }
+  delete[] compressors;
+  delete[] decompressors;
 }
 
 static void enable_nvlink(int gpus)

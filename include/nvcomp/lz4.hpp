@@ -39,162 +39,227 @@ namespace nvcomp
  * Compression and decompression run asynchronously, but compress() requires
  * that the compressed size (*out_bytes) is known and buffers are allocated. Can
  * define synchronous wrapper that includes size estimation kernel + allocation.
- *
- * @param T the type of element to compress.
  */
-template <typename T>
-class LZ4Compressor : public Compressor<T>
+class LZ4Compressor : public Compressor
 {
 public:
   /**
-   * @brief Default constructor that sets the format opts for the compression
-   * and saves the pointer to the input data to compress
+   * @brief Create a new LZ4 compressor.
    *
-   * @param in_ptr The input array to be compressed
-   * @param num_elements size of the input array
    * @param chunk_size size of chunks that are eached compressed separately.
-   * Controls the temporary storage needed.
+   * A value of `0` will result in the default chunk size being used.
    */
-  LZ4Compressor(const T* in_ptr, size_t num_elements, size_t chunk_size);
+  explicit LZ4Compressor(size_t chunk_size);
+
+  /**
+   * @brief Create a new LZ4 compressor with the default chunk size.
+   */
+  LZ4Compressor();
 
   // disable copying
   LZ4Compressor(const LZ4Compressor&) = delete;
   LZ4Compressor& operator=(const LZ4Compressor&) = delete;
 
   /**
-   * @brief Get the size of the temporary buffer required for decompression.
+   * @brief Configure the compressor for the given input, and get the necessary
+   * spaces.
    *
-   * @return The size in bytes.
+   * @param in_bytes The size of the input in bytes.
+   * @param temp_bytes The temporary workspace required (output).
+   * @param out_bytes The maximum possible output size (output).
    */
-  size_t get_temp_size() override;
+  void configure(
+      const size_t in_bytes, size_t* temp_bytes, size_t* out_bytes) override;
 
-  /**
-   * @brief Get the exact size the data will compress to. This can be used in
-   * place of `get_max_output_size()` to get the minimum size of the
-   * allocation that should be passed to `compress()`. This however, may take
-   * similar amount of time to compression itself, and may execute synchronously
-   * on the device.
-   *
-   * For LZ4Compression, this is not yet implemented, and will always
-   * throw an exception.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes THe size of the temporary workspace.
-   *
-   * @return The exact size in bytes.
-   *
-   * @throw NVCompressionException Will always be thrown.
-   */
-  size_t
-  get_exact_output_size(void* comp_temp, size_t comp_temp_bytes) override;
-
-  /**
-   * @brief Get the maximum size the data could compressed to. This is the
-   * upper bound of the minimum size of the allocation that should be
-   * passed to `compress()`.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes THe size of the temporary workspace.
-   *
-   * @return The maximum size in bytes.
-   */
-  size_t get_max_output_size(void* comp_temp, size_t comp_temp_bytes) override;
-
-private:
   /**
    * @brief Perform compression asynchronously.
    *
-   * @param temp_ptr The temporary workspace on the device.
+   * @param in_ptr The uncompressed input data (GPU accessible).
+   * @param in_bytes The length of the uncompressed input data.
+   * @param temp_ptr The temporary workspace (GPU accessible).
    * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The output location the the device (for compressed data).
-   * @param out_bytes The size of the compressed data (output). Must be device
-   * accessible.
+   * @param out_ptr The location to output data to (GPU accessible).
+   * @param out_bytes The size of the output location on input, and the size of
+   * the compressed data on output (CPU accessible, but must be pinned or
+   * managed memory for this function to be asynchronous).
    * @param stream The stream to operate on.
    *
    * @throw NVCompException If compression fails to launch on the stream.
    */
-  void do_compress(
+  void compress_async(
+      const void* in_ptr,
+      const size_t in_bytes,
       void* temp_ptr,
-      size_t temp_bytes,
+      const size_t temp_bytes,
       void* out_ptr,
       size_t* out_bytes,
       cudaStream_t stream) override;
 
-  nvcompLZ4FormatOpts m_opts;
+private:
+  size_t m_chunk_size;
+};
+
+class LZ4Decompressor : public Decompressor
+{
+public:
+  LZ4Decompressor();
+
+  ~LZ4Decompressor();
+
+  // disable copying
+  LZ4Decompressor(const LZ4Decompressor&) = delete;
+  LZ4Decompressor& operator=(const LZ4Decompressor&) = delete;
+
+  /**
+   * @brief Configure the decompressor. This synchronizes with the stream.
+   *
+   * @param in_ptr The compressed data on the device.
+   * @param in_bytes The size of the compressed data.
+   * @param temp_bytes The temporary space required for decompression (output).
+   * @param out_bytes The size of the uncompressed data (output).
+   * @param stream The stream to operate on for copying data from the device to
+   * the host.
+   */
+  void configure(
+      const void* in_ptr,
+      const size_t in_bytes,
+      size_t* temp_bytes,
+      size_t* out_bytes,
+      cudaStream_t stream) override;
+
+  /**
+   * @brief Decompress the given data asynchronously.
+   *
+   * @param temp_ptr The temporary workspace on the device to use.
+   * @param temp_bytes The size of the temporary workspace.
+   * @param out_ptr The location to write the uncompressed data to on the
+   * device.
+   * @param out_num_elements The size of the output location in number of
+   * elements.
+   * @param stream The stream to operate on.
+   *
+   * @throw NVCompException If decompression fails to launch on the stream.
+   */
+  void decompress_async(
+      const void* in_ptr,
+      const size_t in_bytes,
+      void* temp_ptr,
+      const size_t temp_bytes,
+      void* out_ptr,
+      const size_t out_bytes,
+      cudaStream_t stream) override;
+
+private:
+  void* m_metadata_ptr;
+  size_t m_metadata_bytes;
 };
 
 /******************************************************************************
  * METHOD IMPLEMENTATIONS *****************************************************
  *****************************************************************************/
 
-template <typename T>
-inline LZ4Compressor<T>::LZ4Compressor(
-    const T* in_ptr, const size_t num_elements, const size_t chunk_size) :
-    Compressor<T>(in_ptr, num_elements),
-    m_opts{chunk_size}
+inline LZ4Compressor::LZ4Compressor(const size_t chunk_size) :
+    m_chunk_size(chunk_size)
 {
   // do nothing
 }
 
-template <typename T>
-inline size_t LZ4Compressor<T>::get_temp_size()
+inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0)
 {
-  size_t comp_temp_bytes, metadata_bytes, out_bytes;
+  // do nothing
+}
+
+inline void LZ4Compressor::configure(
+    const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
+{
+  nvcompLZ4FormatOpts opts{m_chunk_size};
+
+  size_t metadata_bytes;
   nvcompError_t status = nvcompLZ4CompressConfigure(
-      &m_opts,
-      this->get_type(),
-      this->get_uncompressed_size(),
+      opts.chunk_size == 0 ? nullptr : &opts,
+      NVCOMP_TYPE_BITS,
+      in_bytes,
       &metadata_bytes,
-      &comp_temp_bytes,
-      &out_bytes);
-  throwExceptionIfError(status, "GetTempSize failed");
-
-  return comp_temp_bytes;
+      temp_bytes,
+      out_bytes);
+  throwExceptionIfError(status, "nvcompLZ4CompressConfigure() failed");
 }
 
-template <typename T>
-inline size_t LZ4Compressor<T>::get_exact_output_size(
-    void* const /* comp_temp */, const size_t /* comp_temp_bytes */)
-{
-  throw NVCompException(nvcompErrorNotSupported, "Unimplemented");
-}
-
-template <typename T>
-inline size_t LZ4Compressor<T>::get_max_output_size(
-    void* const /* comp_temp */, const size_t /* comp_temp_bytes */)
-{
-  size_t comp_temp_bytes, metadata_bytes, out_bytes;
-  nvcompError_t status = nvcompLZ4CompressConfigure(
-      &m_opts,
-      this->get_type(),
-      this->get_uncompressed_size(),
-      &metadata_bytes,
-      &comp_temp_bytes,
-      &out_bytes);
-  throwExceptionIfError(status, "get_mx_output_size failed");
-
-  return out_bytes;
-}
-
-template <typename T>
-inline void LZ4Compressor<T>::do_compress(
+inline void LZ4Compressor::compress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
     void* const temp_ptr,
     const size_t temp_bytes,
     void* const out_ptr,
     size_t* const out_bytes,
     cudaStream_t stream)
 {
+  nvcompLZ4FormatOpts opts{m_chunk_size};
   nvcompError_t status = nvcompLZ4CompressAsync(
-      &m_opts,
-      this->get_type(),
-      this->get_uncompressed_data(),
-      this->get_uncompressed_size(),
+      opts.chunk_size == 0 ? nullptr : &opts,
+      NVCOMP_TYPE_BITS,
+      in_ptr,
+      in_bytes,
       temp_ptr,
       temp_bytes,
       out_ptr,
       out_bytes,
       stream);
-  throwExceptionIfError(status, "LZ4CompressAsync() failed");
+  throwExceptionIfError(status, "nvcompLZ4CompressAsync() failed");
+}
+
+inline LZ4Decompressor::LZ4Decompressor() :
+    m_metadata_ptr(nullptr),
+    m_metadata_bytes(0)
+{
+  // do nothing
+}
+
+inline LZ4Decompressor::~LZ4Decompressor()
+{
+  if (m_metadata_ptr) {
+    nvcompLZ4DestroyMetadata(m_metadata_ptr);
+  }
+}
+
+inline void LZ4Decompressor::configure(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    size_t* const temp_bytes,
+    size_t* const out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompLZ4DecompressConfigure(
+      in_ptr,
+      in_bytes,
+      &m_metadata_ptr,
+      &m_metadata_bytes,
+      temp_bytes,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompLZ4Configure() failed");
+}
+
+inline void LZ4Decompressor::decompress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    void* const out_ptr,
+    const size_t out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompLZ4DecompressAsync(
+      in_ptr,
+      in_bytes,
+      m_metadata_ptr,
+      m_metadata_bytes,
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompLZ4QeueryMetadataAsync() failed");
 }
 
 } // namespace nvcomp
