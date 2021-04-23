@@ -178,7 +178,6 @@ int test_batch_compression_and_decompression(void)
   }
   cudaFree(d_in_ptrs);
 
-  // LZ4 decompression does not need temp space.
   size_t temp_bytes;
   status = nvcompBatchedLZ4DecompressGetTempSize(
       BATCH_SIZE, max_chunk_size, &temp_bytes);
@@ -366,7 +365,6 @@ int test_batch_compression_and_decompression_zero_max(void)
   }
   cudaFree(d_in_ptrs);
 
-  // LZ4 decompression does not need temp space.
   size_t temp_bytes;
   status = nvcompBatchedLZ4DecompressGetTempSize(
       BATCH_SIZE, max_chunk_size, &temp_bytes);
