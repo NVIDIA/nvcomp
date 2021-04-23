@@ -34,7 +34,7 @@ operate. Current workaround is to compress/decompress large datasets in pieces,
 re-using temporary workspace for each piece.
 
 # Building the library, with nvCOMP extensions
-To configure nvCOMP extensions, simply define the `NVCOMP_EXTS` variable
+To configure nvCOMP extensions, simply define the `NVCOMP_EXTS_ROOT` variable
 to allow CMake to find the library
 
 First, download nvCOMP extensions from the [DevZone](https://developer.nvidia.com/nvcomp).
