@@ -231,19 +231,27 @@ void test_auto_cpp(const std::vector<T>& data)
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    CascadedCompressor<T> compressor((const T*)d_in_data, data.size());
+    CascadedCompressor compressor(nvcomp::getnvcompType<T>());
+
+    size_t comp_temp_bytes;
+    size_t comp_out_bytes;
+    compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
 
     // Allocate temp storage
-    size_t comp_temp_bytes = compressor.get_temp_size();
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
     // Allocate output space
-    comp_out_bytes = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
-    compressor.compress_async(d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
-
+    compressor.compress_async(
+        d_in_data,
+        in_bytes,
+        d_comp_temp,
+        comp_temp_bytes,
+        d_comp_out,
+        &comp_out_bytes,
+        stream);
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
     cudaFree(d_comp_temp);
@@ -262,13 +270,17 @@ void test_auto_cpp(const std::vector<T>& data)
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    
-    Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
 
-    size_t decomp_temp_bytes = decompressor.get_temp_size();
+    CascadedDecompressor decompressor;
+    size_t decomp_temp_bytes;
+    size_t decomp_out_bytes;
+    decompressor.configure(
+        d_comp_out,
+        comp_out_bytes,
+        &decomp_temp_bytes,
+        &decomp_out_bytes,
+        stream);
     REQUIRE(decomp_temp_bytes > 0);
-    
-    size_t decomp_out_bytes = decompressor.get_num_elements()*sizeof(T);
     REQUIRE(decomp_out_bytes > 0);
 
 
