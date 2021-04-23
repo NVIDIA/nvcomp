@@ -29,10 +29,6 @@ endif()
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
-if(THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(nvcomp PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -pthread>)
-endif()
 target_include_directories(nvcomp PUBLIC "../include")
 target_include_directories(nvcomp PUBLIC "./")
 if(DEFINED CUB_DIR)

@@ -34,7 +34,6 @@
 
 #include "test_common.h"
 
-#include <thread>
 #include <vector>
 
 template <typename T>
@@ -54,32 +53,6 @@ void test_random(
   test<T>(data, chunk_size, numRLEs, numDeltas, bitPacking);
 }
 
-template <typename T>
-void test_random_mt(
-    int num_threads,
-    int max_val,
-    int max_run,
-    size_t chunk_size,
-    int numRLEs,
-    int numDeltas,
-    int bitPacking)
-{
-  std::vector<std::thread> threads;
-  for (int i = 0; i < num_threads; i++)
-    threads.push_back(std::thread(
-        &test_random<T>,
-        max_val,
-        max_run,
-        chunk_size,
-        numRLEs,
-        numDeltas,
-        bitPacking));
-
-  for (int i = 0; i < num_threads; i++)
-    threads[i].join();
-}
-
-// int: single-threaded
 TEST_CASE("small-R-int", "[small]")
 {
   test_random<int>(10, 10, 10000, 1, 0, 0);
@@ -188,32 +161,6 @@ TEST_CASE("large-RDRb-int", "[large][bp]")
 TEST_CASE("large-RDDb-int", "[large][bp]")
 {
   test_random<int>(10000, 1000, 10000000, 1, 2, 1);
-}
-
-// int: multi-threaded
-TEST_CASE("large-R-int-t10", "[large][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 1, 0, 0);
-}
-TEST_CASE("large-RD-int-t10", "[large][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 1, 1, 0);
-}
-TEST_CASE("large-RDR-int-t10", "[large][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 2, 1, 0);
-}
-TEST_CASE("large-Rb-int-t10", "[large][bp][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 1, 0, 1);
-}
-TEST_CASE("large-RDb-int-t10", "[large][bp][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 1, 1, 1);
-}
-TEST_CASE("large-RDRb-int-t10", "[large][bp][mt]")
-{
-  test_random_mt<int>(10, 10000, 1000, 10000000, 2, 1, 1);
 }
 
 // long long
