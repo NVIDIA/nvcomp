@@ -75,11 +75,18 @@ IF(NOT CUB_HEADER)
       "to cub via 'CUB_DIR'")
 ENDIF()
 
-option (ENABLE_BITCOMP "Enable bitcomp inside nvcomp" OFF)
-if (ENABLE_BITCOMP)
-  message(STATUS "Finding Bitcomp")
-  find_package (bitcomp)
-  add_definitions (-DENABLE_BITCOMP)
+if(NOT DEFINED NVCOMP_EXTS_ROOT AND DEFINED ENV{NVCOMP_EXTS_ROOT})
+  set(NVCOMP_EXTS_ROOT "$ENV{NVCOMP_EXTS_ROOT}")
+endif()
+
+if( DEFINED NVCOMP_EXTS_ROOT )
+  set( ENV{GDEFLATE_ROOT} ${NVCOMP_EXTS_ROOT} )
+  set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
+ENDIF()
+
+find_package(bitcomp)
+if (BITCOMP_FOUND)
+  add_definitions(-DENABLE_BITCOMP)
 endif()
 
 find_package(gdeflate)
