@@ -54,10 +54,10 @@ make -j4
 nvCOMP uses CMake for building. Generally, it is best to do an out of source build:
 ```
 git clone https://github.com/NVIDIA/nvcomp.git
-mkdir build/
+mkdir build
 cd build
 cmake ..
-make
+make -j
 ```
 
 If you're building using CUDA 10 or less, you will need to specify a path to
