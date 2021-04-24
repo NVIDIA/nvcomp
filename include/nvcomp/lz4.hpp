@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,10 +35,7 @@
 namespace nvcomp
 {
 /**
- * @brief Alternate compressor offered by nvcomp: LZ4
- * Compression and decompression run asynchronously, but compress() requires
- * that the compressed size (*out_bytes) is known and buffers are allocated. Can
- * define synchronous wrapper that includes size estimation kernel + allocation.
+ * @brief C++ wrapper for LZ4 compressor.
  */
 class LZ4Compressor : public Compressor
 {

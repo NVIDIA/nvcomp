@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -80,22 +80,21 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-  BitcompCompressor<T> compressor(d_in_data, input_elts, algo);
+  BitcompCompressor compressor(nvcomp::getnvcompType<T>(), algo);
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
   // Get temp size needed for compression
-  const size_t comp_temp_bytes = compressor.get_temp_size();
+  size_t comp_temp_bytes;
+  size_t comp_out_bytes;
+  compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
+  benchmark_assert(
+      comp_out_bytes > 0, "Max output size must be greater than zero.");
 
   // Allocate temp workspace
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-
-  size_t comp_out_bytes
-      = compressor.get_max_output_size(d_comp_temp, comp_temp_bytes);
-  benchmark_assert(
-      comp_out_bytes > 0, "Max output size must be greater than zero.");
 
   // Allocate compressed output buffer
   void* d_comp_out;
@@ -103,10 +102,14 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
 
   // Warmup (loading the library takes time)
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
+      d_in_data,
+      in_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      &comp_out_bytes,
+      stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
-
-  auto start = std::chrono::steady_clock::now();
 
   if (verbose_memory) {
     std::cout << "compression memory (input+output+temp) (B): "
@@ -116,9 +119,16 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
               << std::endl;
   }
 
+  auto start = std::chrono::steady_clock::now();
   // Launch compression
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
+      d_in_data,
+      in_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      &comp_out_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -134,16 +144,12 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
             << gbs(start, end, data.size() * sizeof(T)) << std::endl;
 
   // get metadata from compressed data on GPU
-  Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
+  BitcompDecompressor decompressor;
 
-  // allocate temp buffer
-  const size_t decomp_temp_bytes = decompressor.get_temp_size();
-  void* d_decomp_temp;
-  CUDA_CHECK(cudaMalloc(
-      &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
-
-  // get output size
-  const size_t decomp_bytes = decompressor.get_output_size();
+  size_t decomp_temp_bytes;
+  size_t decomp_bytes;
+  decompressor.configure(
+      d_comp_out, comp_out_bytes, &decomp_temp_bytes, &decomp_bytes, stream);
 
   if (verbose_memory) {
     std::cout << "decompression memory (input+output+temp) (B): "
@@ -153,8 +159,10 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
               << std::endl;
   }
 
-  size_t free, total;
-  cudaMemGetInfo(&free, &total);
+  // allocate temp buffer
+  void* d_decomp_temp;
+  CUDA_CHECK(cudaMalloc(
+      &d_decomp_temp, decomp_temp_bytes)); // also can use RMM_ALLOC instead
 
   // allocate output buffer
   T* decomp_out_ptr;
@@ -165,7 +173,13 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
 
   // execute decompression (asynchronous)
   decompressor.decompress_async(
-      d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_bytes, stream);
+      d_comp_out,
+      comp_out_bytes,
+      d_decomp_temp,
+      decomp_temp_bytes,
+      decomp_out_ptr,
+      decomp_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
