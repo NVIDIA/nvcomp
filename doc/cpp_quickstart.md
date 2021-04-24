@@ -7,65 +7,65 @@ throwing exceptions and managing state inside of objects.
 * [Transferring the Data (Optional)](#transferring-the-data-optional)
 * [Decompressing the Data](#decompressing-the-data)
 
-To use NVCOMP's C++ interface with the Cascaded compression scheme below,
-you will need to include `nvcomp.hpp` and `cascaded.hpp`.
+To use NVCOMP's C++ interface, you will need to include `nvcomp.hpp`
+and the headers of the specific compressor you will be using.  For
+the Cascaded compression scheme shown in examples below, this is in
+`nvcomp/cascaded.hpp`. 
 
 ```C++
-#include "cascaded.hpp"
+#include "nvcomp/cascaded.hpp"
 #include "nvcomp.hpp"
 ```
 
 ## Compressing the Data
 
 In order to compress data on the GPU, you must first create a 
-`Compressor` object. In this case, we are using the `CascadedCompressor`, with
+`Compressor` object. In this case, we are using the `CascadedCompressor`, using
+`int` as the input datatype, and compressing with 
 two Run Length Encoding layers, a delta layer, and bit-packing on the final
-output. The type of our data is `int`.
+output. Any data compressed by this compressor
+will be compresssed with this format.
+If the last 3 arguments are omitted from the Cascaded compressor, the format selector will be run 
+to determine them automatically.  For more information see the [Cascaded Format Selector Guide](selector-quickstart.md).
 
 ```c++
-nvcomp::CascadedCompressor<int> compressor(
-    uncompressed_data, uncompressed_count, 2, 1, true);
+nvcomp::CascadedCompressor<int> compressor(getnvcompType<int>(), 2, 1, true);
 ```
 
-Once this is done, we must get the required amount of temporary GPU space, to
-perform the compression, and allocate it.
+Once this is done, we can get the required amount of temporary GPU space to perform the compression,
+and an esimate of the compressed output size.  These have to be allocated in order to perform the compression.
+Note that the output size will often be larger than the actual size of the compressed data.  This
+is because the exact size of the output is not known until compression has completed.
 
 ```c++
-const size_t temp_size = compressor.get_temp_size();
+compressor.configure(uncompressed_bytes, &temp_bytes, &output_bytes);
 
 void * temp_space;
-cudaMalloc(&temp_space, temp_size);
-```
+cudaMalloc(&temp_space, temp_bytes);
 
-Next, we need to get the required size of the output location, and allocate it.
-The required size will often be larger than the actual size of compressed data
-for the `CascadedCompressor`. This is because the exact size of the output is
-not known until compression has run.
-
-```c++
-size_t output_size = compressor.get_max_output_size(
-    temp_space, temp_size);
-    
 void * output_space;
-cudaMalloc(&output_space, output_size);
+cudaMalloc(&output_space, output_bytes);
 ```
 
 Once we have our temporary and output memory allocations created, we can launch
-the compression task.
+the compression task.  We must ensure that the `output_bytes` variable is directly accessible
+by the GPU during compression.  So, we first define a pinned memory variable and copy the size to
+it.  Note that this could also be simple GPU memory, but using a simple pinned variable allows
+easy access by host code as well.
 
 ```c++
-nvcompError_t status;
-compressor.compress_async(temp_space,
-    temp_size, output_space, &output_size, stream);
+int * d_compressed_bytes;
+cudaMallocHost(&d_compressed_bytes, sizeof(int));
+*d_compressed_bytes = output_bytes;
+
+compressor.compress_async(uncompressed_data, uncompressed_bytes,
+    temp_space, temp_bytes, output_space, d_compressed_bytes, stream);
 ```
 
-In this case, `output_size` is in page-able memory, and as a
-result, compression will be synchronous as it copies the value 
-from device memory.
-
-Pinned memory can be used for `output_size` to allow compression
-to be performed asynchronously. However, the stream will need to be
-synchronized on before attempt to read from `output_size`.
+This will issue the compression kernel.  The final compressed output size
+will bet written to `d_compressed_bytes` once it completes.  Since it runs
+asynchronously, you will need to synchronize on the stream to
+access the final output size.
 
 ## Transferring the Data (Optional)
 
@@ -74,11 +74,11 @@ or other devices. The compression information is stored at the front of the
 compressed data, so a simple `cudaMemcpy` can be used.
 
 ```c++
-cudaMemcpy(host_buffer, output_space, output_size, cudaMemcpyDeviceToHost);
+cudaMemcpy(host_buffer, output_space, *d_compressed_bytes, cudaMemcpyDeviceToHost);
 
 ...
 
-cudaMemcpy(compressed_data, host_buffer, output_size, cudaMemcpyHostToDevice);
+cudaMemcpy(compressed_data, host_buffer, *d_compressed_bytes, cudaMemcpyHostToDevice);
 ```
 
 
@@ -88,40 +88,38 @@ When decompressing the data, we can use the generic `Decompressor` class, as it
 will detect what the underlying compression used was. However, it is important
 to match the template type, with that which was compressed.
 
+To decompress the data, we use the corresponding Decompressor object.  Since
+all of the information about the data is included with the compressed data,
+the Decompressor does not need any format or type information.
+
 ```c++
-nvcomp::Decompressor<int> decompressor(compressed_data, output_size, stream);
+nvcomp::CascadedDecompressor decompressor();
 ```
+To prepare the decompressor to work on a specific compressed input, it has
+to be configured.  The configure operation computes the required temporary storage
+needed to perform decompression, as well as the final decompressed output size (exact size).  Once
+complete, we can allocate the temporary and output spaces.
 
-The decompressor will use the stream for copying compression metadata down from
-the device, and synchronize afterwards.
-
-We can then get the required amount of temporary GPU space in bytes, needed for
-decompression, from this object, and allocate it.
+Note that this operation extracts metadata from the compressed input that is on
+the GPU and synchronizes on the input CUDA stream.
 
 ```c++
-const size_t temp_size = decompressor.get_temp_size();
+decompressor.configure(compressed_data, compressed_bytes, &temp_bytes, &uncompressed_bytes, stream);
 
 void * temp_space;
-cudaMalloc(&temp_space, temp_size);
+cudaMalloc(&temp_space, temp_bytes);
+
+void * uncompressed_output;
+cudaMalloc(&uncompressed_output, uncompressed_bytes);
 ```
 
-Next, we need to get the number of elements that will be uncompressed, and
-allocate space for it. The count will be exact.
-
-```c++
-const size_t output_count = decompressor.get_num_elements();
-    
-int * output_space;
-cudaMalloc((void**)&output_space, output_count*sizeof(int));
-```
-
-Finally we can launch our decompression task on a stream.
+Finally we can launch our decompression task.
 
 ```c++
 nvcompError_t status;
-decompressor.decompress_async(temp_space, temp_size, output_space, output_count, 
-    stream);
+decompressor.decompress_async(compressed_data, compressed_bytes, temp_space, 
+    temp_bytes, uncompressed_output, uncompressed_bytes, stream);
 ```
 
-The variable `output_size` here is passed by value rather than reference, so
-decompression will be asynchronous without the need for pinned memory.
+The variable `uncompressed_bytes` here is passed by value rather than reference, so
+there is no need for GPU-accessible memory for the output size.

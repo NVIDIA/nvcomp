@@ -27,14 +27,15 @@ selector_opts.seed = 1; // seed used for random sampling.
 
 // Get size and allocate temp space needed to run selector.
 size_t selector_temp_bytes;
-nvcompCascadedSelectorGetTempSize(in_bytes, getnvcompType<T>(), selector_opts, &selector_temp_bytes);
+nvcompCascadedSelectorConfigure(&selector_opts, getnvcompType<T>(), uncompressed_bytes, &selector_temp_bytes);
 void* d_temp_selector;
-cudaMalloc(&d_temp_selector, temp_bytes);
+cudaMalloc(&d_temp_selector, selector_temp_bytes);
 
 // Run the Selector to get the Cascaded format opts and estimate compression ratio
 nvcompCascadedFormatOpts opts;
 double estimate_ratio;
-nvcompCascadedSelectorSelectConfig(in_data, in_bytes, getnvcompType<T>(), selector_opts, d_temp_selector, temp_selector_bytes, &opts, &estimate_ratio, stream);
+nvcompCascadedSelectorRun(&selector_opts, getnvcompType<T>(), uncompressed_data, uncompressed_bytes, 
+    d_temp_selector, selector_temp_bytes, &opts, &estimate_ratio, stream);
 
 // Now run compression as normal using the format opts
 ```
@@ -67,42 +68,34 @@ Cascaded compression format or any details of the selector. These calls automati
 letting the user avoid extra API calls and added code complexity, while still using the Selector
 to achieve the best compression ratio.  One drawback of this approach is that the compression
 call is no longer asynchronous.  That is, the call synchronizes on the CUDA stream that is passed
-into the API call.  The C interface provides new API methods to auto-run the selector (without any specific
-`nvcompCascadedFormatOpts`), while C++ uses the existing interface and auto-running the selector involves 
-using an overloaded construtor that does not require format opts.  An example of the C API calls to 
-perform compression is below:
+into the API call.  
+
+With the C interface, you can have the selector automatically run by passing NULL in place of the `format_opts`
+parameter.  An example of this is below:
 
 ```c++
 // Get size and allocate storage to run selector and perform compression
 size_t temp_bytes;
-nvcompCascadedCompressAutoGetTempSize(in_data, in_bytes, getnvcompType<T>(), &temp_bytes);
+nvcompCascadedCompressConfigure(NULL, getnvcompType<int>(), in_bytes, &metadata_bytes, &temp_bytes, &out_bytes);
+
 void* d_temp;
 cudaMalloc(&d_temp, temp_bytes);
-
-// Allocate space for the compressed output
-size_t out_bytes;
-nvcompCascadedCompressAutoGetOutputSize(in_data, in_bytes, getnvcompType<T>(), d_temp, temp_bytes, out_bytes);
 void* d_out;
 cudaMalloc(&d_out, out_bytes);
 
 // Run both the selector and compression, putting the compressed output in d_out
-nvcompCascadedCompressAuto(in_data, in_bytes, getnvcompType<T>(), d_temp, temp_bytes, d_out, out_bytes, seed, stream);
+nvcompCascadedCompressAsync(NULL, getnvcompType<T>(), in_data, in_bytes, d_temp, temp_bytes, d_out, out_bytes, stream);
 ```
-Note that the 8th input parameter to the above function is a seed used for random sampling.  Giving a simple unsigned
-integer provides deterministic results..  For non-deterministic random sampling, use a time-based seed such as:
-```c++
-unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-````
 
 As mentioned above, using the C++ interface to auto-run the selector during compression is very simple. You can use all 
 of the CascadedCompressor methods as normal (detailed in the [C++ Quick Start Guide](cpp_quickstart.md)), and just 
 use a constructor that does not take any cascaded format options as input:
 
 ```c++
-CascadedCompressor compressor(in_data, in_bytes);
+CascadedCompressor compressor(getnvcompType<int>());
 ```
 
-The compressor can then be used to `get_temp_size()`, `get_output_size()`, and `compress_async()`.  
+The compressor can then be used to `configure()`, and `compress_async()`.  The only change is that
+the call to `compress_async` will automatically call the selector, causing it to synchronize on the CUDA stream.
 No changes to decompression code are required when using the selector for compression.  When used in this
 way, a time-based random seed is used automatically.
-
