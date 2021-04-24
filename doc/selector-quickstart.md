@@ -14,8 +14,9 @@ also estimate the compression ratio that will be achieved for the given input da
 
 We provide both C and C++ interfaces for the selector. 
 See `tests/test_cascaded_selector.cpp` for working code using both the C and C++ interfaces of
-the selector. Running the Cascaded Selector by itself requires three steps before you can use the output to call
-the cascaded compressor as usual.  The example code below shows how to run the Selector with the C interface to obtain
+the selector. Running the Cascaded Selector by itself requires configuring, allocating temp space, and executing.
+Once it completes, you can use the provided `format_opts` to call the Cascaded compressor as usual. 
+The example code below shows how to run the Selector with the C interface to obtain
 the `nvcompCascadedFormatOpts` that can be used to call Cascaded compression. 
 
 ```c++
@@ -40,8 +41,8 @@ nvcompCascadedSelectorRun(&selector_opts, getnvcompType<T>(), uncompressed_data,
 // Now run compression as normal using the format opts
 ```
 
-The C++ interface is similar but uses a new class called `CascadedSelector` (details in `include/cascaded.hpp`).
-Below is the same example code using the C++interface:
+The C++ interface is similar but uses a new class called `CascadedSelector` (details in `include/nvcomp/cascaded.hpp`).
+Below is the same example code using the C++ interface:
 
 ```c++
 // Set up options for the selector.  This is a good default setting.
@@ -64,7 +65,7 @@ nvcompCascadedFormatOpts opts = selector.select_config(d_temp, temp_bytes, &esti
 ### Automatically using the selector during compression
 
 For ease of use, we also provide an interface to run Cascaded compression without ever specifying the
-Cascaded compression format or any details of the selector. These calls automatically run both the selector and compression,
+format or any details of the selector. These calls automatically run both the selector and compression,
 letting the user avoid extra API calls and added code complexity, while still using the Selector
 to achieve the best compression ratio.  One drawback of this approach is that the compression
 call is no longer asynchronous.  That is, the call synchronizes on the CUDA stream that is passed
@@ -76,7 +77,8 @@ parameter.  An example of this is below:
 ```c++
 // Get size and allocate storage to run selector and perform compression
 size_t temp_bytes;
-nvcompCascadedCompressConfigure(NULL, getnvcompType<int>(), in_bytes, &metadata_bytes, &temp_bytes, &out_bytes);
+nvcompCascadedCompressConfigure(NULL, getnvcompType<int>(), in_bytes, 
+    &metadata_bytes, &temp_bytes, &out_bytes);
 
 void* d_temp;
 cudaMalloc(&d_temp, temp_bytes);
@@ -84,7 +86,8 @@ void* d_out;
 cudaMalloc(&d_out, out_bytes);
 
 // Run both the selector and compression, putting the compressed output in d_out
-nvcompCascadedCompressAsync(NULL, getnvcompType<T>(), in_data, in_bytes, d_temp, temp_bytes, d_out, out_bytes, stream);
+nvcompCascadedCompressAsync(NULL, getnvcompType<T>(), in_data, in_bytes, 
+    d_temp, temp_bytes, d_out, out_bytes, stream);
 ```
 
 As mentioned above, using the C++ interface to auto-run the selector during compression is very simple. You can use all 
@@ -97,5 +100,4 @@ CascadedCompressor compressor(getnvcompType<int>());
 
 The compressor can then be used to `configure()`, and `compress_async()`.  The only change is that
 the call to `compress_async` will automatically call the selector, causing it to synchronize on the CUDA stream.
-No changes to decompression code are required when using the selector for compression.  When used in this
-way, a time-based random seed is used automatically.
+No changes to decompression code are required when using the selector during compression like this.  
