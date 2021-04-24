@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,234 +42,100 @@ namespace nvcomp
 {
 
 /**
- * @brief Bitcomp compressor offered by nvcomp
- *
- * @tparam T The type to compress.
+ * @brief C++ wrapper for Bitcomp compressor.
  */
-template <typename T>
-class BitcompCompressor : public Compressor<T>
+class BitcompCompressor : public Compressor
 {
-
 public:
   /**
-   * @brief Create a new BitcompCompressor.
+   * @brief Create a new Bitcomp compressor.
    *
-   * @param in_ptr The input data on the GPU to compress.
-   * @param num_elements The number of elements to compress.
-   * @param algorithm The bitcomp algorithm selector (0 = default, 1=sparse)
+   * @param type The data type being compressed.
+   * @param algorithm_type The type of algorithm to use for compression.
+   *    0 : Default algorithm, usually gives the best compression ratios
+   *    1 : "Sparse" algorithm, works well on sparse data (with lots of zeroes).
+   *        and is usually a faster than the default algorithm.
    */
-  BitcompCompressor(
-      const T* in_ptr, const size_t num_elements, int algorithm = 0) :
-      Compressor<T>(in_ptr, num_elements), m_algorithm(algorithm)
-  {
-  }
+  BitcompCompressor(nvcompType_t type, int algorithm_type);
+
+  /**
+   * @brief Create a new Bitcomp compressor with the default algorithm.
+   *
+   * @param type The data type being compressed.
+   */
+  explicit BitcompCompressor(nvcompType_t type);
 
   // disable copying
   BitcompCompressor(const BitcompCompressor&) = delete;
   BitcompCompressor& operator=(const BitcompCompressor&) = delete;
 
   /**
-   * @brief Get size of the temporary workspace in bytes, required to perform
-   * compression.
+   * @brief Configure the compressor for the given input, and get the necessary
+   * spaces.
    *
-   * @return The size in bytes.
+   * @param in_bytes The size of the input in bytes.
+   * @param temp_bytes The temporary workspace required (output).
+   * @param out_bytes The maximum possible output size (output).
    */
-  size_t get_temp_size() override
-  {
-    size_t temp_bytes;
-    size_t max_out_bytes;
-    size_t metadata_bytes;
-    nvcompBitcompFormatOpts opts{m_algorithm};
+  void configure(
+      const size_t in_bytes, size_t* temp_bytes, size_t* out_bytes) override;
 
-    nvcompError_t status = nvcompBitcompCompressConfigure(
-        &opts,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &temp_bytes,
-        &max_out_bytes);
-    throwExceptionIfError(status, "nvcompBitcompCompressConfigure() failed");
-    return temp_bytes;
-  }
-
-  /**
-   * @brief Get the exact size the data will compress to. This can be used in
-   * place of `get_max_output_size()` to get the minimum size of the
-   * allocation that should be passed to `compress()`. This however, may take
-   * similar amount of time to compression itself, and may execute synchronously
-   * on the device.
-   *
-   * For Cascaded compression, this is not yet implemented, and will always
-   * throw an exception.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes The size of the temporary workspace.
-   *
-   * @return The exact size in bytes.
-   *
-   * @throw NVCompressionException will always be thrown.
-   */
-  size_t get_exact_output_size(
-      void* /*comp_temp*/, size_t /*comp_temp_bytes*/) override
-  {
-    throwExceptionIfError(nvcompErrorNotSupported, "get_exact_output_size");
-    // should be unreachable
-    return nvcompErrorNotSupported;
-  }
-
-  /**
-   * @brief Get the maximum size the data could compressed to. This is the
-   * upper bound of the minimum size of the allocation that should be
-   * passed to `compress()`.
-   *
-   * @param comp_temp The temporary workspace.
-   * @param comp_temp_bytes THe size of the temporary workspace.
-   *
-   * @return The maximum size in bytes.
-   */
-  size_t
-  get_max_output_size(void* /*comp_temp*/, size_t /*comp_temp_bytes*/) override
-  {
-    size_t temp_bytes;
-    size_t max_out_bytes;
-    size_t metadata_bytes;
-    nvcompBitcompFormatOpts opts{m_algorithm};
-
-    nvcompError_t status = nvcompBitcompCompressConfigure(
-        &opts,
-        this->get_type(),
-        this->get_uncompressed_size(),
-        &metadata_bytes,
-        &temp_bytes,
-        &max_out_bytes);
-    throwExceptionIfError(status, "nvcompBitcompCompressConfigure() failed");
-    return max_out_bytes;
-  }
-
-private:
   /**
    * @brief Perform compression asynchronously.
    *
-   * @param temp_ptr The temporary workspace on the device.
+   * @param in_ptr The uncompressed input data (GPU accessible).
+   * @param in_bytes The length of the uncompressed input data.
+   * @param temp_ptr The temporary workspace (GPU accessible).
    * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The output location the the device (for compressed data).
-   * @param out_bytes The size of the output location on the device on input,
-   * and the size of the compressed data on output.
+   * @param out_ptr The location to output data to (GPU accessible).
+   * @param out_bytes The size of the output location on input, and the size of
+   * the compressed data on output (CPU accessible, but must be pinned or
+   * managed memory for this function to be asynchronous).
    * @param stream The stream to operate on.
    *
    * @throw NVCompException If compression fails to launch on the stream.
    */
-  void do_compress(
+  void compress_async(
+      const void* in_ptr,
+      const size_t in_bytes,
       void* temp_ptr,
-      size_t temp_bytes,
+      const size_t temp_bytes,
       void* out_ptr,
       size_t* out_bytes,
-      cudaStream_t stream) override
-  {
-    nvcompBitcompFormatOpts opts;
-    opts.algorithm_type = m_algorithm;
-    nvcompError_t status = nvcompBitcompCompressAsync(
-        &opts,
-        this->get_type(),
-        this->get_uncompressed_data(),
-        this->get_uncompressed_size(),
-        temp_ptr,
-        temp_bytes,
-        out_ptr,
-        out_bytes,
-        stream);
-    throwExceptionIfError(status, "nvcompBitcompCompressAsync failed");
-  }
+      cudaStream_t stream) override;
 
-  int m_algorithm;
+private:
+  nvcompType_t m_type;
+  int m_algorithm_type;
 };
 
-/**
- * @brief Bitcomp decompressor offered by nvcomp
- *
- * @tparam T The type to decompress to.
- */
-template <typename T>
-class BitcompDecompressor : public Decompressor<T>
+class BitcompDecompressor : public Decompressor
 {
-
 public:
-  BitcompDecompressor(
-      const void* const compressed_data,
-      const size_t compressed_data_size,
-      cudaStream_t stream) :
-      Decompressor<T>(compressed_data, compressed_data_size, stream),
-      expected_uncompressed_size(0)
-  {
-    // Sync the stream to make sure the compressed data is available
-    cudaStreamSynchronize(stream);
+  BitcompDecompressor();
 
-    // Create a plan from the compressed data itself
-    if (bitcompCreatePlanFromCompressedData(&handle, compressed_data)
-        != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Bitcomp decompressor: Plan creation failed");
-
-    if (bitcompGetUncompressedSizeFromHandle(
-            handle, &expected_uncompressed_size)
-        != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInternal,
-          "Bitcomp decompressor: can't get uncompressed size from handle");
-
-    // Make sure the type matches the compressed data
-    bitcompDataType_t expectedDatatype = BITCOMP_UNSIGNED_8BIT;
-    if (std::is_same<T, int8_t>::value)
-      expectedDatatype = BITCOMP_SIGNED_8BIT;
-    if (std::is_same<T, uint16_t>::value)
-      expectedDatatype = BITCOMP_UNSIGNED_16BIT;
-    if (std::is_same<T, int16_t>::value)
-      expectedDatatype = BITCOMP_SIGNED_16BIT;
-    if (std::is_same<T, uint32_t>::value)
-      expectedDatatype = BITCOMP_UNSIGNED_32BIT;
-    if (std::is_same<T, int32_t>::value)
-      expectedDatatype = BITCOMP_SIGNED_32BIT;
-    if (std::is_same<T, uint64_t>::value)
-      expectedDatatype = BITCOMP_UNSIGNED_64BIT;
-    if (std::is_same<T, int64_t>::value)
-      expectedDatatype = BITCOMP_SIGNED_64BIT;
-    bitcompDataType_t dataType;
-    if (bitcompGetDataTypeFromHandle(handle, &dataType) != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInternal,
-          "Bitcomp decompressor: can't get type from handle");
-    if (expectedDatatype != dataType)
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Bitcomp decompressor: data type doesn't match");
-
-    // Make sure the compressed size matches
-    size_t expected_size;
-    if (bitcompGetCompressedSize(compressed_data, &expected_size)
-        != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInternal,
-          "Bitcomp decompressor: can't get compressed size");
-    if (expected_size != compressed_data_size)
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Bitcomp decompressor: compressed size doesn't match");
-
-    // until we can access it from parent class
-    m_compressed_data = compressed_data;
-  }
-
-  ~BitcompDecompressor()
-  {
-    if (bitcompDestroyPlan(handle) != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInvalidValue, "Bitcomp decompressor: Invalid plan");
-  }
+  ~BitcompDecompressor();
 
   // disable copying
-  BitcompDecompressor(const BitcompDecompressor& other) = delete;
-  BitcompDecompressor& operator=(const BitcompDecompressor& other) = delete;
+  BitcompDecompressor(const BitcompDecompressor&) = delete;
+  BitcompDecompressor& operator=(const BitcompDecompressor&) = delete;
+
+  /**
+   * @brief Configure the decompressor. This synchronizes with the stream.
+   *
+   * @param in_ptr The compressed data on the device.
+   * @param in_bytes The size of the compressed data.
+   * @param temp_bytes The temporary space required for decompression (output).
+   * @param out_bytes The size of the uncompressed data (output).
+   * @param stream The stream to operate on for copying data from the device to
+   * the host.
+   */
+  void configure(
+      const void* in_ptr,
+      const size_t in_bytes,
+      size_t* temp_bytes,
+      size_t* out_bytes,
+      cudaStream_t stream) override;
 
   /**
    * @brief Decompress the given data asynchronously.
@@ -285,62 +151,129 @@ public:
    * @throw NVCompException If decompression fails to launch on the stream.
    */
   void decompress_async(
-      void* const temp_ptr,
+      const void* in_ptr,
+      const size_t in_bytes,
+      void* temp_ptr,
       const size_t temp_bytes,
-      T* const out_ptr,
-      const size_t out_num_elements,
-      cudaStream_t stream)
-  {
-    if (expected_uncompressed_size > out_num_elements * sizeof(T))
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Bitcomp decompressor: Output buffer too small");
-    if (bitcompSetStream(handle, stream) != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInternal, "Bitcomp: Invalid handle or stream");
-    // if (bitcompUncompress(handle, this->get_compressed_data(), out_ptr)
-    if (bitcompUncompress(handle, m_compressed_data, out_ptr)
-        != BITCOMP_SUCCESS)
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Bitcomp decompressor: Invalid handle or stream");
-  }
-
-  /**
-   * @brief Get the size of the temporary buffer required for decompression.
-   *
-   * @return The size in bytes.
-   */
-  size_t get_temp_size()
-  {
-    return 0;
-  }
-
-  /**
-   * @brief Get the size of the output buffer in bytes.
-   *
-   * @return The size in bytes.
-   */
-  size_t get_output_size()
-  {
-    return expected_uncompressed_size;
-  }
-
-  /**
-   * @brief Get the number of elements that will be decompressed.
-   *
-   * @return The number of elements.
-   */
-  size_t get_num_elements()
-  {
-    return (expected_uncompressed_size / sizeof(T));
-  }
+      void* out_ptr,
+      const size_t out_bytes,
+      cudaStream_t stream) override;
 
 private:
-  bitcompHandle_t handle;
-  size_t expected_uncompressed_size;
-  const void* m_compressed_data; // Can't access the one from Decompressor
+  void* m_metadata_ptr;
+  size_t m_metadata_bytes;
 };
+
+/******************************************************************************
+ * METHOD IMPLEMENTATIONS *****************************************************
+ *****************************************************************************/
+
+inline BitcompCompressor::BitcompCompressor(
+    const nvcompType_t type, const int algorithm_type) :
+    m_type(type),
+    m_algorithm_type(algorithm_type)
+{
+  // do nothing
+}
+
+inline BitcompCompressor::BitcompCompressor(const nvcompType_t type) :
+    BitcompCompressor(type, -1)
+{
+  // do nothing
+}
+
+inline void BitcompCompressor::configure(
+    const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
+{
+  nvcompBitcompFormatOpts opts{m_algorithm_type};
+
+  size_t metadata_bytes;
+  nvcompError_t status = nvcompBitcompCompressConfigure(
+      opts.algorithm_type == -1 ? nullptr : &opts,
+      m_type,
+      in_bytes,
+      &metadata_bytes,
+      temp_bytes,
+      out_bytes);
+  throwExceptionIfError(status, "nvcompBitcompCompressConfigure() failed");
+}
+
+inline void BitcompCompressor::compress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    void* const out_ptr,
+    size_t* const out_bytes,
+    cudaStream_t stream)
+{
+  nvcompBitcompFormatOpts opts{m_algorithm_type};
+  nvcompError_t status = nvcompBitcompCompressAsync(
+      opts.algorithm_type == -1 ? nullptr : &opts,
+      m_type,
+      in_ptr,
+      in_bytes,
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompBitcompCompressAsync() failed");
+}
+
+inline BitcompDecompressor::BitcompDecompressor() :
+    m_metadata_ptr(nullptr),
+    m_metadata_bytes(0)
+{
+  // do nothing
+}
+
+inline BitcompDecompressor::~BitcompDecompressor()
+{
+  if (m_metadata_ptr) {
+    nvcompBitcompDestroyMetadata(m_metadata_ptr);
+  }
+}
+
+inline void BitcompDecompressor::configure(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    size_t* const temp_bytes,
+    size_t* const out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompBitcompDecompressConfigure(
+      in_ptr,
+      in_bytes,
+      &m_metadata_ptr,
+      &m_metadata_bytes,
+      temp_bytes,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompBitcompConfigure() failed");
+}
+
+inline void BitcompDecompressor::decompress_async(
+    const void* const in_ptr,
+    const size_t in_bytes,
+    void* const temp_ptr,
+    const size_t temp_bytes,
+    void* const out_ptr,
+    const size_t out_bytes,
+    cudaStream_t stream)
+{
+  nvcompError_t status = nvcompBitcompDecompressAsync(
+      in_ptr,
+      in_bytes,
+      m_metadata_ptr,
+      m_metadata_bytes,
+      temp_ptr,
+      temp_bytes,
+      out_ptr,
+      out_bytes,
+      stream);
+  throwExceptionIfError(status, "nvcompBitcompQeueryMetadataAsync() failed");
+}
 
 } // namespace nvcomp
 

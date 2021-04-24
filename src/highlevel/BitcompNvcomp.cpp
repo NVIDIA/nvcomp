@@ -175,8 +175,11 @@ nvcompError_t nvcompBitcompCompressAsync(
   default:
     dataType = BITCOMP_UNSIGNED_8BIT;
   }
-  bitcompAlgorithm_t algo = format_opts->algorithm_type ? BITCOMP_SPARSE_ALGO
-                                                        : BITCOMP_DEFAULT_ALGO;
+  bitcompAlgorithm_t algo = BITCOMP_DEFAULT_ALGO;
+  if (format_opts) {
+    algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
+  }
+
   bitcompHandle_t handle;
   bitcompResult_t ier;
   ier = bitcompCreatePlan(&handle, in_bytes, dataType, BITCOMP_LOSSLESS, algo);

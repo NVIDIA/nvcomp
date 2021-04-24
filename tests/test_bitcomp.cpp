@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -83,25 +83,29 @@ void test_bitcomp(const std::vector<T>& input)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  size_t comp_temp_bytes = 0;
-  size_t comp_out_bytes = 0;
   void* d_comp_out;
   void* const d_comp_temp = nullptr;
 
   // Get compressor temp size. Bitcomp should not use any.
-  BitcompCompressor<T> compressor(d_in_data, input.size());
-  comp_temp_bytes = compressor.get_temp_size();
-  REQUIRE(comp_temp_bytes == 0);
+  BitcompCompressor compressor(nvcomp::getnvcompType<T>());
 
-  // Get compressed buffer worst case size
-  comp_out_bytes = compressor.get_max_output_size(d_in_data, input.size());
+  size_t comp_temp_bytes;
+  size_t comp_out_bytes;
+  compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
+  REQUIRE(comp_temp_bytes == 0);
   REQUIRE(comp_out_bytes > input.size() * sizeof(T));
 
   // Allocate output buffer
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   compressor.compress_async(
-      d_comp_temp, comp_temp_bytes, d_comp_out, &comp_out_bytes, stream);
+      d_in_data,
+      in_bytes,
+      d_comp_temp,
+      comp_temp_bytes,
+      d_comp_out,
+      &comp_out_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -116,18 +120,30 @@ void test_bitcomp(const std::vector<T>& input)
   cudaFree(d_comp_out);
   d_comp_out = copied;
 
-  Decompressor<T> decompressor(d_comp_out, comp_out_bytes, stream);
+  BitcompDecompressor decompressor;
 
-  size_t decomp_temp_bytes = decompressor.get_temp_size();
+  size_t decomp_temp_bytes;
+  size_t decomp_out_bytes;
+  decompressor.configure(
+      d_comp_out,
+      comp_out_bytes,
+      &decomp_temp_bytes,
+      &decomp_out_bytes,
+      stream);
+
   REQUIRE(decomp_temp_bytes == 0);
   void* const d_decomp_temp = nullptr;
 
-  size_t decomp_out_bytes = decompressor.get_output_size();
-
-  cudaMalloc(&out_ptr, decomp_out_bytes);
+  CUDA_CHECK(cudaMalloc(&out_ptr, decomp_out_bytes));
 
   decompressor.decompress_async(
-      d_decomp_temp, decomp_temp_bytes, out_ptr, decomp_out_bytes, stream);
+      d_comp_out,
+      comp_out_bytes,
+      d_decomp_temp,
+      decomp_temp_bytes,
+      out_ptr,
+      decomp_out_bytes,
+      stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
