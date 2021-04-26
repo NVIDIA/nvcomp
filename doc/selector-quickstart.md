@@ -98,6 +98,7 @@ use a constructor that does not take any cascaded format options as input:
 CascadedCompressor compressor(getnvcompType<int>());
 ```
 
-The compressor can then be used to `configure()`, and `compress_async()`.  The only change is that
-the call to `compress_async` will automatically call the selector, causing it to synchronize on the CUDA stream.
+The methods `configure()`, and `compress_async()` can then be called on the compressor.  The only change is that
+the call to `compress_async` will automatically call the selector, causing it to synchronize on the CUDA stream
+before launching the compression kernels on the stream asynchronously.
 No changes to decompression code are required when using the selector during compression like this.  
