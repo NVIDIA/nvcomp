@@ -33,7 +33,7 @@ nvcomp::CascadedCompressor<int> compressor(getnvcompType<int>(), 2, 1, true);
 ```
 
 Once this is done, we can get the required amount of temporary GPU space to perform the compression,
-and an esimate of the compressed output size.  These have to be allocated in order to perform the compression.
+and an estimate of the compressed output size.  These have to be allocated in order to perform the compression.
 Note that the output size will often be larger than the actual size of the compressed data.  This
 is because the exact size of the output is not known until compression has completed.
 
@@ -63,7 +63,7 @@ compressor.compress_async(uncompressed_data, uncompressed_bytes,
 ```
 
 This will issue the compression kernel.  The final compressed output size
-will bet written to `d_compressed_bytes` once it completes.  Since it runs
+will be written to `d_compressed_bytes` once it completes.  Since it runs
 asynchronously, you will need to synchronize on the stream before accessing
 the final output size.
 
