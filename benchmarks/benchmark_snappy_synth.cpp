@@ -35,7 +35,6 @@
 
 #include "cuda_runtime.h"
 
-#include <random>
 #include <string>
 #include <vector>
 #include <numeric>
@@ -285,20 +284,6 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   CUDA_CHECK(cudaEventDestroy(start));
   CUDA_CHECK(cudaEventDestroy(stop));
-}
-
-std::vector<uint8_t>
-gen_data(int max_byte, const size_t size, std::mt19937& rng)
-{
-  std::uniform_int_distribution<uint8_t> dist(0, max_byte);
-
-  std::vector<uint8_t> data;
-
-  for (size_t i = 0; i < size; ++i) {
-    data.emplace_back(dist(rng));
-  }
-
-  return data;
 }
 
 } // namespace

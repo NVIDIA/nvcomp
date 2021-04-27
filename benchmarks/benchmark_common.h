@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#pragma once
+
 #ifndef VERBOSE
 #define VERBOSE 0
 #endif
@@ -38,6 +40,8 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -80,6 +84,25 @@ void benchmark_assert(const bool pass, const std::string& msg)
   if (!pass) {
     throw std::runtime_error("ERROR: " + msg);
   }
+}
+
+std::vector<uint8_t>
+gen_data(const int max_byte, const size_t size, std::mt19937& rng)
+{
+  if (max_byte < 0
+      || max_byte > static_cast<int>(std::numeric_limits<uint8_t>::max())) {
+    throw std::runtime_error("Invalid byte value: " + std::to_string(max_byte));
+  }
+
+  std::uniform_int_distribution<uint16_t> dist(0, max_byte);
+
+  std::vector<uint8_t> data;
+
+  for (size_t i = 0; i < size; ++i) {
+    data.emplace_back(static_cast<uint8_t>(dist(rng) & 0xff));
+  }
+
+  return data;
 }
 
 // Load dataset from binary file into an array of type T
