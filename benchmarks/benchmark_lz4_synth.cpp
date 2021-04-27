@@ -34,7 +34,6 @@
 
 #include "benchmark_common.h"
 
-#include <random>
 #include <string.h>
 #include <string>
 #include <vector>
@@ -177,24 +176,6 @@ void run_benchmark(const std::vector<uint8_t>& data)
   cudaMemcpy(res.data(), decomp_out_ptr, num_bytes, cudaMemcpyDeviceToHost);
 
   benchmark_assert(res == data, "Decompressed data does not match input.");
-}
-
-std::vector<uint8_t>
-gen_data(int max_byte, const size_t size, std::mt19937& rng)
-{
-#if defined(_MSC_VER)
-  std::uniform_int_distribution<uint16_t> dist(0, max_byte);
-#else
-  std::uniform_int_distribution<uint8_t> dist(0, max_byte);
-#endif
-
-  std::vector<uint8_t> data;
-
-  for (size_t i = 0; i < size; ++i) {
-    data.emplace_back(dist(rng) & 0xff);
-  }
-
-  return data;
 }
 
 void run_tests(std::mt19937& rng)
