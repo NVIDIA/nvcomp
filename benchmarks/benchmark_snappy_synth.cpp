@@ -35,10 +35,11 @@
 
 #include "cuda_runtime.h"
 
+#include <cstring>
+#include <numeric>
+#include <random>
 #include <string>
 #include <vector>
-#include <numeric>
-#include <cstring>
 
 using namespace nvcomp;
 
