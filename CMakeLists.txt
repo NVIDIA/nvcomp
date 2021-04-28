@@ -51,6 +51,8 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
   endif()
 
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --Werror=all-warnings")
+
   # TODO: add clang warnings
 endif()
 

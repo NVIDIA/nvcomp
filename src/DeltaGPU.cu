@@ -61,7 +61,7 @@ __global__ void deltaKernel(
     VALUE** const outputPtr,
     const VALUE* const input,
     const size_t* const numDevice,
-    const size_t maxNum)
+    const size_t /* maxNum */)
 {
   const size_t num = *numDevice;
 
