@@ -151,7 +151,7 @@ namespace
 
 __global__ void serializeV1(
     void* const dest,
-    const size_t destSize,
+    const size_t /* destSize */,
     const int numRLEs,
     const int numDeltas,
     const bool useBitPacking,
@@ -314,9 +314,6 @@ CascadedMetadata deserializeMetadataFromGPUVersion1(
         + std::to_string(numInputs) + " vs. "
         + std::to_string(metadata.getNumInputs()));
   }
-
-  std::vector<OFFSET_TYPE> hdrOffsets(metadata.getNumInputs());
-  std::vector<OFFSET_TYPE> dataOffsets(metadata.getNumInputs());
 
   for (size_t i = 0; i < metadata.getNumInputs(); ++i) {
     const HEADER_TYPE header
