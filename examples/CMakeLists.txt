@@ -25,3 +25,16 @@ if (BUILD_GDS_EXAMPLE)
   add_executable (nvcomp_gds nvcomp_gds.cu)
   target_link_libraries(nvcomp_gds PRIVATE nvcomp CUDA::cudart cufile)
 endif()
+
+# Add LZ4 CPU executable
+find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
+find_library(LZ4_LIBRARY NAMES lz4)
+if (LZ4_INCLUDE_DIR AND LZ4_LIBRARY) 
+  # lz4 CPU example requires lz4 libraries
+  add_executable(lz4_cpu_compression lz4_cpu_compression.cu)
+  target_link_libraries(lz4_cpu_compression PRIVATE nvcomp CUDA::cudart)
+  target_include_directories(lz4_cpu_compression PUBLIC ${LZ4_INCLUDE_DIR})
+  target_link_libraries(lz4_cpu_compression PUBLIC ${LZ4_LIBRARY})
+else()
+  message(WARNING "Skipping building LZ4 CPU example, as no LZ4 library was found.")
+endif()
