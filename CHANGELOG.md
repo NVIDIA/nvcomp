@@ -1,8 +1,13 @@
-# nvcomp 2.0.0-rc0 (2021-04-20)
+# nvcomp 2.0.0 (2021-04-28)
 
-- Changed interfaces for LZ4 and Cascaded compressors.
-- Added Snappy compression.
+- Replace previous C, and C++ APIs.
+- Added Snappy compression (batched interface).
 - Added support for using Bitcomp and GDeflate external compressors.
+- Added `/examples` folder demonstrating use cases interface with CPU
+implementations of LZ4 and GDeflate, as well as GPU Direct Storage.
+- Improve support for Windows in benchmark implementations.
+- Made usage of `std::uniform_int_distribution<>` in the benchmarks
+conform to the C++14 standard.
 
 # nvcomp 1.2.3 (2021-04-07)
 
