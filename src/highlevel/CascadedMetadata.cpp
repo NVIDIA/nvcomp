@@ -37,6 +37,7 @@
 
 #include <iostream>
 #include <memory>
+#include <algorithm>
 
 namespace nvcomp
 {
