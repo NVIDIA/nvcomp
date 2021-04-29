@@ -51,7 +51,10 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
   endif()
 
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --Werror=all-warnings")
+  
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --Werror=all-warnings")
+  endif()
 
   # TODO: add clang warnings
 endif()
