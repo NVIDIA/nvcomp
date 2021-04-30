@@ -86,8 +86,8 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
       max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
-  std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
   std::cout << "chunks " << batch_size << std::endl;
+  std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
 
   size_t * batch_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
@@ -199,7 +199,9 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   std::cout << "comp_size: " << total_bytes_compressed
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
             << (double)total_bytes_uncompressed / total_bytes_compressed << std::endl;
-  std::cout << "compression throughput read+write (GB/s): " << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F
+  std::cout << "compression throughput (GB/s): "
+            << total_bytes_uncompressed
+                   / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F
             << std::endl;
 
   CUDA_CHECK(cudaFree(d_comp_temp));
@@ -257,8 +259,10 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
-  std::cout << "decompression throughput read+write (GB/s): "
-            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F << std::endl;
+  std::cout << "decompression throughput (GB/s): "
+            << total_bytes_uncompressed
+                   / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F
+            << std::endl;
 
   CUDA_CHECK(cudaFree(temp_ptr));
   CUDA_CHECK(cudaFree(d_comp_out_device));

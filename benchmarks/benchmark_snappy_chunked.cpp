@@ -67,13 +67,20 @@ void print_usage()
   printf("  %-35s Warm up benchmark (default %d)\n", "-w, --warmup_count", DEFAULT_WARMUP_COUNT);
   printf("  %-35s Average multiple kernel runtimes (default %d)\n", "-i, --iterations_count", DEFAULT_ITERATIONS_COUNT);
   printf("  %-35s Clone uncompressed chunks multiple times (default 0)\n", "-x, --duplicate_data");
+  printf(
+      "  %-35s Output in column/csv format (default comma)\n", "--csv-output");
   printf("  %-35s Use tab separator for the output (default comma)\n", "-t, --tab");
   printf("  %-35s Files(s) contain pages, each prefixed with int64 size\n", "-w, --file_with_page_sizes");
   printf("  %-35s Page size to use when splitting uncompressed data (default %d)\n", "-p, --page_size", DEFAULT_PAGE_SIZE);
   exit(1);
 }
 
-void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, int warmup_count, int iterations_count, char separator)
+void run_benchmark(
+    const std::vector<std::vector<uint8_t>>& uncompressed_data,
+    int warmup_count,
+    int iterations_count,
+    char separator,
+    const bool csv_output)
 {
   size_t batch_size = uncompressed_data.size();
 
@@ -88,7 +95,9 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
       max_batch_bytes_uncompressed = batch_bytes_host[i];
   }
 
-  std::cout << separator << total_bytes_uncompressed;
+  if (csv_output) {
+    std::cout << separator << total_bytes_uncompressed;
+  }
 
   size_t * batch_bytes_device;
   CUDA_CHECK(cudaMalloc((void **)(&batch_bytes_device), sizeof(size_t) * batch_bytes_host.size()));
@@ -197,10 +206,24 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
     sizeof(size_t) * batch_size,
     cudaMemcpyDeviceToHost));
   size_t total_bytes_compressed = std::accumulate(comp_out_bytes_host.begin(), comp_out_bytes_host.end(), (size_t)0);
-  std::cout << separator << total_bytes_compressed;
-  std::cout << separator << std::fixed << std::setprecision(2)
-            << (double)total_bytes_uncompressed / total_bytes_compressed;
-  std::cout << separator << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
+  if (csv_output) {
+    std::cout << separator << total_bytes_compressed;
+    std::cout << separator << std::fixed << std::setprecision(2)
+              << (double)total_bytes_uncompressed / total_bytes_compressed;
+    std::cout << separator
+              << (total_bytes_compressed + total_bytes_uncompressed)
+                     / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
+  } else {
+    std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
+    std::cout << "comp_size: " << total_bytes_compressed
+              << ", compressed ratio: " << std::fixed << std::setprecision(2)
+              << (double)total_bytes_compressed / total_bytes_uncompressed
+              << std::endl;
+    std::cout << "compression throughput (GB/s): "
+              << (double)total_bytes_uncompressed
+                     / (1.0e6 * (elapsedTime / iterations_count))
+              << std::endl;
+  }
 
   CUDA_CHECK(cudaFree(d_comp_temp));
   CUDA_CHECK(cudaFree(d_in_data_device));
@@ -257,8 +280,16 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
 
   CUDA_CHECK(cudaEventElapsedTime(&elapsedTime, start, stop));
 
-  std::cout << separator
-            << (total_bytes_compressed + total_bytes_uncompressed) / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
+  if (csv_output) {
+    std::cout << separator
+              << (total_bytes_compressed + total_bytes_uncompressed)
+                     / (elapsedTime * 0.001F / iterations_count) / 1.0e+9F;
+  } else {
+    std::cout << "decompression throughput (GB/s): "
+              << (double)total_bytes_uncompressed
+                     / (1.0e6 * (elapsedTime / iterations_count))
+              << std::endl;
+  }
 
   CUDA_CHECK(cudaFree(temp_ptr));
   CUDA_CHECK(cudaFree(d_comp_out_device));
@@ -333,6 +364,7 @@ int main(int argc, char* argv[])
   char separator = ',';
   int page_size = DEFAULT_PAGE_SIZE;
   bool file_with_page_sizes = false;
+  bool csv_output = false;
 
   char** argv_end = argv + argc;
   argv += 1;
@@ -348,6 +380,10 @@ int main(int argc, char* argv[])
     }
     if (strcmp(arg, "--file_with_page_sizes") == 0 || strcmp(arg, "-w") == 0) {
       file_with_page_sizes = true;
+      continue;
+    }
+    if (strcmp(arg, "--csv-output") == 0) {
+      csv_output = true;
       continue;
     }
 
@@ -394,28 +430,33 @@ int main(int argc, char* argv[])
 
   cudaSetDevice(gpu_num);
 
-  std::cout << "File"
-    << separator << "Duplicate data"
-    << separator << "Size in MB"
-    << separator << "Pages"
-    << separator << "Avg page size in KB"
-    << separator << "Max page size in KB"
-    << separator << "Ucompressed size in bytes"
-    << separator << "Compressed size in bytes"
-    << separator << "Compression ratio"
-    << separator << "Compression throughput read+write in GB/s"
-    << separator << "Decompression throughput read+write in GB/s"
-    << std::endl;
+  if (csv_output) {
+    std::cout << "File" << separator << "Duplicate data" << separator
+              << "Size in MB" << separator << "Pages" << separator
+              << "Avg page size in KB" << separator << "Max page size in KB"
+              << separator << "Ucompressed size in bytes" << separator
+              << "Compressed size in bytes" << separator << "Compression ratio"
+              << separator << "Compression throughput read+write in GB/s"
+              << separator << "Decompression throughput read+write in GB/s"
+              << std::endl;
+  }
 
   for(const std::string& input_file: input_files) {
-    std::cout << input_file;
+    if (csv_output) {
+      std::cout << input_file;
+    } else {
+      std::cout << "----------" << std::endl;
+      std::cout << "file: " << input_file << std::endl;
+    }
 
     std::vector<std::vector<uint8_t>> uncompressed_data = file_with_page_sizes ? 
       readFileWithPageSizes(input_file) : readFile(input_file, page_size);
 
     size_t original_chunks = uncompressed_data.size();
     {
-      std::cout << separator << duplicate_data;
+      if (csv_output) {
+        std::cout << separator << duplicate_data;
+      }
 
       uncompressed_data.resize(original_chunks * (duplicate_data + 1));
       for(int i = 0; i < duplicate_data; ++i)
@@ -428,14 +469,24 @@ int main(int argc, char* argv[])
     uint64_t max_size = std::accumulate(uncompressed_data.begin(), uncompressed_data.end(), (uint64_t)0,
       [] (uint64_t accum, const std::vector<uint8_t>& chunk) { return std::max<uint64_t>(accum, chunk.size()); } );
 
-    std::cout << separator << std::fixed << std::setprecision(2) << (total_size / 1.0e+6F);
-    std::cout << separator << uncompressed_data.size();
-    std::cout << separator << total_size / uncompressed_data.size() / 1.0e+3F;
-    std::cout << separator << max_size / 1.0e+3F;
+    if (csv_output) {
+      std::cout << separator << std::fixed << std::setprecision(2)
+                << (total_size / 1.0e+6F);
+      std::cout << separator << uncompressed_data.size();
+      std::cout << separator << total_size / uncompressed_data.size() / 1.0e+3F;
+      std::cout << separator << max_size / 1.0e+3F;
+    }
 
-    run_benchmark(uncompressed_data, warmup_count, iterations_count, separator);
+    run_benchmark(
+        uncompressed_data,
+        warmup_count,
+        iterations_count,
+        separator,
+        csv_output);
 
-    std::cout << std::endl;
+    if (csv_output) {
+      std::cout << std::endl;
+    }
   }
 
   return 0;
