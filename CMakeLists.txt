@@ -90,7 +90,8 @@ if( DEFINED NVCOMP_EXTS_ROOT )
 ENDIF()
 
 find_package(bitcomp)
-if (BITCOMP_FOUND)
+if (bitcomp_FOUND)
+  message (STATUS "Found bitcomp")
   add_definitions(-DENABLE_BITCOMP)
 endif()
 
