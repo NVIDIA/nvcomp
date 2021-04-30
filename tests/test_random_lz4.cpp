@@ -77,8 +77,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
     LZ4Compressor compressor(chunk_size);
     size_t comp_temp_bytes;
-    size_t comp_out_bytes;
-    compressor.configure(data.size(), &comp_temp_bytes, &comp_out_bytes);
+    compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
 
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -90,7 +89,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
     compressor.compress_async(
         d_in_data,
-        data.size(),
+        in_bytes,
         d_comp_temp,
         comp_temp_bytes,
         d_comp_out,
@@ -115,59 +114,54 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
     // between compression and decopmression
     //
 
-    try {
-      cudaStream_t stream;
-      cudaStreamCreate(&stream);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
 
-      LZ4Decompressor decompressor;
-      size_t temp_bytes;
-      size_t decomp_out_bytes;
-      decompressor.configure(
-          d_comp_out, comp_out_bytes, &temp_bytes, &decomp_out_bytes, stream);
+    LZ4Decompressor decompressor;
+    size_t temp_bytes;
+    size_t decomp_out_bytes;
+    decompressor.configure(
+        d_comp_out, comp_out_bytes, &temp_bytes, &decomp_out_bytes, stream);
 
-      void* temp_ptr;
-      cudaMalloc(&temp_ptr, temp_bytes);
-      T* out_ptr = NULL;
-      cudaMalloc((void**)&out_ptr, decomp_out_bytes);
+    void* temp_ptr;
+    cudaMalloc(&temp_ptr, temp_bytes);
+    T* out_ptr = NULL;
+    cudaMalloc((void**)&out_ptr, decomp_out_bytes);
 
-      auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
-      decompressor.decompress_async(
-          d_comp_out,
-          comp_out_bytes,
-          temp_ptr,
-          temp_bytes,
-          out_ptr,
-          decomp_out_bytes,
-          stream);
+    decompressor.decompress_async(
+        d_comp_out,
+        comp_out_bytes,
+        temp_ptr,
+        temp_bytes,
+        out_ptr,
+        decomp_out_bytes,
+        stream);
 
-      CUDA_CHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
 
-      // stop timing and the profiler
-      auto end = std::chrono::steady_clock::now();
-      std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
-                << std::endl;
+    // stop timing and the profiler
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
+              << std::endl;
 
-      cudaStreamDestroy(stream);
-      cudaFree(d_comp_out);
-      cudaFree(temp_ptr);
+    cudaStreamDestroy(stream);
+    cudaFree(d_comp_out);
+    cudaFree(temp_ptr);
 
-      std::vector<T> res(decomp_out_bytes / sizeof(T));
-      cudaMemcpy(&res[0], out_ptr, decomp_out_bytes, cudaMemcpyDeviceToHost);
+    std::vector<T> res(decomp_out_bytes / sizeof(T));
+    cudaMemcpy(&res[0], out_ptr, decomp_out_bytes, cudaMemcpyDeviceToHost);
 
 #if VERBOSE > 1
-      // dump output data
-      std::cout << "Output" << std::endl;
-      for (size_t i = 0; i < data.size(); i++)
-        std::cout << ((T*)out_ptr)[i] << " ";
-      std::cout << std::endl;
+    // dump output data
+    std::cout << "Output" << std::endl;
+    for (size_t i = 0; i < data.size(); i++)
+      std::cout << ((T*)out_ptr)[i] << " ";
+    std::cout << std::endl;
 #endif
 
-      REQUIRE(res == data);
-    } catch (const std::exception& e) {
-      std::cerr << "Exception in nvcompLZ4DecompressGetMetadata: " << e.what()
-                << std::endl;
-    }
+    REQUIRE(res == data);
   }
 }
 
