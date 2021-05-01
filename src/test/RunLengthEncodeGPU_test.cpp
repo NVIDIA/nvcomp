@@ -127,7 +127,7 @@ void compressAsyncTestRandom(const size_t n)
   void* workspace;
   const size_t maxNum = 2 * n;
   size_t const workspaceSize = RunLengthEncodeGPU::requiredWorkspaceSize(
-      maxNum, getnvcompType<T>(), getnvcompType<V>());
+      maxNum, TypeOf<T>(), TypeOf<V>());
   CUDA_RT_CALL(cudaMalloc((void**)&workspace, workspaceSize));
 
   // create on device inputs
@@ -162,9 +162,9 @@ void compressAsyncTestRandom(const size_t n)
   RunLengthEncodeGPU::compressDownstream(
       workspace,
       workspaceSize,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       reinterpret_cast<void**>(outputValuesPtr),
-      getnvcompType<V>(),
+      TypeOf<V>(),
       reinterpret_cast<void**>(outputCountsPtr),
       numOutDevice,
       input,
@@ -280,8 +280,8 @@ TEST_CASE("compress_10Million_Test", "[small]")
   CUDA_RT_CALL(cudaMalloc((void**)&numOutDevice, sizeof(*numOutDevice)));
 
   void* workspace;
-  size_t const workspaceSize = RunLengthEncodeGPU::requiredWorkspaceSize(
-      n, getnvcompType<T>(), getnvcompType<V>());
+  size_t const workspaceSize
+      = RunLengthEncodeGPU::requiredWorkspaceSize(n, TypeOf<T>(), TypeOf<V>());
   CUDA_RT_CALL(cudaMalloc((void**)&workspace, workspaceSize));
 
   cudaEvent_t start, stop;
@@ -294,9 +294,9 @@ TEST_CASE("compress_10Million_Test", "[small]")
   RunLengthEncodeGPU::compress(
       workspace,
       workspaceSize,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       outputValues,
-      getnvcompType<V>(),
+      TypeOf<V>(),
       outputCounts,
       numOutDevice,
       input,
@@ -386,7 +386,7 @@ TEST_CASE("compressDownstream_10kUniform_Test", "[small]")
   void* workspace;
   const size_t maxNum = 2 * n;
   const size_t workspaceSize = RunLengthEncodeGPU::requiredWorkspaceSize(
-      maxNum, getnvcompType<T>(), getnvcompType<V>());
+      maxNum, TypeOf<T>(), TypeOf<V>());
   CUDA_RT_CALL(cudaMalloc((void**)&workspace, workspaceSize));
 
   // create on device inputs
@@ -421,9 +421,9 @@ TEST_CASE("compressDownstream_10kUniform_Test", "[small]")
   RunLengthEncodeGPU::compressDownstream(
       workspace,
       workspaceSize,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       reinterpret_cast<void**>(outputValuesPtr),
-      getnvcompType<V>(),
+      TypeOf<V>(),
       reinterpret_cast<void**>(outputCountsPtr),
       numOutDevice,
       input,

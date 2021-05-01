@@ -364,7 +364,7 @@ inline CascadedSelector<T>::CascadedSelector(
   size_t temp;
 
   nvcompError_t status = nvcompCascadedSelectorConfigure(
-      &opts, getnvcompType<T>(), input_byte_len, &temp);
+      &opts, TypeOf<T>(), input_byte_len, &temp);
   throwExceptionIfError(status, "SelectorGetTempSize failed");
 
   this->max_temp_size = temp;
@@ -387,7 +387,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
   nvcompCascadedFormatOpts cascadedOpts;
   nvcompError_t status = nvcompCascadedSelectorRun(
       &opts,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       input_data,
       input_byte_len,
       d_workspace,

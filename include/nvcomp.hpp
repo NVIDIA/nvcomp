@@ -146,7 +146,7 @@ public:
  *****************************************************************************/
 
 template <typename T>
-inline nvcompType_t getnvcompType()
+inline nvcompType_t TypeOf()
 {
   if (std::is_same<T, int8_t>::value) {
     return NVCOMP_TYPE_CHAR;

@@ -142,11 +142,10 @@ void runBitPackingOnGPU(
       cudaMemcpyHostToDevice));
 
   void* workspace;
-  size_t workspaceBytes
-      = BitPackGPU::requiredWorkspaceSize(n, getnvcompType<T>());
+  size_t workspaceBytes = BitPackGPU::requiredWorkspaceSize(n, TypeOf<T>());
   CUDA_RT_CALL(cudaMalloc(&workspace, workspaceBytes));
 
-  const nvcompType_t inType = getnvcompType<T>();
+  const nvcompType_t inType = TypeOf<T>();
 
   cudaStream_t stream;
   CUDA_RT_CALL(cudaStreamCreate(&stream));

@@ -80,7 +80,7 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-  BitcompCompressor compressor(nvcomp::getnvcompType<T>(), algo);
+  BitcompCompressor compressor(nvcomp::TypeOf<T>(), algo);
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);

@@ -89,7 +89,7 @@ void test(
     int numDeltas,
     int bitPacking)
 {
-  const nvcompType_t type = nvcomp::getnvcompType<T>();
+  const nvcompType_t type = nvcomp::TypeOf<T>();
 
 #if VERBOSE > 1
   // dump input data
@@ -134,7 +134,7 @@ void test(
 
     status = nvcompCascadedCompressConfigure(
         &comp_opts,
-        nvcomp::getnvcompType<T>(),
+        nvcomp::TypeOf<T>(),
         in_bytes,
         &metadata_bytes,
         &comp_temp_bytes,
@@ -148,7 +148,7 @@ void test(
 
     status = nvcompCascadedCompressAsync(
         &comp_opts,
-        nvcomp::getnvcompType<T>(),
+        nvcomp::TypeOf<T>(),
         d_in_data,
         in_bytes,
         d_comp_temp,

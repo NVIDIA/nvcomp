@@ -132,7 +132,7 @@ nvcompCascadedFormatOpts internal_select(
       d_sample_ptrs,
       sample_bytes,
       num_samples,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       tempSpace.next(),
       tempSpace.spaceLeft(),
       out_sizes,
@@ -194,7 +194,7 @@ inline CascadedSelector<T>::CascadedSelector(
   size_t temp;
 
   NVCOMP_TYPE_ONE_SWITCH(
-      getnvcompType<T>(), get_workspace_size_internal, opts.num_samples, &temp);
+      TypeOf<T>(), get_workspace_size_internal, opts.num_samples, &temp);
 
   temp = roundUpTo(temp, 8);
 
@@ -217,7 +217,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
 {
 
   NVCOMP_TYPE_ONE_SWITCH_RETURN(
-      getnvcompType<T>(),
+      TypeOf<T>(),
       internal_select,
       input_data,
       input_byte_len,
@@ -239,7 +239,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
   double comp_ratio;
 
   NVCOMP_TYPE_ONE_SWITCH_RETURN(
-      getnvcompType<T>(),
+      TypeOf<T>(),
       internal_select,
       input_data,
       input_byte_len,

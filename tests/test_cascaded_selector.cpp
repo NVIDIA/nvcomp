@@ -84,7 +84,8 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   selector_opts.num_samples = num_samples;
   selector_opts.seed = 1;
 
-  nvcompError_t err = nvcompCascadedSelectorConfigure(&selector_opts, getnvcompType<T>(), in_bytes, &temp_bytes);
+  nvcompError_t err = nvcompCascadedSelectorConfigure(
+      &selector_opts, TypeOf<T>(), in_bytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
 
   CUDA_CHECK( cudaMalloc(&d_temp, temp_bytes) );
@@ -94,15 +95,15 @@ double test_selector_c(const std::vector<T>& input, size_t sample_size, size_t n
   double est_ratio;
 
   err = nvcompCascadedSelectorRun(
-           &selector_opts,
-           getnvcompType<T>(),
-           d_in_data,
-           in_bytes,
-           d_temp,
-           temp_bytes,
-           opts,
-           &est_ratio,
-           stream);
+      &selector_opts,
+      TypeOf<T>(),
+      d_in_data,
+      in_bytes,
+      d_temp,
+      temp_bytes,
+      opts,
+      &est_ratio,
+      stream);
 
   cudaStreamSynchronize(stream);
   REQUIRE(err == nvcompSuccess);
@@ -127,7 +128,8 @@ double test_selector_default_c(const std::vector<T>& input, nvcompCascadedFormat
   size_t temp_bytes = 0;
   void* d_temp;
 
-  nvcompError_t err = nvcompCascadedSelectorConfigure(NULL, getnvcompType<T>(), in_bytes, &temp_bytes);
+  nvcompError_t err = nvcompCascadedSelectorConfigure(
+      NULL, TypeOf<T>(), in_bytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
 
   CUDA_CHECK( cudaMalloc(&d_temp, temp_bytes) );
@@ -137,15 +139,15 @@ double test_selector_default_c(const std::vector<T>& input, nvcompCascadedFormat
   double est_ratio;
 
   err = nvcompCascadedSelectorRun(
-           NULL,
-           getnvcompType<T>(),
-           d_in_data,
-           in_bytes,
-           d_temp,
-           temp_bytes,
-           opts,
-           &est_ratio,
-           stream);
+      NULL,
+      TypeOf<T>(),
+      d_in_data,
+      in_bytes,
+      d_temp,
+      temp_bytes,
+      opts,
+      &est_ratio,
+      stream);
 
   cudaStreamSynchronize(stream);
   REQUIRE(err == nvcompSuccess);

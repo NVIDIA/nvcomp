@@ -90,12 +90,12 @@ TEST_CASE("AutoTempSize_OutputSize_C", "[small]")
 
   nvcompError_t err = nvcompCascadedCompressConfigure(
       NULL,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       numBytes,
       &metadata_bytes,
       &temp_bytes,
       &compressed_bytes);
-      
+
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 12251072);
   REQUIRE(compressed_bytes == 12000256);
