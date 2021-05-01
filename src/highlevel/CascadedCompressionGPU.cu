@@ -478,7 +478,8 @@ void compressTypedAsync(
   size_t* offsetDevice;
   tempSpace.reserve(&offsetDevice, 1);
 
-  CascadedMetadataOnGPU metadataOnGPU(out_ptr, *out_bytes);
+  CascadedMetadataOnGPU metadataOnGPU(
+      out_ptr, CascadedMetadataOnGPU::getSerializedSizeOf(metadata));
 
   metadataOnGPU.copyToGPU(metadata, offsetDevice, stream);
 
