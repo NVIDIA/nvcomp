@@ -101,23 +101,17 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   // Warmup (loading the library takes time)
+  size_t* comp_out_bytes_ptr;
+  cudaMallocHost((void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr));
   compressor.compress_async(
       d_in_data,
       in_bytes,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
-      &comp_out_bytes,
+      comp_out_bytes_ptr,
       stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
-
-  if (verbose_memory) {
-    std::cout << "compression memory (input+output+temp) (B): "
-              << (in_bytes + comp_out_bytes + comp_temp_bytes) << std::endl;
-    std::cout << "compression temp space (B): " << comp_temp_bytes << std::endl;
-    std::cout << "compression output space (B): " << comp_out_bytes
-              << std::endl;
-  }
 
   auto start = std::chrono::steady_clock::now();
   // Launch compression
@@ -127,10 +121,20 @@ static void run_benchmark(char* fname, int verbose_memory, int algo)
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
-      &comp_out_bytes,
+      comp_out_bytes_ptr,
       stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
+  comp_out_bytes = *comp_out_bytes_ptr;
+  cudaFreeHost(comp_out_bytes_ptr);
+
+  if (verbose_memory) {
+    std::cout << "compression memory (input+output+temp) (B): "
+              << (in_bytes + comp_out_bytes + comp_temp_bytes) << std::endl;
+    std::cout << "compression temp space (B): " << comp_temp_bytes << std::endl;
+    std::cout << "compression output space (B): " << comp_out_bytes
+              << std::endl;
+  }
 
   auto end = std::chrono::steady_clock::now();
 

@@ -192,10 +192,8 @@ nvcompError_t nvcompBitcompCompressAsync(
     return nvcompErrorInternal;
   if (bitcompDestroyPlan(handle) != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
-  // Not really async since we need to return the compressed size...
-  if (cudaStreamSynchronize(stream) != cudaSuccess)
-    return nvcompErrorInternal;
-  if (bitcompGetCompressedSize(static_cast<char*>(out_ptr), out_bytes)
+  if (bitcompGetCompressedSizeAsync(
+          static_cast<char*>(out_ptr), out_bytes, stream)
       != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
   return nvcompSuccess;

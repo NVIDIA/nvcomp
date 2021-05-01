@@ -97,6 +97,9 @@ void test_bitcomp(const std::vector<T>& input)
 
   // Allocate output buffer
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
+  size_t* comp_out_bytes_ptr;
+  CUDA_CHECK(
+      cudaMalloc((void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr)));
 
   compressor.compress_async(
       d_in_data,
@@ -104,10 +107,15 @@ void test_bitcomp(const std::vector<T>& input)
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out,
-      &comp_out_bytes,
+      comp_out_bytes_ptr,
       stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
+  CUDA_CHECK(cudaMemcpy(
+      &comp_out_bytes,
+      comp_out_bytes_ptr,
+      sizeof(comp_out_bytes),
+      cudaMemcpyDeviceToHost));
 
   cudaFree(d_in_data);
 
