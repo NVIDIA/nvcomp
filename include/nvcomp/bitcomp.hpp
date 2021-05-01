@@ -89,8 +89,7 @@ public:
    * @param temp_bytes The size of the temporary workspace.
    * @param out_ptr The location to output data to (GPU accessible).
    * @param out_bytes The size of the output location on input, and the size of
-   * the compressed data on output (CPU accessible, but must be pinned or
-   * managed memory for this function to be asynchronous).
+   * the compressed data on output (GPU accessible).
    * @param stream The stream to operate on.
    *
    * @throw NVCompException If compression fails to launch on the stream.
