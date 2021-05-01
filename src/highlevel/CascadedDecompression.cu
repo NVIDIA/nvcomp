@@ -1439,15 +1439,6 @@ nvcompError_t nvcompCascadedCompressAsync(
     checkCompressSize(in_bytes);
 
     CHECK_NOT_NULL(out_bytes);
-
-    if (*out_bytes == 0) {
-      throw NVCompException(
-          nvcompErrorInvalidValue,
-          "Output size cannot be zero. Make sure "
-          "to set the size of out_bytes to size of output space allocated "
-          "for compressed output.");
-    }
-
     nvcompCascadedFormatOpts final_opts;
     if(format_opts == NULL) { // need to run auto-selector of NULL
       nvcompCascadedSelectorOpts selector_opts;
