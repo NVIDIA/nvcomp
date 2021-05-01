@@ -73,7 +73,7 @@ TEST_CASE("comp/decomp RLE-Delta", "[nvcomp]")
   void* d_comp_out;
 
   // Get comptess temp size
-  CascadedCompressor compressor(getnvcompType<T>(), RLE, Delta, packing);
+  CascadedCompressor compressor(TypeOf<T>(), RLE, Delta, packing);
 
   compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(comp_temp_bytes > 0);
@@ -175,7 +175,7 @@ TEST_CASE("comp/decomp RLE-Delta-BP", "[nvcomp]")
   void* d_comp_temp;
   void* d_comp_out;
 
-  CascadedCompressor compressor(getnvcompType<T>(), RLE, Delta, packing);
+  CascadedCompressor compressor(TypeOf<T>(), RLE, Delta, packing);
 
   compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(comp_temp_bytes > 0);
@@ -273,7 +273,7 @@ TEST_CASE("max_size_test", "[nvcomp]")
   cudaMallocHost((void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr));
 
   try {
-    CascadedCompressor compressor(getnvcompType<T>(), RLE, Delta, packing);
+    CascadedCompressor compressor(TypeOf<T>(), RLE, Delta, packing);
 
     compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
 

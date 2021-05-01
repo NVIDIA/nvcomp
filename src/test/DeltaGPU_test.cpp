@@ -139,8 +139,7 @@ TEST_CASE("compress_10Thousand_Test", "[small]")
       inputSizePtr, &n, sizeof(*inputSizePtr), cudaMemcpyHostToDevice));
 
   void* workspace;
-  size_t const workspaceSize
-      = DeltaGPU::requiredWorkspaceSize(n, getnvcompType<T>());
+  size_t const workspaceSize = DeltaGPU::requiredWorkspaceSize(n, TypeOf<T>());
   CUDA_RT_CALL(cudaMalloc((void**)&workspace, workspaceSize));
 
   cudaEvent_t start, stop;
@@ -152,7 +151,7 @@ TEST_CASE("compress_10Thousand_Test", "[small]")
   DeltaGPU::compress(
       workspace,
       workspaceSize,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       (void**)outputPtr,
       input,
       inputSizePtr,

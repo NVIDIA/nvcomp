@@ -65,7 +65,7 @@ namespace nvcomp
 #endif
 
 template <>
-inline nvcompType_t getnvcompType<float>()
+inline nvcompType_t TypeOf<float>()
 {
   return NVCOMP_TYPE_INT;
 }

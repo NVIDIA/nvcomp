@@ -394,7 +394,7 @@ void compressInternal(
   const VALUE* const inTyped = static_cast<const VALUE*>(in);
 
   const size_t reqWorkspaceSize = RunLengthEncodeGPU::requiredWorkspaceSize(
-      num, getnvcompType<VALUE>(), getnvcompType<COUNT>());
+      num, TypeOf<VALUE>(), TypeOf<COUNT>());
   if (workspaceSize < reqWorkspaceSize) {
     throw std::runtime_error(
         "Invalid workspace size: " + std::to_string(workspaceSize)

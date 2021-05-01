@@ -118,14 +118,14 @@ TEST_CASE("SelectorGetTempSize_C", "[small]")
   selector_opts.seed = 1;
 
   nvcompError_t err = nvcompCascadedSelectorConfigure(
-      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
+      &selector_opts, TypeOf<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 120);
 
   selector_opts.num_samples = 100;
 
   err = nvcompCascadedSelectorConfigure(
-      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
+      &selector_opts, TypeOf<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 840);
 
@@ -133,7 +133,7 @@ TEST_CASE("SelectorGetTempSize_C", "[small]")
   selector_opts.num_samples = 1000;
 
   err = nvcompCascadedSelectorConfigure(
-      &selector_opts, getnvcompType<T>(), numBytes, &temp_bytes);
+      &selector_opts, TypeOf<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 8040);
 
@@ -178,7 +178,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
   try {
     nvcompError_t err = nvcompCascadedSelectorRun(
         &selector_opts,
-        getnvcompType<T>(),
+        TypeOf<T>(),
         d_input,
         numBytes,
         d_temp,
@@ -197,7 +197,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
   // Should run and get a good compression ratio estimate.
   nvcompError_t err = nvcompCascadedSelectorRun(
       &selector_opts,
-      getnvcompType<T>(),
+      TypeOf<T>(),
       d_input,
       numBytes,
       d_temp,

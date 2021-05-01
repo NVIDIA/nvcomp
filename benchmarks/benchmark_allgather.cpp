@@ -581,7 +581,7 @@ static void run_cascaded_benchmark(
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
       compressors[idx] = new CascadedCompressor(
-          getnvcompType<T>(), RLEs, deltas, bitPacking);
+          nvcomp::TypeOf<T>(), RLEs, deltas, bitPacking);
     }
   }
 

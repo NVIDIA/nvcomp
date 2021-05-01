@@ -92,7 +92,12 @@ static void run_benchmark(
   CUDA_CHECK(cudaMallocHost(&comp_out_bytes, sizeof(size_t)));
 
   status = nvcompCascadedCompressConfigure(
-      NULL, getnvcompType<T>(), in_bytes, &metadata_bytes, &comp_temp_bytes, comp_out_bytes);
+      NULL,
+      nvcomp::TypeOf<T>(),
+      in_bytes,
+      &metadata_bytes,
+      &comp_temp_bytes,
+      comp_out_bytes);
   benchmark_assert(status == nvcompSuccess, "CompressConfigure not successful");
 
   // Allocate temp workspace
@@ -116,7 +121,7 @@ static void run_benchmark(
   // Launch compression
   status = nvcompCascadedCompressAsync(
       NULL, // Null format_opts causes Selector to run
-      getnvcompType<T>(),
+      nvcomp::TypeOf<T>(),
       d_in_data,
       in_bytes,
       d_comp_temp,

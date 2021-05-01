@@ -323,7 +323,7 @@ void packToOutput(
     BitPackGPU::compress(
         packTemp,
         packTempSize,
-        getnvcompType<T>(),
+        TypeOf<T>(),
         outputDPtr,
         input,
         numElementsDPtr,
@@ -352,7 +352,7 @@ void generateTypedOutputUpperBound(
     const nvcompCascadedFormatOpts* const opts,
     size_t* const out_bytes)
 {
-  CascadedMetadata metadata(*opts, getnvcompType<valT>(), in_bytes, 0);
+  CascadedMetadata metadata(*opts, TypeOf<valT>(), in_bytes, 0);
 
   const int numRLEs = metadata.getNumRLEs();
   const int numDeltas = metadata.getNumDeltas();
@@ -365,7 +365,7 @@ void generateTypedOutputUpperBound(
   int vals_id = 0;
 
   // initialize config
-  nvcompType_t type = getnvcompType<valT>();
+  nvcompType_t type = TypeOf<valT>();
   nvcompIntConfig_t* config = createConfig(&metadata);
 
   // First past - set layers assume nothing actual compresses.
@@ -460,7 +460,7 @@ void compressTypedAsync(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  const nvcompType_t type = getnvcompType<valT>();
+  const nvcompType_t type = TypeOf<valT>();
 
   CascadedMetadata metadata(*format_opts, type, in_bytes, 0);
 
@@ -544,9 +544,9 @@ void compressTypedAsync(
         RunLengthEncodeGPU::compress(
             tempSpace.next(),
             tempSpace.spaceLeft(),
-            getnvcompType<valT>(),
+            TypeOf<valT>(),
             vals_output,
-            getnvcompType<runT>(),
+            TypeOf<runT>(),
             runs_output,
             numRunsDevice,
             vals_input,
@@ -556,9 +556,9 @@ void compressTypedAsync(
         RunLengthEncodeGPU::compressDownstream(
             tempSpace.next(),
             tempSpace.spaceLeft(),
-            getnvcompType<valT>(),
+            TypeOf<valT>(),
             (void**)vals_output_ptr,
-            getnvcompType<runT>(),
+            TypeOf<runT>(),
             (void**)runs_output_ptr,
             numRunsDevice,
             vals_input,
@@ -585,7 +585,7 @@ void compressTypedAsync(
         DeltaGPU::compress(
             tempSpace.next(),
             tempSpace.spaceLeft(),
-            getnvcompType<valT>(),
+            TypeOf<valT>(),
             (void**)vals_delta_ptr,
             vals_output,
             numRunsDevice,
@@ -643,7 +643,7 @@ void compressTypedAsync(
       DeltaGPU::compress(
           tempSpace.next(),
           tempSpace.spaceLeft(),
-          getnvcompType<valT>(),
+          TypeOf<valT>(),
           (void**)vals_output_ptr,
           vals_input,
           numRunsDevice,

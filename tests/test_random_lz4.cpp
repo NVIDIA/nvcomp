@@ -40,7 +40,7 @@
 template <typename T>
 void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 {
-  const nvcompType_t type = nvcomp::getnvcompType<T>();
+  const nvcompType_t type = nvcomp::TypeOf<T>();
 
   size_t chunk_size = 1 << 16;
 

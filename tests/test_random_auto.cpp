@@ -46,7 +46,7 @@
 template <typename T>
 void test_auto_c(const std::vector<T>& data)
 {
-  const nvcompType_t type = nvcomp::getnvcompType<T>();
+  const nvcompType_t type = nvcomp::TypeOf<T>();
 
 #if VERBOSE > 1
   // dump input data
@@ -86,19 +86,19 @@ void test_auto_c(const std::vector<T>& data)
 
     status = nvcompCascadedCompressConfigure(
         NULL, // Null means to auto-select the best scheme
-        nvcomp::getnvcompType<T>(),
+        nvcomp::TypeOf<T>(),
         in_bytes,
-        &metadata_bytes, 
+        &metadata_bytes,
         &comp_temp_bytes,
         &comp_out_bytes);
-        
+
     void* d_comp_temp;
     CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
     status = nvcompCascadedCompressAsync(
         NULL,
-        nvcomp::getnvcompType<T>(),
+        nvcomp::TypeOf<T>(),
         d_in_data,
         in_bytes,
         d_comp_temp,
@@ -198,7 +198,7 @@ void test_auto_c(const std::vector<T>& data)
 template <typename T>
 void test_auto_cpp(const std::vector<T>& data)
 {
-  const nvcompType_t type = nvcomp::getnvcompType<T>();
+  const nvcompType_t type = nvcomp::TypeOf<T>();
 
 #if VERBOSE > 1
   // dump input data
@@ -231,7 +231,7 @@ void test_auto_cpp(const std::vector<T>& data)
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    CascadedCompressor compressor(nvcomp::getnvcompType<T>());
+    CascadedCompressor compressor(nvcomp::TypeOf<T>());
 
     size_t comp_temp_bytes;
     size_t comp_out_bytes;

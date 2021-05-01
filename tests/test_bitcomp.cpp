@@ -87,7 +87,7 @@ void test_bitcomp(const std::vector<T>& input)
   void* const d_comp_temp = nullptr;
 
   // Get compressor temp size. Bitcomp should not use any.
-  BitcompCompressor compressor(nvcomp::getnvcompType<T>());
+  BitcompCompressor compressor(nvcomp::TypeOf<T>());
 
   size_t comp_temp_bytes;
   size_t comp_out_bytes;
