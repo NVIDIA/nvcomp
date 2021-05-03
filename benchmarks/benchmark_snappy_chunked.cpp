@@ -217,7 +217,7 @@ void run_benchmark(
     std::cout << "uncompressed (B): " << total_bytes_uncompressed << std::endl;
     std::cout << "comp_size: " << total_bytes_compressed
               << ", compressed ratio: " << std::fixed << std::setprecision(2)
-              << (double)total_bytes_compressed / total_bytes_uncompressed
+              << (double)total_bytes_uncompressed / total_bytes_compressed
               << std::endl;
     std::cout << "compression throughput (GB/s): "
               << (double)total_bytes_uncompressed
