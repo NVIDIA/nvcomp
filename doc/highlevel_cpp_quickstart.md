@@ -1,4 +1,4 @@
-# C++ Quick Start Guide
+# High-level C++ Quick Start Guide
 
 NVCOMP provides a C++ interface, which simplifies use of the library by
 throwing exceptions and managing state inside of objects.

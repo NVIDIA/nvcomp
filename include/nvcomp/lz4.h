@@ -189,7 +189,7 @@ nvcompError_t nvcompLZ4DecompressAsync(
 void nvcompLZ4DestroyMetadata(void* metadata_ptr);
 
 /******************************************************************************
- * Batched compression/decompression interface for LZ4 2.0
+ * Batched compression/decompression interface
  *****************************************************************************/
 
 /**
