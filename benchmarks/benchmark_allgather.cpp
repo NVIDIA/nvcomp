@@ -701,6 +701,12 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  if (gpu_num < 2) {
+    std::cerr << "The number of GPUs specified by `--gpu` must be at least 2."
+              << std::endl;
+    return 1;
+  }
+
   if (chunks == 0)
     chunks = gpu_num;
 
