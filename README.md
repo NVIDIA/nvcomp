@@ -20,8 +20,15 @@ Below are compression ratio and performance plots for three methods available in
 ![decompression performance](/doc/decompression_performance_a100.png)
 
 nvCOMP 2.0.0 features new flexible APIs:
-* **Low-level** is targeting advanced users — metadata and chunking must be handled outside of nvCOMP, low-level nvCOMP APIs perform batch compression/decompression of multiple streams, they are light-weight and fully asynchronous.
-* **High-level** is provided for ease of use — metadata and chunking is handled internally by nvCOMP, this enables the easiest way to ramp up and use nvCOMP in applications, some of the high-level APIs are synchronous and for best performance/flexibility it’s recommended to use the low-level APIs.
+* [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
+  metadata and chunking must be handled outside of nvCOMP, low-level nvCOMP
+  APIs perform batch compression/decompression of multiple streams, they are
+  light-weight and fully asynchronous.
+* [**High-level**](doc/highlevel_cpp_quickstart.md) is provided for ease of use —
+  metadata and chunking is handled internally by nvCOMP, this enables the
+  easiest way to ramp up and use nvCOMP in applications, some of the high-level
+  APIs are synchronous and for best performance/flexibility it’s recommended to
+  use the low-level APIs.
 
 Please note, that in nvCOMP 2.0.0 some compressor are only available either through the Low-level API or through the High-level API.
 
@@ -77,8 +84,8 @@ cmake -DCUB_DIR=<path to cub repository>
 
 # How to use the library in your code
 
-* [C++ Quick Start Guide](doc/cpp_quickstart.md)
-* [Batched Compression/Decompression Guide](doc/batched-quickstart.md)
+* [High-level Quick Start Guide](doc/highlevel_cpp_quickstart.md)
+* [Low-level Quick Start Guide](doc/lowlevel_c_quickstart.md)
 * [Cascaded Format Selector Guide](doc/selector-quickstart.md)
 
 # Further information about our compression algorithms
