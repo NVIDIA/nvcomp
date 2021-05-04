@@ -15,7 +15,7 @@ Below are compression ratio and performance plots for three methods available in
 
 ![compression ratio](/doc/compression_ratio.png)
 
-![compression performance](/doc/compression_performance_a100.png)
+![compression performance](/doc/compression_performance_a100.svg)
 
 ![decompression performance](/doc/decompression_performance_a100.png)
 
