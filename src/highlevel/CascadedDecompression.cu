@@ -1449,8 +1449,13 @@ nvcompError_t nvcompCascadedCompressAsync(
 
       // Adjust sample size if input is too small
       if (in_bytes < (selector_opts.sample_size * selector_opts.num_samples * type_bytes)) {
-        selector_opts.sample_size = in_bytes / (10 * type_bytes);
-        selector_opts.num_samples = 10;
+        selector_opts.num_samples = in_bytes / (selector_opts.sample_size*type_bytes);
+
+        // If too small for even 1 sample of 1024, decrease sample size
+        if (in_bytes < 1024*type_bytes) {
+          selector_opts.num_samples = 1;
+          selector_opts.sample_size = in_bytes / type_bytes;
+        }
       }
 
       double est_ratio;
