@@ -351,6 +351,12 @@ void test_random_auto_cpp(int max_val, int max_run, size_t chunk_size)
 }
 
 
+TEST_CASE("Auto-tiny-int", "[tiny][auto]")
+{
+  for(int size=1; size<1024; size++) {
+    test_random_auto_c<int>(10,10,size);
+  }
+}
 
 TEST_CASE("Auto-small-int", "[small][auto]")
 {
