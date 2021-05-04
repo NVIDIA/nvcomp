@@ -8,6 +8,8 @@ implementations of LZ4 and GDeflate, as well as GPU Direct Storage.
 - Improve support for Windows in benchmark implementations.
 - Made usage of `std::uniform_int_distribution<>` in the benchmarks
 conform to the C++14 standard.
+- Fix issue in Cascaded compression when using the default configuration
+('auto'), for small inputs.
 
 # nvcomp 1.2.3 (2021-04-07)
 
