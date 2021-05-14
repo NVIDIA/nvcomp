@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.18)
 project(nvcomp LANGUAGES C CUDA CXX)
 
+option(BUILD_TESTS "Build unit and end-to-end tests." OFF)
+option(BUILD_BENCHMARKS "Build benchmarks." OFF)
+option(BUILD_EXAMPLES "Build examples." OFF)
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -105,9 +109,18 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 file(COPY include/ DESTINATION ${CMAKE_BINARY_DIR}/include)
 
-enable_testing()
+if (BUILD_TESTS)
+  enable_testing()
+endif()
 
 add_subdirectory(src)
-add_subdirectory(tests)
-add_subdirectory(benchmarks)
-add_subdirectory(examples)
+
+if (BUILD_TESTS)
+  add_subdirectory(tests)
+endif()
+if (BUILD_BENCHMARKS)
+  add_subdirectory(benchmarks)
+endif()
+if (BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
