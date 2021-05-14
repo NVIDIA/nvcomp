@@ -234,7 +234,6 @@ void test_auto_cpp(const std::vector<T>& data)
     CascadedCompressor compressor(nvcomp::TypeOf<T>());
 
     size_t comp_temp_bytes;
-    size_t comp_out_bytes;
     compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
 
     // Allocate temp storage
@@ -271,9 +270,10 @@ void test_auto_cpp(const std::vector<T>& data)
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    CascadedDecompressor decompressor;
     size_t decomp_temp_bytes;
     size_t decomp_out_bytes;
+    CascadedDecompressor decompressor;
+
     decompressor.configure(
         d_comp_out,
         comp_out_bytes,
@@ -297,7 +297,8 @@ void test_auto_cpp(const std::vector<T>& data)
     auto start = std::chrono::steady_clock::now();
 
     // execute decompression 
-    decompressor.decompress_async(d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_out_bytes, stream);
+    decompressor.decompress_async(
+        d_comp_out, comp_out_bytes, d_decomp_temp, decomp_temp_bytes, decomp_out_ptr, decomp_out_bytes, stream);
     
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -347,7 +348,7 @@ void test_random_auto_cpp(int max_val, int max_run, size_t chunk_size)
   int seed = (max_val ^ max_run ^ chunk_size);
   random_runs(data, (T)max_val, (T)max_run, seed);
 
-//  test_auto_cpp(data); // TODO - Fix CPP test with new API
+  test_auto_cpp(data); 
 }
 
 

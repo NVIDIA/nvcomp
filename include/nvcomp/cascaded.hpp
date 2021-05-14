@@ -270,8 +270,14 @@ inline void CascadedCompressor::configure(
     const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
 {
   size_t metadata_bytes;
+  nvcompCascadedFormatOpts* temp_opts = &m_opts;
+  if(m_opts.num_RLEs == -1) {
+    temp_opts = NULL;
+  }
+
   nvcompError_t status = nvcompCascadedCompressConfigure(
-      &m_opts, m_type, in_bytes, &metadata_bytes, temp_bytes, out_bytes);
+        temp_opts, m_type, in_bytes, &metadata_bytes, temp_bytes, out_bytes);
+
   throwExceptionIfError(status, "nvcompCascadedCompressConfigure() failed");
 }
 
@@ -284,8 +290,14 @@ inline void CascadedCompressor::compress_async(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
+
+  nvcompCascadedFormatOpts* temp_opts = &m_opts;
+  if(m_opts.num_RLEs == -1) {
+    temp_opts = NULL;
+  }
+
   nvcompError_t status = nvcompCascadedCompressAsync(
-      &m_opts,
+      temp_opts,
       m_type,
       in_ptr,
       in_bytes,
