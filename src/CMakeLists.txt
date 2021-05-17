@@ -1,10 +1,11 @@
+# build real and virtual, so as to run on 6x cards.
 set(GPU_ARCHS "60")
 
 if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "8")
-  set(GPU_ARCHS ${GPU_ARCHS} "70")
+  set(GPU_ARCHS ${GPU_ARCHS} "70-real")
 endif()
 if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "9")
-  set(GPU_ARCHS ${GPU_ARCHS} "75")
+  set(GPU_ARCHS ${GPU_ARCHS} "75-real")
 endif()
 if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11")
   set(GPU_ARCHS ${GPU_ARCHS} "80")
