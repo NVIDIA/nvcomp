@@ -109,6 +109,19 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 file(COPY include/ DESTINATION ${CMAKE_BINARY_DIR}/include)
 
+# determine version
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.h" MAIN_HEADER)
+string(REGEX MATCH "#define NVCOMP_MAJOR_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
+set(VER_MAJOR "${CMAKE_MATCH_1}")
+string(REGEX MATCH "#define NVCOMP_MINOR_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
+set(VER_MINOR "${CMAKE_MATCH_1}")
+string(REGEX MATCH "#define NVCOMP_PATCH_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
+set(VER_PATCH "${CMAKE_MATCH_1}")
+
+set(NVCOMP_VERSION "${VER_MAJOR}.${VER_MINOR}.${VER_PATCH}")
+
+message("Build nvCOMP version ${NVCOMP_VERSION}")
+
 if (BUILD_TESTS)
   enable_testing()
 endif()
@@ -124,3 +137,44 @@ endif()
 if (BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
+
+
+if (UNIX)
+  include(GNUInstallDirs)
+endif()
+
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/nvcomp)
+
+
+#------
+# Build directory exporting
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/nvcomp-config.cmake.in"
+                              "${CMAKE_CURRENT_BINARY_DIR}/nvcomp-config.cmake"
+                              INSTALL_DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+export(TARGETS nvcomp
+       FILE "${CMAKE_CURRENT_BINARY_DIR}/nvcomp-targets.cmake"
+       )
+
+
+#------
+# Install directory setup
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/nvcomp-config.cmake.in"
+                              "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
+                              INSTALL_DESTINATION "${INSTALL_CONFIGDIR}")
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake
+    VERSION "${NVCOMP_VERSION}"
+    COMPATIBILITY SameMinorVersion)
+
+install(TARGETS nvcomp EXPORT nvcomp-exports DESTINATION lib)
+install(EXPORT nvcomp-exports
+        FILE          nvcomp-targets.cmake
+        NAMESPACE     nvcomp::
+        DESTINATION   "${INSTALL_CONFIGDIR}")
+
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
+              "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake"
+        DESTINATION "${INSTALL_CONFIGDIR}")
