@@ -82,6 +82,24 @@ If you're building using CUDA 10 or less, you will need to specify a path to
 cmake -DCUB_DIR=<path to cub repository>
 ```
 
+# Install the library
+
+The library can then be installed via:
+```
+make install
+```
+
+To change where the library is installed, set the `CMAKE_INSTALL_PREFIX`
+variable to the desired prefix. For example, to install into `/foo/bar/`:
+
+```
+cmake .. -DCMAKE_INSTALL_PREFIX=/foo/bar
+make -j
+make install
+```
+Will install the `libnvcomp.so` into `/foo/bar/lib/libnvcomp.so` and the
+headers into `/foo/bar/include/`.
+
 # How to use the library in your code
 
 * [High-level Quick Start Guide](doc/highlevel_cpp_quickstart.md)
@@ -93,6 +111,16 @@ cmake -DCUB_DIR=<path to cub repository>
 * [Algorithms overview](doc/algorithms_overview.md)
 
 # Running benchmarks
+
+By default the benchmarks are not built. To build them, pass
+`-DBUILD_BENCHMARKS=ON` to cmake.
+
+```
+cmake .. -DBUILD_BENCHMARKS=ON
+make -j
+```
+This will result in the benchmarks being placed inside of the `bin/` directory.
+
 To obtain TPC-H data:
 - Clone and compile https://github.com/electrum/tpch-dbgen
 - Run `./dbgen -s <scale factor>`, then grab `lineitem.tbl`
@@ -106,7 +134,7 @@ Convert CSV files to binary files:
 - For example, run `python benchmarks/text_to_binary.py lineitem.tbl <column number> <datatype> column_data.bin '|'` to generate the binary dataset `column_data.bin` for TPC-H lineitem column `<column number>` using `<datatype>` as the type
 - *Note*: make sure that the delimiter is set correctly, default is `,`
 
-Run tests:
+Run benchmarks:
 - Run `./bin/benchmark_cascaded_auto` or `./bin/benchmark_lz4` with `-f column_data.bin <options>` to measure throughput.
 
 Below are some example benchmark results on a RTX 3090 for the Mortgage 2000Q4 column 0:
