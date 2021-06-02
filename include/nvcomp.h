@@ -131,16 +131,6 @@ nvcompError_t
 nvcompDecompressGetType(const void* metadata_ptr, nvcompType_t* type);
 
 /**
- * @brief Check if the compressed data must be decompressed to the same data
- * type from which was compressed.
- *
- * @param metadata_ptr The metadata.
- *
- * @return nvcompSuccess if successful, and an error code otherwise.
- */
-int nvcompDecompressIsTypeSensitive(const void* metadata_ptr);
-
-/**
  * @brief Perform the asynchronous decompression.
  *
  * @param in_ptr The compressed data on the device to decompress.
