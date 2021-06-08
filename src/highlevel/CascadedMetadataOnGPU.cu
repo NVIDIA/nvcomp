@@ -390,12 +390,7 @@ void CascadedMetadataOnGPU::copyToGPU(
       metadata.getValueType(),
       metadata.getNumInputs(),
       serializedSizeDevice);
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    throw std::runtime_error(
-        "Failed to launch metadata serialization kernel: "
-        + std::to_string(err));
-  }
+  CudaUtils::check_last_error("Failed to launch metadata serialization kernel");
 
   if (metadata.haveAnyOffsetsBeenSet()) {
     if (!metadata.haveAllOffsetsBeenSet()) {
@@ -459,6 +454,7 @@ void CascadedMetadataOnGPU::saveOffset(
   }
 
   setOffset<<<1, 1, 0, stream>>>(m_ptr, index, offsetDevice);
+  CudaUtils::check_last_error("Failed to launch setOffset");
 }
 
 void CascadedMetadataOnGPU::setCompressedSizeFromGPU(

@@ -233,8 +233,10 @@ void cubDeviceScanTempSpace(size_t& temp_scan_bytes, const size_t max_input_len)
   void* temp_scan = nullptr;
   T* temp_run = nullptr;
 
-  cub::DeviceScan::InclusiveSum(
-      temp_scan, temp_scan_bytes, temp_run, temp_run, max_input_len);
+  CudaUtils::check(
+      cub::DeviceScan::InclusiveSum(
+          temp_scan, temp_scan_bytes, temp_run, temp_run, max_input_len),
+      "cub::DeviceScan::InclusiveSum failed");
 }
 
 void checkCompressSize(const size_t numBytes)
@@ -791,12 +793,15 @@ void unpackGpu(
 
   const dim3 block(512);
   const dim3 grid(roundUpDiv(length, block.x));
+
   if (node->packing) {
     unpackBytesKernel<<<grid, block, 0, stream>>>(
         d_input, d_output, numBits, minValue, length);
+    CudaUtils::check_last_error("unpacKBytesKernel failed to launch");
   } else {
     convertKernel<<<grid, block, 0, stream>>>(
         static_cast<const inputT*>(d_input), d_output, length);
+    CudaUtils::check_last_error("convertKernel failed to launch");
   }
 }
 
@@ -938,39 +943,15 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
     const void** h_headers,
     cudaStream_t stream)
 {
-  // prepare device output buffer if necessary
-  // TODO: move to the init step
-  cudaPointerAttributes attr;
-  outputT* out_ptr = NULL;
-
   // get typed copies of pointers to avoid casting
   outputT* const localOutput = static_cast<outputT*>(temp_output);
   outputT* const localDelta = static_cast<outputT*>(temp_delta);
   runT* const localRun = static_cast<runT*>(temp_run);
 
-  if (node->ptr == nullptr) {
-    throw std::runtime_error(
-        "nvcompIntHandle_t::decompGPU(): Got node with null ptr.");
-  }
-
-  cudaError_t err = cudaPointerGetAttributes(&attr, node->ptr);
-  if (err != cudaSuccess) {
-    throw std::runtime_error(
-        "nvcompIntHandle_t::decompGPU(): Failed to get cuda pointer "
-        "attributes: "
-        + std::to_string(err));
-  }
-
-  if (attr.type != cudaMemoryTypeUnregistered) {
-    // direct access is possible
-    out_ptr = (outputT*)attr.devicePointer;
-  } else {
-    throw std::runtime_error("nvcompIntHandle_t::decompGPU(): Workspace memory "
-                             "not accessible to GPU.");
-  }
+  outputT* out_ptr
+      = CudaUtils::device_pointer(static_cast<outputT*>(node->ptr));
 
   nvcompLayer_t* layer = node->parentLayer;
-
   if (layer->scheme == NVCOMP_SCHEME_BP) {
     // We assume this is the only layer, and we just do it and exit
     layer->vals->ptr = out_ptr;
@@ -1033,8 +1014,10 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
 
   if (layer->scheme == NVCOMP_SCHEME_DELTA) {
     assert(out_ptr != d_vals);
-    cub::DeviceScan::InclusiveSum(
-        temp_scan, temp_scan_bytes, d_vals, out_ptr, input_size, stream);
+    CudaUtils::check(
+        cub::DeviceScan::InclusiveSum(
+            temp_scan, temp_scan_bytes, d_vals, out_ptr, input_size, stream),
+        "cub::DeviceScan::InclusiveSum failed");
   } else {
     // must be RLE of some form
     runT* d_runs = (runT*)layer->runs->ptr;
@@ -1046,21 +1029,26 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
       const dim3 grid(roundUpDiv(input_size, block.x));
       vecMultKernel<<<grid, block, 0, stream>>>(
           d_vals, d_runs, localDelta, input_size);
+      CudaUtils::check_last_error("vecMultKernel failed to launch");
 
       // inclusive scan to compute Delta sums
-      cub::DeviceScan::InclusiveSum(
-          temp_scan,
-          temp_scan_bytes,
-          localDelta,
-          localDelta,
-          input_size,
-          stream);
+      CudaUtils::check(
+          cub::DeviceScan::InclusiveSum(
+              temp_scan,
+              temp_scan_bytes,
+              localDelta,
+              localDelta,
+              input_size,
+              stream),
+          "cub::DeviceScan::InclusiveSum");
     }
 
     // inclusive scan to compute RLE offsets
     // TODO: could be merged with the unpack kernel?
-    cub::DeviceScan::InclusiveSum(
-        temp_scan, temp_scan_bytes, d_runs, d_runs, input_size, stream);
+    CudaUtils::check(
+        cub::DeviceScan::InclusiveSum(
+            temp_scan, temp_scan_bytes, d_runs, d_runs, input_size, stream),
+        "cub::DeviceScan::InclusiveSum");
 
     const size_t output_length = node->length;
 
@@ -1072,6 +1060,7 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
     searchBlockBoundaries<runT, RLE_THREAD_BLOCK, RLE_ELEMS_PER_THREAD>
         <<<output_grid_block, RLE_THREAD_BLOCK, 0, stream>>>(
             start_ind, start_off, output_grid, input_size, d_runs);
+    CudaUtils::check_last_error("searchBlockBoundariesKernel failed to launch");
 
     // expand RLE and apply Delta: buf[r] -> buf[r+1]
     // TODO: implement macro to look nicer?
@@ -1091,6 +1080,7 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
           localDelta,
           start_ind,
           start_off);
+      CudaUtils::check_last_error("expandRLEDelta failed to launch");
       break;
     case NVCOMP_SCHEME_RLE:
       expandRLEDelta<
@@ -1107,6 +1097,7 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
           localDelta,
           start_ind,
           start_off);
+      CudaUtils::check_last_error("expandRLEDelta failed to launch");
       break;
     default:
       throw std::runtime_error(
