@@ -71,6 +71,14 @@ typedef enum nvcompType_t
  *****************************************************************************/
 
 /**
+ * NOTE: These interfaces will be removed in future releases, please switch to
+ * the compression schemes specific interfaces in nvcomp/cascaded.h,
+ * nvcomp/lz4.h, nvcomp/snappy, nvcomp/bitcomp.h, and nvcomp/gdeflate.h.
+ */
+
+/**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Extracts the metadata from the input in_ptr on the device and copies
  *it to the host.
  *
@@ -89,6 +97,8 @@ nvcompError_t nvcompDecompressGetMetadata(
     cudaStream_t stream);
 
 /**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Destroys the metadata object and frees the associated memory.
  *
  * @param metadata_ptr The pointer to destroy.
@@ -96,6 +106,8 @@ nvcompError_t nvcompDecompressGetMetadata(
 void nvcompDecompressDestroyMetadata(void* metadata_ptr);
 
 /**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Computes the required temporary workspace required to perform
  * decompression.
  *
@@ -109,6 +121,8 @@ nvcompError_t
 nvcompDecompressGetTempSize(const void* metadata_ptr, size_t* temp_bytes);
 
 /**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Computes the size of the uncompressed data in bytes.
  *
  * @para metadata_ptr The metadata.
@@ -120,6 +134,8 @@ nvcompError_t
 nvcompDecompressGetOutputSize(const void* metadata_ptr, size_t* output_bytes);
 
 /**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Get the type of the compressed data.
  *
  * @param metadata_ptr The metadata.
@@ -131,6 +147,8 @@ nvcompError_t
 nvcompDecompressGetType(const void* metadata_ptr, nvcompType_t* type);
 
 /**
+ * DEPRECATED: Will be removed in future releases.
+ *
  * @brief Perform the asynchronous decompression.
  *
  * @param in_ptr The compressed data on the device to decompress.

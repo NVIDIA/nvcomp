@@ -37,10 +37,43 @@
 #include "nvcomp/lz4.h"
 #include "nvcomp/bitcomp.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 
 using namespace nvcomp;
 using namespace nvcomp::highlevel;
+
+#define DEPRECATED_FUNC(replacement)                                           \
+  do {                                                                         \
+    static bool has_warned = false;                                            \
+    if (!has_warned) {                                                         \
+      warn_deprecated(__FUNCTION__, replacement);                              \
+      has_warned = true;                                                       \
+    }                                                                          \
+  } while (false)
+
+namespace
+{
+
+void warn_deprecated(
+    const std::string& name, const std::string& replacement = "")
+{
+  const char* const level = std::getenv("NVCOMP_WARN");
+  if (level == nullptr || strcmp(level, "SILENT") != 0) {
+    std::cerr << "WARNING: The function '" << name
+              << "' is deprecated and "
+                 "will be removed in future releases. ";
+    if (!replacement.empty()) {
+      std::cerr << "Please use '" << replacement << "' instead. ";
+    }
+    std::cerr << "To suppress this message, define the environment variable "
+                 "'NVCOMP_WARN=SILENT'."
+              << std::endl;
+  }
+}
+
+} // namespace
 
 nvcompError_t nvcompDecompressGetMetadata(
     const void* const in_ptr,
@@ -48,6 +81,8 @@ nvcompError_t nvcompDecompressGetMetadata(
     void** const metadata_ptr,
     cudaStream_t stream)
 {
+  DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
+
   cudaStreamSynchronize(stream);
   if (LZ4IsData(in_ptr, in_bytes, stream)) {
     size_t metadata_bytes, temp_bytes, uncompressed_bytes;
@@ -93,6 +128,7 @@ nvcompError_t nvcompDecompressGetMetadata(
 
 void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 {
+  DEPRECATED_FUNC("nvcomp*DestroyMetadata()");
 #ifdef ENABLE_BITCOMP
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
 #endif
@@ -112,6 +148,8 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 nvcompError_t nvcompDecompressGetTempSize(
     const void* const metadata_ptr, size_t* const temp_bytes)
 {
+  DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
+
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
   if (LZ4IsMetadata(metadata_ptr)) {
     try {
@@ -148,6 +186,8 @@ nvcompError_t nvcompDecompressGetTempSize(
 nvcompError_t nvcompDecompressGetOutputSize(
     const void* const metadata_ptr, size_t* const output_bytes)
 {
+  DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
+
   if (metadata_ptr == nullptr) {
     std::cerr << "Cannot get the output size from a null metadata."
               << std::endl;
@@ -168,6 +208,8 @@ nvcompError_t nvcompDecompressGetOutputSize(
 nvcompError_t nvcompDecompressGetType(
     const void* const metadata_ptr, nvcompType_t* const type)
 {
+  DEPRECATED_FUNC(""); // no replacement
+
   if (metadata_ptr == nullptr) {
     std::cerr << "Cannot get the type from a null metadata." << std::endl;
     return nvcompErrorInvalidValue;
@@ -199,6 +241,8 @@ nvcompError_t nvcompDecompressAsync(
     const size_t out_bytes,
     cudaStream_t stream)
 {
+  DEPRECATED_FUNC("nvcomp*DecompressAsync()");
+
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
   if (LZ4IsMetadata(metadata_ptr)) {
     return nvcompLZ4DecompressAsync(
@@ -227,10 +271,8 @@ nvcompError_t nvcompDecompressAsync(
         stream);
 #else
     return nvcompErrorNotSupported;
-#endif        
-  }
-
-  else {
+#endif
+  } else {
     size_t metadata_bytes = 0;
     return nvcompCascadedDecompressAsync(
         in_ptr,
@@ -243,5 +285,4 @@ nvcompError_t nvcompDecompressAsync(
         out_bytes,
         stream);
   }
-
 }
