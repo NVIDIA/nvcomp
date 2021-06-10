@@ -1,3 +1,15 @@
+# nvcomp 2.0.1 (2021-06-08)
+
+- Improve CMake setup for using nvCOMP as a submodule. This includes marking
+dependencies as PRIVATE, and adding options for building examples, tests, and
+benchmarks (e.g., `-DBUILD_EXAMPLES=ON`, `-DBUILD_TESTS=ON`, and
+`-DBUILD_BENCHMARKS=ON`).
+- Fix double free error in `benchmark_snappy_synth`.
+- Fix copy direction in Cascaded compression when the output size on the GPU.
+- Improve testing coverage.
+- Mark the generic decompression interfaces defined in `include/nvcomp.h` as
+deprecated.
+
 # nvcomp 2.0.0 (2021-04-28)
 
 - Replace previous C, and C++ APIs.
