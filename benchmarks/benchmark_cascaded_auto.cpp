@@ -202,7 +202,7 @@ static void run_benchmark(
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
-  nvcompDecompressDestroyMetadata(metadata_ptr);
+  nvcompCascadedDestroyMetadata(metadata_ptr);
   
   cudaStreamDestroy(stream);
   cudaFree(d_decomp_temp);
