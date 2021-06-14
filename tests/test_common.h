@@ -226,7 +226,7 @@ void test(
     std::cout << "throughput (GB/s): " << gbs(start, end, decomp_out_bytes)
               << std::endl;
 
-    nvcompDecompressDestroyMetadata(metadata);
+    nvcompCascadedDestroyMetadata(metadata);
 
     cudaStreamDestroy(stream);
     cudaFree(d_decomp_temp);

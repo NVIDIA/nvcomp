@@ -315,7 +315,7 @@ int test_ones_init_data(void)
         CUDA_CHECK(cudaStreamSynchronize(stream));
 
         // Destory the metadata object and free memory
-        nvcompDecompressDestroyMetadata(metadata_ptr);
+        nvcompCascadedDestroyMetadata(metadata_ptr);
 
         // Copy result back to host
         int res[12];
