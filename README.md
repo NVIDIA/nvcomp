@@ -13,11 +13,11 @@ arbitrary byte streams.
 
 Below are compression ratio and performance plots for three methods available in nvCOMP (Cascaded, Snappy and LZ4). Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The numbers were collected on a NVIDIA A100 80GB GPU (with ECC on). 
 
-![compression ratio](/doc/compression_ratio.png)
+![compression ratio](/doc/compression_ratio.svg)
 
-![compression performance](/doc/compression_performance_a100.png)
+![compression performance](/doc/compression_performance_a100.svg)
 
-![decompression performance](/doc/decompression_performance_a100.png)
+![decompression performance](/doc/decompression_performance_a100.svg)
 
 nvCOMP 2.0 features new flexible APIs:
 * [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
