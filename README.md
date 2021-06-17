@@ -156,3 +156,44 @@ comp_size: 3831058, compressed ratio: 21.22
 compression throughput (GB/s): 36.64
 decompression throughput (GB/s): 118.47
 ```
+
+# Running examples
+
+By default the examples are not built. To build the CPU compression examples, pass `-DBUILD_EXAMPLES=ON` to cmake.
+
+```
+cmake .. -DBUILD_EXAMPLES=ON [other cmake options]
+make -j
+```
+To additionally compile the GPU Direct Storage example, pass `-DBUILD_GDS_EXAMPLE=ON` to cmake.
+This will result in the examples being placed inside of the `bin/` directory.
+
+These examples require some external dependencies namely:
+- [zlib](https://github.com/madler/zlib) for the GDeflate CPU compression example (`zlib1g-dev` on debian based systems)
+- [LZ4](https://github.com/lz4/lz4) for the LZ4 CPU compression example (`liblz4-dev` on debian based systems)
+- [GPU Direct Storage](https://developer.nvidia.com/blog/gpudirect-storage/) for the corresponding example
+
+Run examples:
+- Run `./bin/gdeflate_cpu_compression` or `./bin/lz4_cpu_compression` with `-f </path/to/datafile>` to compress the data on the CPU and decompress on the GPU.
+- Run `./bin/nvcomp_gds </path/to/filename>` to run the example showing how to use nvcomp with GPU Direct Storage (GDS).
+
+Below are the CPU compression example results on a RTX A6000 for the Mortgage 2000Q4 column 12:
+```
+$ ./bin/gdeflate_cpu_compression -f /Data/mortgage/mortgage-2009Q2-col12-string.bin 
+----------
+files: 1
+uncompressed (B): 164527964
+chunks: 2511
+comp_size: 1785796, compressed ratio: 92.13
+decompression validated :)
+decompression throughput (GB/s): 152.88
+
+$ ./bin/lz4_cpu_compression -f /Data/mortgage/mortgage-2009Q2-col12-string.bin 
+----------
+files: 1
+uncompressed (B): 164527964
+chunks: 2511
+comp_size: 2018066, compressed ratio: 81.53
+decompression validated :)
+decompression throughput (GB/s): 160.35
+```
