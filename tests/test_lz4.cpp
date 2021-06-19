@@ -122,7 +122,8 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   // Test to make sure copying the compressed file is ok
   void* copied = 0;
   CUDA_CHECK(cudaMalloc(&copied, comp_out_bytes));
-  CUDA_CHECK(cudaMemcpy(copied, d_comp_out, comp_out_bytes, cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(
+      cudaMemcpy(copied, d_comp_out, comp_out_bytes, cudaMemcpyDeviceToDevice));
   cudaFree(d_comp_out);
   d_comp_out = copied;
 

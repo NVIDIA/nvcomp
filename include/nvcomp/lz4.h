@@ -53,6 +53,14 @@ typedef struct
 } nvcompLZ4FormatOpts;
 
 /**
+ * LZ4 compression options for the low-level API
+ */
+typedef struct
+{
+    int reserved;
+} nvcomp_lz4_lowlevel_opt_type;
+
+/**
  * @brief Check if a given chunk of compressed data on the GPU is LZ4.
  *
  * @param in_ptr The compressed data.
@@ -248,6 +256,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
  * each compressed batch item (output). This pointer must be GPU accessible.
  * @param device_out_bytes The compressed size of each chunk on the GPU
  * (output). This pointer must be GPU accessible.
+ * @param format_opts The LZ4 compression options to use
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
@@ -261,6 +270,7 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
     size_t temp_bytes,
     void* const* device_out_ptr,
     size_t* device_out_bytes,
+    nvcomp_lz4_lowlevel_opt_type* format_opts,
     cudaStream_t stream);
 
 /**
@@ -279,34 +289,62 @@ nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
 
 /**
  * @brief Perform decompression asynchronously. All pointers must be GPU
- * accessible.
+ * accessible. In the case where a chunk of compressed data is not a valid LZ4
+ * block, 0 will be written for the size of the invalid chunk and
+ * nvcompStatusCannotDecompress will be flagged for that chunk.
  *
- * @param device_in_ptrs The pointers on the GPU, to the compressed chunks.
- * This pointer must be accessible from the GPU.
- * @param device_in_bytes The size of each compressed chunk on the GPU.
- * @param device_out_bytes The size of each uncompressed chunk on the GPU.
- * @param max_uncompressed_chunk_bytes The maximum size in bytes of the largest
- * chunk in the batch. This parameter is currently unused, so if it is not set
- * with the maximum size, it should be set to zero. If a future version makes
- * use of it, it will return an error if it is set to zero.
+ * @param device_compressed_ptrs The pointers on the GPU, to the compressed
+ * chunks. This pointer must be accessible from the GPU.
+ * @param device_compressed_bytes The size of each compressed chunk on the GPU.
+ * This pointer must be GPU accessible.
+ * @param device_uncompressed_bytes The decompressed buffer size. This is needed
+ * to prevent OOB accesses. This pointer must be GPU accessible.
+ * @param device_actual_uncompressed_bytes The actual calculated decompressed
+ * size of each chunk. This pointer must be accessible from the GPU.
  * @param batch_size The number of batch items.
  * @param device_temp_ptr The temporary GPU space.
  * @param temp_bytes The size of the temporary GPU space.
- * @param device_out_ptr The pointers on the GPU, to where to uncompress each
- * chunk (output). This pointer must be accessible from the GPU.
+ * @param device_uncompressed_ptrs The pointers on the GPU, to where to
+ * uncompress each chunk (output). This pointer must be accessible from the GPU.
+ * @param device_status_ptrs The status for each chunk of whether it was
+ * decompressed or not. This pointer must be accessible from the GPU.
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedLZ4DecompressAsync(
-    const void* const* device_in_ptrs,
-    const size_t* device_in_bytes,
-    const size_t* device_out_bytes,
-    size_t max_uncompressed_chunk_bytes,
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
     size_t batch_size,
     void* const device_temp_ptr,
-    const size_t temp_bytes,
-    void* const* device_out_ptr,
+    size_t temp_bytes,
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_status_ptrs,
+    cudaStream_t stream);
+
+/**
+ * @brief Calculates the decompressed size of each chunk asynchronously. This is
+ * needed when we do not know the expected output size. All pointers must be GPU
+ * accessible. Note, if the stream is corrupt, the sizes will be garbage.
+ *
+ * @param device_compress_ptrs The compressed chunks of data. List of pointers
+ * must be GPU accessible along with each chunk.
+ * @param device_compressed_bytes The size of each compressed chunk. Must be GPU
+ * accessible.
+ * @param device_uncompressed_bytes The calculated decompressed size of each
+ * chunk. Must be GPU accessible.
+ * @param batch_size The number of chunks
+ * @param stream The stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompBatchedLZ4GetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
     cudaStream_t stream);
 
 #ifdef __cplusplus

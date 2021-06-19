@@ -79,10 +79,7 @@ public:
   BatchData(
       const std::vector<std::vector<char>>& host_data,
       const size_t chunk_size) :
-      m_ptrs(),
-      m_sizes(),
-      m_data(),
-      m_size(0)
+      m_ptrs(), m_sizes(), m_data(), m_size(0)
   {
     m_size = compute_batch_size(host_data, chunk_size);
 
@@ -114,10 +111,7 @@ public:
   }
 
   BatchData(const size_t max_output_size, const size_t batch_size) :
-      m_ptrs(),
-      m_sizes(),
-      m_data(),
-      m_size(batch_size)
+      m_ptrs(), m_sizes(), m_data(), m_size(batch_size)
   {
     m_data = thrust::device_vector<uint8_t>(max_output_size * size());
 
@@ -215,6 +209,8 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   cudaEventCreate(&end);
   cudaEventRecord(start, stream);
 
+  nvcomp_lz4_lowlevel_opt_type fmt_opts;
+
   status = nvcompBatchedLZ4CompressAsync(
       input_data.ptrs(),
       input_data.sizes(),
@@ -224,6 +220,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
       comp_temp_bytes,
       compress_data.ptrs(),
       compress_data.sizes(),
+      &fmt_opts,
       stream);
   if (status != nvcompSuccess) {
     throw std::runtime_error("nvcompBatchedLZ4CompressAsync() failed.");
@@ -274,17 +271,26 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
 
+  size_t* d_decomp_sizes;
+  CUDA_CHECK(
+      cudaMalloc((void**)&d_decomp_sizes, input_data.size() * sizeof(size_t)));
+
+  nvcompStatus_t* d_status_ptrs;
+  CUDA_CHECK(cudaMalloc(
+      (void**)&d_status_ptrs, input_data.size() * sizeof(nvcompStatus_t)));
+
   cudaEventRecord(start, stream);
 
   status = nvcompBatchedLZ4DecompressAsync(
       compress_data.ptrs(),
       compress_data.sizes(),
       input_data.sizes(),
-      chunk_size,
+      d_decomp_sizes,
       compress_data.size(),
       d_decomp_temp,
       decomp_temp_bytes,
       input_data.ptrs(),
+      d_status_ptrs,
       stream);
   benchmark_assert(
       status == nvcompSuccess,
@@ -302,6 +308,8 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   }
 
   cudaFree(d_decomp_temp);
+  cudaFree(d_decomp_sizes);
+  cudaFree(d_status_ptrs);
 
   cudaStreamDestroy(stream);
   (void)status;
