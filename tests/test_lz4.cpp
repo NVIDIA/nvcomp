@@ -69,7 +69,7 @@ std::vector<T> buildRuns(const size_t numRuns, const size_t runSize)
 }
 
 template <typename T>
-void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
+void test_lz4(const std::vector<T>& input, nvcompType_t data_type, const size_t chunk_size = 1 << 16)
 {
   // create GPU only input buffer
   T* d_in_data;
@@ -86,7 +86,7 @@ void test_lz4(const std::vector<T>& input, const size_t chunk_size = 1 << 16)
   void* d_comp_temp;
   void* d_comp_out;
 
-  LZ4Compressor compressor(chunk_size);
+  LZ4Compressor compressor(chunk_size, data_type);
   compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
   REQUIRE(comp_temp_bytes > 0);
   REQUIRE(comp_out_bytes > 0);
@@ -183,7 +183,7 @@ TEST_CASE("comp/decomp LZ4-small", "[nvcomp]")
 
   std::vector<T> input = {0, 2, 2, 3, 0, 0, 0, 0, 0, 3, 1, 1, 1, 1, 1, 2, 3, 3};
 
-  test_lz4(input);
+  test_lz4(input, NVCOMP_TYPE_INT);
 }
 
 TEST_CASE("comp/decomp LZ4-1", "[nvcomp]")
@@ -196,7 +196,7 @@ TEST_CASE("comp/decomp LZ4-1", "[nvcomp]")
     input.push_back(i >> 2);
   }
 
-  test_lz4(input);
+  test_lz4(input, NVCOMP_TYPE_INT);
 }
 
 TEST_CASE("comp/decomp LZ4-all-small-sizes", "[nvcomp][small]")
@@ -205,7 +205,7 @@ TEST_CASE("comp/decomp LZ4-all-small-sizes", "[nvcomp][small]")
 
   for (int total = 1; total < 4096; ++total) {
     std::vector<T> input = buildRuns<T>(total, 1);
-    test_lz4(input);
+    test_lz4(input, NVCOMP_TYPE_UCHAR);
   }
 }
 
@@ -215,7 +215,7 @@ TEST_CASE("comp/decomp LZ4-multichunk", "[nvcomp][large]")
 
   for (int total = 10; total < (1 << 24); total = total * 2 + 7) {
     std::vector<T> input = buildRuns<T>(total, 10);
-    test_lz4(input);
+    test_lz4(input, NVCOMP_TYPE_INT);
   }
 }
 
@@ -225,7 +225,7 @@ TEST_CASE("comp/decomp LZ4-small-uint8", "[nvcomp][small]")
 
   for (size_t num = 1; num < 1 << 18; num = num * 2 + 1) {
     std::vector<T> input = buildRuns<T>(num, 3);
-    test_lz4(input);
+    test_lz4(input, NVCOMP_TYPE_UCHAR);
   }
 }
 
@@ -235,7 +235,7 @@ TEST_CASE("comp/decomp LZ4-small-uint16", "[nvcomp][small]")
 
   for (size_t num = 1; num < 1 << 18; num = num * 2 + 1) {
     std::vector<T> input = buildRuns<T>(num, 3);
-    test_lz4(input);
+    test_lz4(input, NVCOMP_TYPE_USHORT);
   }
 }
 
@@ -245,7 +245,7 @@ TEST_CASE("comp/decomp LZ4-small-uint32", "[nvcomp][small]")
 
   for (size_t num = 1; num < 1 << 18; num = num * 2 + 1) {
     std::vector<T> input = buildRuns<T>(num, 3);
-    test_lz4(input);
+    test_lz4(input, NVCOMP_TYPE_UINT);
   }
 }
 
@@ -255,7 +255,8 @@ TEST_CASE("comp/decomp LZ4-small-uint64", "[nvcomp][small]")
 
   for (size_t num = 1; num < 1 << 18; num = num * 2 + 1) {
     std::vector<T> input = buildRuns<T>(num, 3);
-    test_lz4(input);
+    // NVCOMP_TYPE_ULONGLONG currently unsupported
+    test_lz4(input, NVCOMP_TYPE_UINT);
   }
 }
 
@@ -270,6 +271,24 @@ TEST_CASE("comp/decomp LZ4-chunksizes-uint64", "[nvcomp][small]")
 
   for (const size_t chunk : chunk_sizes) {
     std::vector<T> input = buildRuns<T>(num, 5);
-    test_lz4(input, chunk);
+    test_lz4(input, NVCOMP_TYPE_CHAR, chunk);
+  }
+}
+
+TEST_CASE("comp/decomp LZ4-none-aligned-sizes", "[nvcomp][small]")
+{
+  std::vector<size_t> input_sizes = { 1, 33, 1021 };
+
+  std::vector<nvcompType_t> data_types = {
+    NVCOMP_TYPE_BITS,
+    NVCOMP_TYPE_CHAR,
+    NVCOMP_TYPE_SHORT,
+    NVCOMP_TYPE_INT
+  };
+  for (auto size : input_sizes) {
+    std::vector<uint8_t> input = buildRuns<uint8_t>(1, size);
+    for (auto type : data_types ) {
+      test_lz4(input, type);
+    }
   }
 }

@@ -174,7 +174,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     const size_t temp_bytes,
     void* const* const device_out_ptrs,
     size_t* const device_out_bytes,
-    const nvcompBatchedLZ4Opts_t /* format_opts */,
+    const nvcompBatchedLZ4Opts_t format_opts,
     cudaStream_t stream)
 {
   // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check
@@ -192,6 +192,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressAsync(
         CudaUtils::device_pointer(
             reinterpret_cast<uint8_t* const*>(device_out_ptrs)),
         CudaUtils::device_pointer(device_out_bytes),
+        format_opts.data_type,
         stream);
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedLZ4CompressAsync()");

@@ -54,9 +54,10 @@ public:
    * @param decomp_data The data to compress.
    * @param decomp_data_size The size of the data to compress.
    * @param chunk_size The size of each chunk to compress.
+   * @param data_type The type of the data to compress.
    */
   LZ4Compressor(
-      const uint8_t* decomp_data, size_t decomp_data_size, size_t chunk_size);
+      const uint8_t* decomp_data, size_t decomp_data_size, size_t chunk_size, nvcompType_t data_type);
 
   LZ4Compressor(const LZ4Compressor& other) = delete;
   LZ4Compressor& operator=(const LZ4Compressor& other) = delete;
@@ -86,6 +87,7 @@ private:
   const uint8_t* m_input_ptr;
   size_t m_input_size;
   size_t m_chunk_size;
+  nvcompType_t m_data_type;
   size_t m_num_chunks;
   uint8_t* m_output_ptr;
   size_t* m_output_offsets;

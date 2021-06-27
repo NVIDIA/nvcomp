@@ -45,8 +45,9 @@ public:
    *
    * @param chunk_size size of chunks that are eached compressed separately.
    * A value of `0` will result in the default chunk size being used.
+   * @param data_type The type of data to compress.
    */
-  explicit LZ4Compressor(size_t chunk_size);
+  explicit LZ4Compressor(size_t chunk_size, nvcompType_t data_type);
 
   /**
    * @brief Create a new LZ4 compressor with the default chunk size.
@@ -94,6 +95,7 @@ public:
 
 private:
   size_t m_chunk_size;
+  nvcompType_t m_data_type;
 };
 
 class LZ4Decompressor : public Decompressor
@@ -155,13 +157,14 @@ private:
  * METHOD IMPLEMENTATIONS *****************************************************
  *****************************************************************************/
 
-inline LZ4Compressor::LZ4Compressor(const size_t chunk_size) :
-    m_chunk_size(chunk_size)
+inline LZ4Compressor::LZ4Compressor(const size_t chunk_size, nvcompType_t data_type) :
+    m_chunk_size(chunk_size),
+    m_data_type(data_type)
 {
   // do nothing
 }
 
-inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0)
+inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0, NVCOMP_TYPE_CHAR)
 {
   // do nothing
 }
@@ -169,12 +172,12 @@ inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0)
 inline void LZ4Compressor::configure(
     const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
 {
-  nvcompLZ4FormatOpts opts{m_chunk_size};
+  nvcompLZ4FormatOpts opts = { .chunk_size = m_chunk_size };
 
   size_t metadata_bytes;
   nvcompStatus_t status = nvcompLZ4CompressConfigure(
       opts.chunk_size == 0 ? nullptr : &opts,
-      NVCOMP_TYPE_BITS,
+      m_data_type,
       in_bytes,
       &metadata_bytes,
       temp_bytes,
@@ -191,10 +194,10 @@ inline void LZ4Compressor::compress_async(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  nvcompLZ4FormatOpts opts{m_chunk_size};
+  nvcompLZ4FormatOpts opts = { .chunk_size = m_chunk_size };
   nvcompStatus_t status = nvcompLZ4CompressAsync(
       opts.chunk_size == 0 ? nullptr : &opts,
-      NVCOMP_TYPE_BITS,
+      m_data_type,
       in_ptr,
       in_bytes,
       temp_ptr,

@@ -43,6 +43,7 @@ namespace lowlevel
  * @param temp_bytes The size of the temporary memory.
  * @param comp_data The output location of each batch item.
  * @param comp_sizes
+ * @param data_type The type of the input data to compress.
  * @param stream The stream to operate on.
  */
 void lz4BatchCompress(
@@ -53,6 +54,7 @@ void lz4BatchCompress(
     size_t temp_bytes,
     uint8_t* const* comp_data_device,
     size_t* const comp_sizes_device,
+    nvcompType_t data_type,
     cudaStream_t stream);
 
 void lz4BatchDecompress(

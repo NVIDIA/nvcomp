@@ -117,8 +117,8 @@ constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
  * @brief The last 5 bytes of input are always literals.
  * @brief The last match must start at least 12 bytes before the end of block.
  */
-constexpr const uint8_t MIN_ENDING_LITERALS = 5;
-constexpr const uint8_t LAST_VALID_MATCH = 12;
+constexpr const uint8_t MIN_ENDING_LITERALS_BYTES = 5;
+constexpr const uint8_t LAST_VALID_MATCH_BYTES = 12;
 
 /**
  * @brief The maximum size of an uncompressed chunk.
@@ -205,14 +205,14 @@ inline __device__ void writeWord(uint8_t* const address, const T word)
   }
 }
 
-template <typename T>
-inline __device__ T readWord(const uint8_t* const address)
+template <typename T, typename S>
+inline __device__ T readWord(const S* const address)
 {
   T word = 0;
-  for (size_t i = 0; i < sizeof(T); ++i) {
-    word |= address[i] << (8 * i);
+#pragma unroll
+  for (size_t i = 0; i < sizeof(T) / sizeof(S); ++i) {
+    word |= address[i] << (8 * sizeof(S) * i);
   }
-
   return word;
 }
 
@@ -535,24 +535,31 @@ inline __device__ void copyLiterals(
   }
 }
 
+constexpr __host__ __device__ size_t divRoundUp(size_t x, size_t y)
+{
+  return (x + y - 1) / y;
+}
+
+template<typename T>
 inline __device__ position_type lengthOfMatch(
-    const uint8_t* const data,
+    const T* const data,
     const position_type prev_location,
     const position_type next_location,
     const position_type length)
 {
   assert(prev_location < next_location);
 
-  position_type match_length = length - next_location - MIN_ENDING_LITERALS;
-  for (position_type j = 0; j + next_location + MIN_ENDING_LITERALS < length;
-       j += blockDim.x) {
+  constexpr position_type min_ending_literals = divRoundUp(MIN_ENDING_LITERALS_BYTES, sizeof(T));
+
+  position_type match_length = length - next_location - min_ending_literals;
+  for (position_type j = 0; j + next_location + min_ending_literals < length; j += blockDim.x) {
     const position_type i = threadIdx.x + j;
-    int match = i + next_location + MIN_ENDING_LITERALS < length
+    int no_matches = i + next_location + min_ending_literals < length
                     ? (data[prev_location + i] != data[next_location + i])
                     : 1;
-    match = warpBallot(match);
-    if (match) {
-      match_length = j + __clz(__brev(match));
+    no_matches = warpBallot(no_matches);
+    if (no_matches) {
+      match_length = j + __clz(__brev(no_matches));
       break;
     }
   }
@@ -560,8 +567,7 @@ inline __device__ position_type lengthOfMatch(
   return match_length;
 }
 
-inline __device__ position_type
-convertIdx(const offset_type offset, const position_type pos)
+inline __device__ position_type convertIdx(const offset_type offset, const position_type pos)
 {
   constexpr const position_type OFFSET_SIZE = MAX_OFFSET + 1;
 
@@ -576,8 +582,9 @@ convertIdx(const offset_type offset, const position_type pos)
   return realPos;
 }
 
+template<typename T>
 inline __device__ bool isValidHash(
-    const uint8_t* const data,
+    const T* const data,
     const offset_type* const hashTable,
     const position_type key,
     const position_type hashPos,
@@ -678,14 +685,64 @@ inline __device__ void insertHashTableWarp(
   __syncwarp();
 }
 
+template<typename ALIGNMENT>
+inline __device__ word_type shuffleLiterals(word_type literals);
+
+/**
+ * Each thread needs a four byte word, but only separated by sizeof(ALIGNMENT)
+ * e.g.: for two threads, the five bytes [ 0x12 0x34 0x56 0x78 0x9a ] would
+ * be assigned as [0x78563412 0x9a785634 ] to the two threads
+ * (little-endian). That means when reading 32 bytes, we can only fill
+ * the first 29 thread's 4-byte words.
+ */
+template<>
+inline __device__ word_type shuffleLiterals<uint8_t>(word_type literals)
+{
+  // collect first byte
+  word_type next = literals;
+  // collect second byte
+  next |= __shfl_down_sync(0xffffffff, next, 1) << 8;
+  // collect third and fourth bytes
+  next |= __shfl_down_sync(0xffffffff, next, 2) << 16;
+  return next;
+}
+
+/**
+ * We shuffle on 16-bit alignment, so six bytes [ 0x12 0x34 0x56 0x78 0x9a 0x0b ]
+ * would be assigned [0x78563412 0x0b9a7856 ] to the two threads. We only fill
+ * the first 31 threads because the 32'nd thread wouldn't have a complete 4 byte
+ * word to process.
+ */
+template<>
+inline __device__ word_type shuffleLiterals<uint16_t>(word_type literals)
+{
+  // collect first and second bytes
+  word_type next = literals;
+  // collect third and fourth byte
+  next |= __shfl_down_sync(0xffffffff, next, 1) << 16;
+  return next;
+}
+
+/**
+ * We shuffle on 32-bit alignment, so since each thread already reads 32-bits
+ * we don't need to shuffle - so this function is no-op.
+ */
+template<>
+inline __device__ word_type shuffleLiterals<uint32_t>(word_type literals)
+{
+  return literals;
+}
+
+template<typename T>
 __device__ void compressStream(
     uint8_t* compData,
-    const uint8_t* decompData,
+    const T* decompData,
     offset_type* const hashTable,
     const position_type length,
     size_t* comp_length)
 {
   assert(blockDim.x == COMP_THREADS_PER_CHUNK);
+
   static_assert(
       COMP_THREADS_PER_CHUNK <= 32,
       "Compression can be done with at "
@@ -693,6 +750,7 @@ __device__ void compressStream(
 
   position_type decomp_idx = 0;
   position_type comp_idx = 0;
+  const position_type typed_length = divRoundUp(length, sizeof(T));
 
   for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE;
        i += COMP_THREADS_PER_CHUNK) {
@@ -701,47 +759,50 @@ __device__ void compressStream(
 
   __syncwarp();
 
-  while (decomp_idx < length) {
+  constexpr position_type last_valid_match = divRoundUp(LAST_VALID_MATCH_BYTES, sizeof(T));
+  constexpr position_type min_ending_literals = divRoundUp(MIN_ENDING_LITERALS_BYTES, sizeof(T));
+
+  // otherwise ceil of typed_length can result in illegal memory access
+  static_assert(last_valid_match > 0);
+  static_assert(min_ending_literals > 0);
+
+  while (decomp_idx < typed_length) {
     const position_type tokenStart = decomp_idx;
     while (true) {
-      if (decomp_idx + LAST_VALID_MATCH >= length) {
+      if (decomp_idx + last_valid_match >= typed_length) {
         // jump to end
-        decomp_idx = length;
+        decomp_idx = typed_length;
 
         // no match -- literals to the end
         token_type tok;
-        tok.num_literals = length - tokenStart;
+        tok.num_literals = length - (tokenStart * sizeof(T));
         tok.num_matches = 0;
+        // TODO: write sizeof(T) aligned sequences, needs padding and
+        // decompressor to be aware of alignment
         writeSequenceData<COMP_THREADS_PER_CHUNK>(
-            compData, decompData, tok, 0, tokenStart, comp_idx);
+            compData, reinterpret_cast<const uint8_t*>(decompData), tok, 0, tokenStart * sizeof(T), comp_idx);
         break;
       }
 
       // begin adding tokens to the hash table until we find a match
-      uint8_t byte = 0;
-      if (decomp_idx + MIN_ENDING_LITERALS + threadIdx.x < length) {
-        byte = decompData[decomp_idx + threadIdx.x];
+      word_type next = 0;
+      if (decomp_idx + min_ending_literals + threadIdx.x < typed_length)
+      {
+        next = decompData[decomp_idx + threadIdx.x];
       }
 
-      // each thread needs a four byte word, but only separated by a byte e.g.:
-      // for two threads, the five bytes [ 0x12 0x34 0x56 0x78 0x9a ] would
-      // be assigned as [0x78563412 0x9a785634 ] to the two threads
-      // (little-endian). That means when reading 32 bytes, we can only fill
-      // the first 29 thread's 4-byte words.
-      word_type next = byte;
-      // collect second byte
-      next |= __shfl_down_sync(0xffffffff, byte, 1) << 8;
-      // collect third and fourth bytes
-      next |= __shfl_down_sync(0xffffffff, next, 2) << 16;
+      next = shuffleLiterals<T>(next);
 
-      // since we do not have valid data for the last 3 threads (or more if
-      // we're at the end of the data), mark them as inactive.
+      // the number of threads which won't have enough literals - read
+      // shuffleLiterals comment for more details.
+      constexpr int invalid_threads = 3 / sizeof(T);
+      // if we're at the end of the data, mark them as inactive.
       const int numValidThreads = min(
-          static_cast<int>(COMP_THREADS_PER_CHUNK - 3),
-          static_cast<int>(length - decomp_idx - LAST_VALID_MATCH));
+          static_cast<int>(COMP_THREADS_PER_CHUNK - invalid_threads),
+          static_cast<int>(typed_length - decomp_idx - last_valid_match));
 
       // first try to find a local match
-      position_type match_location = length;
+      position_type match_location = typed_length;
       int match_mask_self = 0;
       if (threadIdx.x < numValidThreads) {
         match_mask_self
@@ -773,14 +834,15 @@ __device__ void compressStream(
         // go to hash table for an earlier match
         position_type hashPos = hash(next);
         word_type offset = decomp_idx;
-        const int match_found = threadIdx.x < first_match_thread ? isValidHash(
-                                    decompData,
-                                    hashTable,
-                                    next,
-                                    hashPos,
-                                    decomp_idx + threadIdx.x,
-                                    offset)
-                                                                 : 0;
+        const int match_found = threadIdx.x < first_match_thread
+                                    ? isValidHash<T>(
+                                          decompData,
+                                          hashTable,
+                                          next,
+                                          hashPos,
+                                          decomp_idx + threadIdx.x,
+                                          offset)
+                                    : 0;
 
         // determine the first thread to find a match
         const int match = warpBallot(match_found);
@@ -797,7 +859,7 @@ __device__ void compressStream(
         }
       }
 
-      if (match_location != length) {
+      if (match_location != typed_length) {
         // insert up to the match into the hash table
         insertHashTableWarp(
             hashTable, decomp_idx + threadIdx.x, next, first_match_thread);
@@ -814,19 +876,19 @@ __device__ void compressStream(
 
         // compute match length
         const position_type num_matches
-            = lengthOfMatch(decompData, match_location, pos, length);
+            = lengthOfMatch(decompData, match_location, pos, typed_length);
 
         // -> write our token and literal length
         token_type tok;
-        tok.num_literals = num_literals;
-        tok.num_matches = num_matches;
+        tok.num_literals = num_literals * sizeof(T);
+        tok.num_matches = num_matches * sizeof(T);
 
         // update our position
         decomp_idx = tokenStart + num_matches + num_literals;
 
         // insert only the literals into the hash table
         writeSequenceData<COMP_THREADS_PER_CHUNK>(
-            compData, decompData, tok, match_offset, tokenStart, comp_idx);
+            compData, reinterpret_cast<const uint8_t*>(decompData), tok, match_offset * sizeof(T), tokenStart * sizeof(T), comp_idx);
         break;
       }
 
@@ -971,16 +1033,20 @@ inline __device__ void decompressStream(
   }
 }
 
+template<typename T>
 __global__ void lz4CompressBatchKernel(
-    const uint8_t* const* const device_in_ptr,
+    const uint8_t* const* device_in_ptr,
     const size_t* const device_in_bytes,
     uint8_t* const* const device_out_ptr,
     size_t* const device_out_bytes,
     offset_type* const temp_space)
 {
+  static_assert(sizeof(T) <= sizeof(uint32_t) && "Max alignment support is 4 bytes");
+
   const int bidx = blockIdx.x * blockDim.y + threadIdx.y;
 
-  const uint8_t* decomp_ptr = device_in_ptr[bidx];
+  auto decomp_ptr = device_in_ptr[bidx];
+  assert(reinterpret_cast<uintptr_t>(decomp_ptr) % sizeof(T) == 0 && "Input buffer not aligned");
   const size_t decomp_length = device_in_bytes[bidx];
 
   uint8_t* const comp_ptr = device_out_ptr[bidx];
@@ -988,7 +1054,7 @@ __global__ void lz4CompressBatchKernel(
 
   offset_type* const hash_table = temp_space + bidx * HASH_TABLE_SIZE;
 
-  compressStream(comp_ptr, decomp_ptr, hash_table, decomp_length, comp_length);
+  compressStream(comp_ptr, reinterpret_cast<const T*>(decomp_ptr), hash_table, decomp_length, comp_length);
 }
 
 __global__ void lz4DecompressBatchKernel(
@@ -1036,13 +1102,14 @@ __global__ void lz4DecompressBatchKernel(
  *****************************************************************************/
 
 void lz4BatchCompress(
-    const uint8_t* const* const decomp_data_device,
+    const uint8_t* const* decomp_data_device,
     const size_t* const decomp_sizes_device,
     const size_t batch_size,
     void* const temp_data,
     const size_t temp_bytes,
     uint8_t* const* const comp_data_device,
     size_t* const comp_sizes_device,
+    nvcompType_t data_type,
     cudaStream_t stream)
 {
   const size_t total_required_temp
@@ -1057,12 +1124,39 @@ void lz4BatchCompress(
   const dim3 grid(batch_size);
   const dim3 block(COMP_THREADS_PER_CHUNK);
 
-  lz4CompressBatchKernel<<<grid, block, 0, stream>>>(
-      decomp_data_device,
-      decomp_sizes_device,
-      comp_data_device,
-      comp_sizes_device,
-      static_cast<offset_type*>(temp_data));
+  switch (data_type) {
+    case NVCOMP_TYPE_BITS:
+    case NVCOMP_TYPE_CHAR:
+    case NVCOMP_TYPE_UCHAR:
+      lz4CompressBatchKernel<uint8_t><<<grid, block, 0, stream>>>(
+          decomp_data_device,
+          decomp_sizes_device,
+          comp_data_device,
+          comp_sizes_device,
+          static_cast<offset_type*>(temp_data));
+      break;
+    case NVCOMP_TYPE_SHORT:
+    case NVCOMP_TYPE_USHORT:
+      lz4CompressBatchKernel<uint16_t><<<grid, block, 0, stream>>>(
+          decomp_data_device,
+          decomp_sizes_device,
+          comp_data_device,
+          comp_sizes_device,
+          static_cast<offset_type*>(temp_data));
+      break;
+    case NVCOMP_TYPE_INT:
+    case NVCOMP_TYPE_UINT:
+      lz4CompressBatchKernel<uint32_t><<<grid, block, 0, stream>>>(
+          decomp_data_device,
+          decomp_sizes_device,
+          comp_data_device,
+          comp_sizes_device,
+          static_cast<offset_type*>(temp_data));
+      break;
+    default:
+      throw std::invalid_argument("Unsupported input data type");
+  }
+
   CudaUtils::check_last_error();
 }
 
