@@ -112,6 +112,13 @@ constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
 constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
 
 /**
+ * @brief The last 5 bytes of input are always literals.
+ * @brief The last match must start at least 12 bytes before the end of block.
+ */
+constexpr const uint8_t MIN_ENDING_LITERALS = 5;
+constexpr const uint8_t LAST_VALID_MATCH = 12;
+
+/**
  * @brief The maximum size of an uncompressed chunk.
  */
 constexpr const size_t MAX_CHUNK_SIZE = 1U << 24; // 16 MB
@@ -536,10 +543,10 @@ inline __device__ position_type lengthOfMatch(
 {
   assert(prev_location < next_location);
 
-  position_type match_length = length - next_location - 5;
-  for (position_type j = 0; j + next_location + 5 < length; j += blockDim.x) {
+  position_type match_length = length - next_location - MIN_ENDING_LITERALS ;
+  for (position_type j = 0; j + next_location + MIN_ENDING_LITERALS < length; j += blockDim.x) {
     const position_type i = threadIdx.x + j;
-    int match = i + next_location + 5 < length
+    int match = i + next_location + MIN_ENDING_LITERALS < length
                     ? (data[prev_location + i] != data[next_location + i])
                     : 1;
     match = warpBallot(match);
@@ -696,7 +703,7 @@ __device__ void compressStream(
   while (decomp_idx < length) {
     const position_type tokenStart = decomp_idx;
     while (true) {
-      if (decomp_idx + 5 + 4 >= length) {
+      if (decomp_idx + LAST_VALID_MATCH >= length) {
         // jump to end
         decomp_idx = length;
 
@@ -711,7 +718,7 @@ __device__ void compressStream(
 
       // begin adding tokens to the hash table until we find a match
       uint8_t byte = 0;
-      if (decomp_idx + 5 + threadIdx.x < length) {
+      if (decomp_idx + MIN_ENDING_LITERALS + threadIdx.x < length) {
         byte = decompData[decomp_idx + threadIdx.x];
       }
 
@@ -730,7 +737,7 @@ __device__ void compressStream(
       // we're at the end of the data), mark them as inactive.
       const int numValidThreads = min(
           static_cast<int>(COMP_THREADS_PER_CHUNK - 3),
-          static_cast<int>(length - decomp_idx - 9));
+          static_cast<int>(length - decomp_idx - LAST_VALID_MATCH));
 
       // first try to find a local match
       position_type match_location = length;
