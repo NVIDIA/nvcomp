@@ -20,11 +20,15 @@ file(GLOB CPP_SOURCES
   ./lowlevel/*.cpp
   ./highlevel/*.cpp)
 
-if (MSVC_VERSION)
-  # we have to export all symbols on windows for a dll
+if (BUILD_STATIC)
   add_library(nvcomp STATIC ${CUDA_SOURCES} ${CPP_SOURCES})
 else()
-  add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
+  if (MSVC_VERSION)
+    # we have to export all symbols on windows for a dll
+    add_library(nvcomp STATIC ${CUDA_SOURCES} ${CPP_SOURCES})
+  else()
+    add_library(nvcomp SHARED ${CUDA_SOURCES} ${CPP_SOURCES})
+  endif()
 endif()
 
 include_directories("./")
