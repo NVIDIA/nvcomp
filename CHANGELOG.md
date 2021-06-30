@@ -1,3 +1,12 @@
+# nvcomp 2.0.2 (2021-06-30)
+
+- Add example `lz4_cpu_decompression` to compress on the GPU with nvCOMP and
+  decompress on the CPU with `liblz4`.
+- Add CMake option for building a static library.
+- Fix bug in LZ4 compression kernel to comply with LZ4 end of block
+  restrictions.
+- Fix temp allocation size bug in `benchmark_lz4_chunked`.
+
 # nvcomp 2.0.1 (2021-06-08)
 
 - Improve CMake setup for using nvCOMP as a submodule. This includes marking
