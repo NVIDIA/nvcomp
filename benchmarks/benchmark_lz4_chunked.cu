@@ -190,7 +190,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
   status = nvcompBatchedLZ4CompressGetTempSize(
-      chunk_size, input_data.size(), &comp_temp_bytes);
+      input_data.size(), chunk_size, &comp_temp_bytes);
   if (status != nvcompSuccess) {
     throw std::runtime_error("nvcompBatchedLZ4CompressGetTempSize() failed.");
   }

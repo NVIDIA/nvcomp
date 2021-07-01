@@ -254,7 +254,7 @@ int main(int argc, char** argv)
 
   nvtxRangePop();
   nvtxRangePushA("Decompression and comparison");
-  printf ("Decompressing\n");
+  printf("Decompressing\n");
 
   // Decompress the data (asynchronous)
   decompressor.decompress_async(
@@ -274,8 +274,7 @@ int main(int argc, char** argv)
   nvtxRangePushA("Final cleanup");
 
   // Cleanup
-  if (registered)
-  {
+  if (registered) {
     status = cuFileBufDeregister(d_compressed);
     if (status.err != CU_FILE_SUCCESS) {
       printf("Error: cuFileBufDeregister failed(%d)\n", status.err);

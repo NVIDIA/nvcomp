@@ -2,7 +2,7 @@
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
 
-nvCOMP 2.0.0 includes Cascaded, LZ4, and Snappy compression methods.
+nvCOMP 2.0 includes Cascaded, LZ4, and Snappy compression methods.
 It also adds support for the external Bitcomp and GDeflate methods.
 Cascaded compression methods demonstrate high performance with up to 500 GB/s
 throughput and a high compression ratio of up to 80x on numerical data from
@@ -13,13 +13,13 @@ arbitrary byte streams.
 
 Below are compression ratio and performance plots for three methods available in nvCOMP (Cascaded, Snappy and LZ4). Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The numbers were collected on a NVIDIA A100 80GB GPU (with ECC on). 
 
-![compression ratio](/doc/compression_ratio.png)
+![compression ratio](/doc/compression_ratio.svg)
 
-![compression performance](/doc/compression_performance_a100.png)
+![compression performance](/doc/compression_performance_a100.svg)
 
-![decompression performance](/doc/decompression_performance_a100.png)
+![decompression performance](/doc/decompression_performance_a100.svg)
 
-nvCOMP 2.0.0 features new flexible APIs:
+nvCOMP 2.0 features new flexible APIs:
 * [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
   metadata and chunking must be handled outside of nvCOMP, low-level nvCOMP
   APIs perform batch compression/decompression of multiple streams, they are
@@ -30,11 +30,11 @@ nvCOMP 2.0.0 features new flexible APIs:
   APIs are synchronous and for best performance/flexibility it’s recommended to
   use the low-level APIs.
 
-Please note, that in nvCOMP 2.0.0 some compressor are only available either through the Low-level API or through the High-level API.
+Please note, that in nvCOMP 2.0 some compressors are only available either through the Low-level API or through the High-level API.
 
 Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
 
-# Version 2.0.0 Release
+# Version 2.0 Release
 
 This release of nvCOMP introduces new interfaces and compression methods.
 
@@ -155,4 +155,45 @@ uncompressed (B): 81289736
 comp_size: 3831058, compressed ratio: 21.22
 compression throughput (GB/s): 36.64
 decompression throughput (GB/s): 118.47
+```
+
+# Running examples
+
+By default the examples are not built. To build the CPU compression examples, pass `-DBUILD_EXAMPLES=ON` to cmake.
+
+```
+cmake .. -DBUILD_EXAMPLES=ON [other cmake options]
+make -j
+```
+To additionally compile the GPU Direct Storage example, pass `-DBUILD_GDS_EXAMPLE=ON` to cmake.
+This will result in the examples being placed inside of the `bin/` directory.
+
+These examples require some external dependencies namely:
+- [zlib](https://github.com/madler/zlib) for the GDeflate CPU compression example (`zlib1g-dev` on debian based systems)
+- [LZ4](https://github.com/lz4/lz4) for the LZ4 CPU compression example (`liblz4-dev` on debian based systems)
+- [GPU Direct Storage](https://developer.nvidia.com/blog/gpudirect-storage/) for the corresponding example
+
+Run examples:
+- Run `./bin/gdeflate_cpu_compression` or `./bin/lz4_cpu_compression` with `-f </path/to/datafile>` to compress the data on the CPU and decompress on the GPU.
+- Run `./bin/nvcomp_gds </path/to/filename>` to run the example showing how to use nvcomp with GPU Direct Storage (GDS).
+
+Below are the CPU compression example results on a RTX A6000 for the Mortgage 2000Q4 column 12:
+```
+$ ./bin/gdeflate_cpu_compression -f /Data/mortgage/mortgage-2009Q2-col12-string.bin 
+----------
+files: 1
+uncompressed (B): 164527964
+chunks: 2511
+comp_size: 1785796, compressed ratio: 92.13
+decompression validated :)
+decompression throughput (GB/s): 152.88
+
+$ ./bin/lz4_cpu_compression -f /Data/mortgage/mortgage-2009Q2-col12-string.bin 
+----------
+files: 1
+uncompressed (B): 164527964
+chunks: 2511
+comp_size: 2018066, compressed ratio: 81.53
+decompression validated :)
+decompression throughput (GB/s): 160.35
 ```

@@ -86,9 +86,43 @@ const void* CudaUtils::void_device_pointer(const void* const ptr)
   return attr.devicePointer;
 }
 
+bool CudaUtils::is_device_pointer(const void* const ptr)
+{
+  cudaPointerAttributes attr;
+
+  cudaError_t err = cudaPointerGetAttributes(&attr, ptr);
+
+  if (err == cudaErrorInvalidValue) {
+    int cuda_version;
+    check(
+        cudaRuntimeGetVersion(&cuda_version),
+        "Failed to get runtime "
+        "verison.");
+
+    if (cuda_version < 11000) {
+      // error is normal for non-device memory -- clear the error and return
+      // false
+      (void)cudaGetLastError();
+      return false;
+    }
+  }
+
+  // if we continue, make sure we successfully got pointer information
+  check(
+      err,
+      "Failed to get pointer "
+      "attributes for pointer: "
+          + to_string(ptr));
+
+  return attr.type == cudaMemoryTypeDevice;
+}
+
 void* CudaUtils::void_device_pointer(void* const ptr)
 {
   cudaPointerAttributes attr;
+  // we don't need to worry about the difference between cuda 10 and cuda 11
+  // here, as if it's not a device pointer, we want throw an exception either
+  // way.
   check(
       cudaPointerGetAttributes(&attr, ptr),
       "Failed to get pointer "

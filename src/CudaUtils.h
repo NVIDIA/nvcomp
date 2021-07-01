@@ -101,6 +101,8 @@ public:
         "CudaUtils::copy(dst, src, count, kind)");
   }
 
+  static bool is_device_pointer(const void* ptr);
+
   template <typename T>
   static T* device_pointer(T* const ptr)
   {

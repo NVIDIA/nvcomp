@@ -1,2 +1,5 @@
 *.swp
 *.o
+build/
+.env
+.vscode/

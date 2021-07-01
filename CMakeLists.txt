@@ -4,6 +4,7 @@ project(nvcomp LANGUAGES C CUDA CXX)
 option(BUILD_TESTS "Build unit and end-to-end tests." OFF)
 option(BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(BUILD_EXAMPLES "Build examples." OFF)
+option(BUILD_STATIC "Build a static library." OFF)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)

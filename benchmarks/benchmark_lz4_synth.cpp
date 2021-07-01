@@ -116,11 +116,10 @@ void run_benchmark(const std::vector<uint8_t>& data)
   auto end = std::chrono::steady_clock::now();
 
   comp_out_bytes = *d_comp_out_bytes;
-  cudaFreeHost(d_comp_out_bytes);
+  CUDA_CHECK(cudaFreeHost(d_comp_out_bytes));
 
-  cudaFree(d_comp_out_bytes);
-  cudaFree(d_comp_temp);
-  cudaFree(d_in_data);
+  CUDA_CHECK(cudaFree(d_comp_temp));
+  CUDA_CHECK(cudaFree(d_in_data));
 
   std::cout << "comp_size: " << comp_out_bytes
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
@@ -165,15 +164,16 @@ void run_benchmark(const std::vector<uint8_t>& data)
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
-  cudaStreamDestroy(stream);
-  cudaFree(d_decomp_temp);
-  cudaFree(d_comp_out);
+  CUDA_CHECK(cudaStreamDestroy(stream));
+  CUDA_CHECK(cudaFree(d_decomp_temp));
+  CUDA_CHECK(cudaFree(d_comp_out));
 
   benchmark_assert(
       decomp_bytes == num_bytes, "Decompressed result incorrect size.");
 
   std::vector<uint8_t> res(num_bytes);
-  cudaMemcpy(res.data(), decomp_out_ptr, num_bytes, cudaMemcpyDeviceToHost);
+  CUDA_CHECK(cudaMemcpy(
+      res.data(), decomp_out_ptr, num_bytes, cudaMemcpyDeviceToHost));
 
   benchmark_assert(res == data, "Decompressed data does not match input.");
 }
@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
     print_usage();
     return 1;
   }
-  cudaSetDevice(gpu_num);
+  CUDA_CHECK(cudaSetDevice(gpu_num));
 
   std::mt19937 rng(0);
 
