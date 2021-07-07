@@ -123,7 +123,7 @@ static void run_benchmark(char* fname, int verbose_memory)
 
   comp_out_bytes = *d_comp_out_bytes;
 
-  cudaFree(d_comp_out_bytes);
+  cudaFreeHost(d_comp_out_bytes);
   cudaFree(d_comp_temp);
   cudaFree(d_in_data);
 
