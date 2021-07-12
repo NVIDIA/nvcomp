@@ -350,10 +350,10 @@ snap_kernel(
 #define BATCH_SIZE (1 << LOG2_BATCH_SIZE)
 #define LOG2_BATCH_COUNT 2
 #define BATCH_COUNT (1 << LOG2_BATCH_COUNT)
-#define LOG2_PREFETCH_SIZE 10
+#define LOG2_PREFETCH_SIZE 12
 #define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 512B, in 32B chunks
 #define PREFETCH_SECTORS 8 // How many loads in flight when prefetching
-#define LITERAL_SECTORS 8 // How many loads in flight when processing the literal
+#define LITERAL_SECTORS 4 // How many loads in flight when processing the literal
 
 #define LOG_CYCLECOUNT 0
 
@@ -374,6 +374,7 @@ struct unsnap_queue_s {
   uint32_t prefetch_rdpos;         ///< Prefetch consumer read position
   int32_t prefetch_end;            ///< Prefetch enable flag (nonzero stops prefetcher)
   int32_t batch_len[BATCH_COUNT];  ///< Length of each batch - <0:end, 0:not ready, >0:symbol count
+  uint32_t batch_prefetch_rdpos[BATCH_COUNT];
   unsnap_batch_s batch[BATCH_COUNT * BATCH_SIZE];  ///< LZ77 batch data
   uint8_t buf[PREFETCH_SIZE];                      ///< Prefetch buffer
 };
@@ -626,7 +627,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
 
     // Wait for prefetcher
     if (t == 0) {
-      s->q.prefetch_rdpos = cur;
+//      s->q.prefetch_rdpos = cur;
 #pragma unroll(1)  // We don't want unrolling here
       while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
       b = &s->q.batch[batch * BATCH_SIZE];
@@ -732,7 +733,8 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
       }
     }
     if (t == 0) {
-      while (bytes_left > 0 && batch_len < BATCH_SIZE) {
+      uint32_t current_prefetch_wrpos = s->q.prefetch_wrpos;
+      while (bytes_left > 0 && batch_len < BATCH_SIZE && min(cur + 5, end) <= current_prefetch_wrpos) {
         uint32_t blen, offset;
         uint8_t b0 = READ_BYTE(cur);
         if (b0 & 3) {
@@ -785,9 +787,9 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
           offset = -(int32_t)cur;
           cur += blen;
           // Wait for prefetcher
-          s->q.prefetch_rdpos = cur;
-#pragma unroll(1)  // We don't want unrolling here
-          while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
+//          s->q.prefetch_rdpos = cur;
+//#pragma unroll(1)  // We don't want unrolling here
+//          while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
           dst_pos += blen;
           if (bytes_left < blen) break;
           bytes_left -= blen;
@@ -798,14 +800,16 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
       }
       if (batch_len != 0) {
         s->q.batch_len[batch] = batch_len;
+        s->q.batch_prefetch_rdpos[batch] = cur;
         batch                 = (batch + 1) & (BATCH_COUNT - 1);
       }
     }
     batch_len = SHFL0(batch_len);
+    bytes_left = SHFL0(bytes_left);
     if (t == 0) {
       while (s->q.batch_len[batch] != 0) { NANOSLEEP(100); }
     }
-    if (batch_len != BATCH_SIZE) { break; }
+    if (bytes_left <= 0) { break; }
   }
   if (!t) {
     s->q.prefetch_end     = 1;
@@ -872,6 +876,7 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
         }
       } while (n >= 4);
     }
+    uint32_t current_prefetch_wrpos = s->q.prefetch_wrpos;
     for (int i = 0; i < batch_len; i++) {
       int32_t blen  = SHFL(blen_t, i);
       int32_t dist  = SHFL(dist_t, i);
@@ -917,17 +922,28 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
         uint8_t b[LITERAL_SECTORS];
         dist = -dist;
         while (blen >= LITERAL_SECTORS * 32u) {
-          for(int i = 0; i < LITERAL_SECTORS; ++i)
-            b[i] = literal_base[dist + i * 32u + t];
+          if (dist + LITERAL_SECTORS * 32u < current_prefetch_wrpos) {
+            for(int i = 0; i < LITERAL_SECTORS; ++i)
+              b[i] = READ_BYTE(dist + i * 32u + t);
+          } else {
+            for(int i = 0; i < LITERAL_SECTORS; ++i)
+              b[i] = literal_base[dist + i * 32u + t];
+          }
           for(int i = 0; i < LITERAL_SECTORS; ++i)
             out[i * 32u + t] = b[i];
           dist += LITERAL_SECTORS * 32u;
           out += LITERAL_SECTORS * 32u;
           blen -= LITERAL_SECTORS * 32u;
         }
-        for(int i = 0; i < LITERAL_SECTORS; ++i)
-          if (i * 32u + t < blen)
-            b[i] = literal_base[dist + i * 32u + t];
+        if (dist + blen < current_prefetch_wrpos) {
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            if (i * 32u + t < blen)
+              b[i] = READ_BYTE(dist + i * 32u + t);
+        } else {
+          for(int i = 0; i < LITERAL_SECTORS; ++i)
+            if (i * 32u + t < blen)
+              b[i] = literal_base[dist + i * 32u + t];
+        }
         for(int i = 0; i < LITERAL_SECTORS; ++i)
           if (i * 32u + t < blen)
             out[i * 32u + t] = b[i];
@@ -935,7 +951,10 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
       out += blen;
     }
     SYNCWARP();
-    if (t == 0) { s->q.batch_len[batch] = 0; }
+    if (t == 0) {
+      s->q.prefetch_rdpos = s->q.batch_prefetch_rdpos[batch];
+      s->q.batch_len[batch] = 0;
+    }
     batch = (batch + 1) & (BATCH_COUNT - 1);
   } while (1);
 }
