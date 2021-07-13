@@ -351,7 +351,7 @@ snap_kernel(
 #define LOG2_BATCH_COUNT 2
 #define BATCH_COUNT (1 << LOG2_BATCH_COUNT)
 #define LOG2_PREFETCH_SIZE 12
-#define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 512B, in 32B chunks
+#define PREFETCH_SIZE (1 << LOG2_PREFETCH_SIZE)  // 4KB, in 32B chunks
 #define PREFETCH_SECTORS 8 // How many loads in flight when prefetching
 #define LITERAL_SECTORS 4 // How many loads in flight when processing the literal
 
