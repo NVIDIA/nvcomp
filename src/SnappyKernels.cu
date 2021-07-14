@@ -921,7 +921,8 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
         // Literal
         uint8_t b[LITERAL_SECTORS];
         dist = -dist;
-        while (blen >= LITERAL_SECTORS * 32u) {
+#pragma unroll 1
+        for(int k = 0; k < blen / (LITERAL_SECTORS * 32u); ++k) {
           if (dist + LITERAL_SECTORS * 32u < current_prefetch_wrpos) {
             for(int i = 0; i < LITERAL_SECTORS; ++i)
               b[i] = READ_BYTE(dist + i * 32u + t);
