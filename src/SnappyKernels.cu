@@ -627,7 +627,6 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
 
     // Wait for prefetcher
     if (t == 0) {
-//      s->q.prefetch_rdpos = cur;
 #pragma unroll(1)  // We don't want unrolling here
       while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
       b = &s->q.batch[batch * BATCH_SIZE];
@@ -786,10 +785,6 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
           blen += 1;
           offset = -(int32_t)cur;
           cur += blen;
-          // Wait for prefetcher
-//          s->q.prefetch_rdpos = cur;
-//#pragma unroll(1)  // We don't want unrolling here
-//          while (s->q.prefetch_wrpos < min(cur + 5 * BATCH_SIZE, end)) { NANOSLEEP(50); }
           dst_pos += blen;
           if (bytes_left < blen) break;
           bytes_left -= blen;
