@@ -91,7 +91,7 @@ with open(str(in_fname), "r") as inFile:
                 in_data=numpy.genfromtxt(inFile, dtype=dtype,
                 max_rows=chunk_size, usecols=[int(col_num)], delimiter=delimiter, loose=False)
 
-		iters = iters+1
+                iters = iters+1
 
                 if offset == 0:
                     # don't warn about an empty file after we have read something
