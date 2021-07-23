@@ -16,6 +16,7 @@
 
 #include "SnappyBlockUtils.cuh"
 #include "SnappyKernels.h"
+#include "CudaUtils.h"
 
 namespace nvcomp {
 
@@ -250,7 +251,7 @@ static __device__ uint32_t Match60(const uint8_t *src1,
  * @param[out] outputs Compression status per block
  * @param[in] count Number of blocks to compress
  **/
-extern "C" __global__ void __launch_bounds__(64)
+__global__ void __launch_bounds__(64)
 snap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -940,6 +941,58 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
   } while (1);
 }
 
+__global__ void __launch_bounds__(32)
+get_uncompressed_sizes_kernel(
+  const void* const* __restrict__ device_in_ptr,
+  const uint64_t* __restrict__ device_in_bytes,
+	uint64_t* __restrict__ device_out_bytes)
+{
+  int t             = threadIdx.x;
+  int strm_id       = blockIdx.x;
+
+  if (t == 0) {
+    uint32_t uncompressed_size = 0;
+    const uint8_t *cur = reinterpret_cast<const uint8_t *>(device_in_ptr[strm_id]);
+    const uint8_t *end = cur + device_in_bytes[strm_id];
+    if (cur < end) {
+      // Read uncompressed size (varint), limited to 31-bit
+      // The size is stored as little-endian varint, from 1 to 5 bytes (as we allow up to 2^31 sizes only)
+      // The upper bit of each byte indicates if there is another byte to read to compute the size
+      // Please see format details at https://github.com/google/snappy/blob/master/format_description.txt 
+      uncompressed_size = *cur++;
+      if (uncompressed_size > 0x7f) {
+        uint32_t c        = (cur < end) ? *cur++ : 0;
+        uncompressed_size = (uncompressed_size & 0x7f) | (c << 7);
+        // Check if the most significant bit is set, this indicates we need to read the next byte
+        // (maybe even more) to compute the uncompressed size
+        // We do it several time stopping if 1) MSB is cleared or 2) we see that the size is >= 2^31
+        // which we cannot handle  
+        if (uncompressed_size >= (0x80 << 7)) {
+          c                 = (cur < end) ? *cur++ : 0;
+          uncompressed_size = (uncompressed_size & ((0x7f << 7) | 0x7f)) | (c << 14);
+          if (uncompressed_size >= (0x80 << 14)) {
+            c = (cur < end) ? *cur++ : 0;
+            uncompressed_size =
+              (uncompressed_size & ((0x7f << 14) | (0x7f << 7) | 0x7f)) | (c << 21);
+            if (uncompressed_size >= (0x80 << 21)) {
+              c = (cur < end) ? *cur++ : 0;
+              // Snappy format alllows uncompressed sizes larger than 2^31
+              // We generate an error in this case
+              if (c < 0x8)
+                uncompressed_size =
+                  (uncompressed_size & ((0x7f << 21) | (0x7f << 14) | (0x7f << 7) | 0x7f)) |
+                  (c << 28);
+              else
+                uncompressed_size = 0;
+            }
+          }
+        }
+      }
+    }
+    device_out_bytes[strm_id] = uncompressed_size;
+  }
+}
+
 /**
  * @brief Snappy decompression kernel
  * See http://github.com/google/snappy/blob/master/format_description.txt
@@ -949,7 +1002,7 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
  * @param[in] inputs Source & destination information per block
  * @param[out] outputs Decompression status per block
  **/
-extern "C" __global__ void __launch_bounds__(96)
+__global__ void __launch_bounds__(96)
 unsnap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -1042,7 +1095,7 @@ unsnap_kernel(
   }
 }
 
-cudaError_t gpu_snap(
+void gpu_snap(
   const void* const* device_in_ptr,
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
@@ -1057,10 +1110,10 @@ cudaError_t gpu_snap(
   if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
     device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
       outputs, device_out_bytes); }
-  return cudaGetLastError();
+  CudaUtils::check_last_error("Failed to launch Snappy compression CUDA kernel gpu_snap");
 }
 
-cudaError_t gpu_unsnap(
+void gpu_unsnap(
   const void* const* device_in_ptr,
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
@@ -1077,7 +1130,22 @@ cudaError_t gpu_unsnap(
   unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(
     device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
       outputs, device_out_bytes);
-  return cudaGetLastError();
+  CudaUtils::check_last_error("Failed to launch Snappy decompression CUDA kernel gpu_unsnap");
+}
+
+void gpu_get_uncompressed_sizes(
+  const void* const* device_in_ptr,
+  const size_t* device_in_bytes,
+  size_t* device_out_bytes,
+  int count,
+  cudaStream_t stream)
+{
+  dim3 dim_block(32, 1);
+  dim3 dim_grid(count, 1);
+
+  get_uncompressed_sizes_kernel<<<dim_grid, dim_block, 0, stream>>>(
+    device_in_ptr, device_in_bytes, device_out_bytes);
+  CudaUtils::check_last_error("Failed to run Snappy kernel gpu_get_uncompressed_sizes");
 }
 
 } // nvcomp namespace
