@@ -59,7 +59,7 @@ struct gpu_snappy_status_s {
  * @param[in] stream All the compression will be enqueued into this CUDA
  * stream and run asynchronously.
  **/
-cudaError_t gpu_snap(
+void gpu_snap(
   const void* const* device_in_ptr,
 	const size_t* device_in_bytes,
 	void* const* device_out_ptr,
@@ -92,12 +92,39 @@ cudaError_t gpu_snap(
  * @param[in] stream All the decompression will be enqueued into this CUDA
  * stream and run asynchronously.
  **/
-cudaError_t gpu_unsnap(
+void gpu_unsnap(
   const void* const* device_in_ptr,
   const size_t* device_in_bytes,
   void* const* device_out_ptr,
   const size_t* device_out_available_bytes,
   gpu_snappy_status_s *outputs,
+  size_t* device_out_bytes,
+  int count,
+  cudaStream_t stream);
+
+/**
+ * @brief Compute the sizes of the uncompressed data chunks
+ *
+ * The function computes the sizes of the uncompressed data,
+ * given the compressed data chunks.
+ * All the pointers parameters are to GPU-accessible memory.
+ *
+ * @param[in] device_in_ptr Pointer to the list of pointers to
+ * the GPU-accessible compressed data.
+ * @param[in] device_in_bytes Pointer to the list of sizes of compressed
+ * data.
+ * @param[out] device_out_bytes Pointer to the list of actual sizes
+ * of uncompressed data. The function would put 0 for the uncompressed
+ * size if it detects that the compressed chunk is not a valid snappy
+ * stream. Non-zero value doesn't necesary mean though that the chunk
+ * is a valid snappy compressed stream.
+ * @param[in] count The number of chunks to compute sizes for.
+ * @param[in] stream All the computations will be enqueued into this CUDA
+ * stream and run asynchronously.
+ **/
+void gpu_get_uncompressed_sizes(
+  const void* const* device_in_ptr,
+  const size_t* device_in_bytes,
   size_t* device_out_bytes,
   int count,
   cudaStream_t stream);

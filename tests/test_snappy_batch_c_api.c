@@ -172,11 +172,13 @@ int test_batch_compression_and_decompression(const size_t batch_size)
   status = nvcompBatchedSnappyCompressAsync(
       (const void* const*)d_in_data_device,
       batch_bytes_device,
+      max_batch_bytes_uncompressed,
       batch_size,
       d_comp_temp,
       comp_temp_bytes,
       d_comp_out_device,
       comp_out_bytes_device,
+      0,
       stream);
   REQUIRE(status == nvcompSuccess);
 
@@ -212,14 +214,20 @@ int test_batch_compression_and_decompression(const size_t batch_size)
       batch_size * sizeof(*d_decomp_out),
       cudaMemcpyHostToDevice);
 
+  nvcompStatus_t * device_status_ptr;
+  CUDA_CHECK(cudaMalloc(
+      (void**)(&device_status_ptr), batch_size * sizeof(nvcompStatus_t)));
+
   status = nvcompBatchedSnappyDecompressAsync(
       (const void* const*)d_comp_out_device,
       comp_out_bytes_device,
+      batch_bytes_device,
       batch_bytes_device,
       batch_size,
       temp_ptr,
       temp_bytes,
       (void* const*)d_decomp_out_device,
+      device_status_ptr,
       stream);
   REQUIRE(status == nvcompSuccess);
 
@@ -229,6 +237,7 @@ int test_batch_compression_and_decompression(const size_t batch_size)
   cudaFree(d_comp_out_device);
   cudaFree(comp_out_bytes_device);
   cudaFree(batch_bytes_device);
+  cudaFree(device_status_ptr);
 
   for (size_t i = 0; i < batch_size; i++) {
     cudaMemcpy(
