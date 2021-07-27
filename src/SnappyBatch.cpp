@@ -134,7 +134,7 @@ nvcompError_t nvcompBatchedSnappyDecompressAsync(
         device_compressed_bytes,
         device_uncompressed_ptr,
         device_uncompressed_bytes,
-        (gpu_snappy_status_s*)device_statuses,
+        device_statuses,
         device_actual_uncompressed_bytes,
         batch_size,
         stream);
@@ -164,7 +164,7 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
+nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
     size_t max_chunk_size, size_t* max_compressed_size)
 {
   try {

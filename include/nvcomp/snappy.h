@@ -126,9 +126,8 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    size_t max_chunk_size,
-    size_t * max_compressed_size);
+nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
+    size_t max_chunk_size, size_t* max_compressed_size);
 
 /**
  * @brief Perform compression.

@@ -905,7 +905,7 @@ inline __device__ void decompressStream(
     // Note that the last sequence stops right after literals field.
     // There are specific parsing rules to respect to be compatible with the
     // reference decoder : 1) The last 5 bytes are always literals 2) The last
-    // match cannot start within the last 12 bytes Consequently, a file with
+    // match cannot start within the last 12 bytes. Consequently, a file with
     // less then 13 bytes can only be represented as literals These rules are in
     // place to benefit speed and ensure buffer limits are never crossed.
     if (comp_idx < comp_end) {
@@ -918,13 +918,6 @@ inline __device__ void decompressStream(
         offset = readWord<offset_type>(ctrl.rawAt(comp_idx));
       }
 
-#if OOB_CHECKING
-      if (decomp_idx < offset) {
-        corrupted_sequence = true;
-        break;
-      }
-#endif
-
       comp_idx += sizeof(offset_type);
 
       // read the match length
@@ -932,6 +925,13 @@ inline __device__ void decompressStream(
       if (tok.num_matches == 15) {
         match += ctrl.readLSIC(comp_idx);
       }
+
+#if OOB_CHECKING
+      if (decomp_idx < offset || decomp_idx + match > buf_end) {
+        corrupted_sequence = true;
+        break;
+      }
+#endif
 
       // copy match
       if (output_decompressed) {
