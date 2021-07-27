@@ -26,6 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "nvcomp.h"
 
 namespace nvcomp {
 
@@ -93,14 +94,14 @@ void gpu_snap(
  * stream and run asynchronously.
  **/
 void gpu_unsnap(
-  const void* const* device_in_ptr,
-  const size_t* device_in_bytes,
-  void* const* device_out_ptr,
-  const size_t* device_out_available_bytes,
-  gpu_snappy_status_s *outputs,
-  size_t* device_out_bytes,
-  int count,
-  cudaStream_t stream);
+    const void* const* device_in_ptr,
+    const size_t* device_in_bytes,
+    void* const* device_out_ptr,
+    const size_t* device_out_available_bytes,
+    nvcompStatus_t* outputs,
+    size_t* device_out_bytes,
+    int count,
+    cudaStream_t stream);
 
 /**
  * @brief Compute the sizes of the uncompressed data chunks
