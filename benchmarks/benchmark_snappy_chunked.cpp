@@ -145,7 +145,7 @@ void run_benchmark(
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
   size_t comp_out_bytes;
-  status = nvcompBatchedSnappyCompressGetOutputSize(
+  status = nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
       max_batch_bytes_uncompressed,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
