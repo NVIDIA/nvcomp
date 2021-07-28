@@ -38,6 +38,10 @@
 extern "C" {
 #endif
 
+typedef struct snappy_opt_type {
+	int dummy;
+} snappy_opt_type;
+
 /**
  * @brief Get the amount of temp space required on the GPU for decompression.
  *
@@ -54,27 +58,49 @@ nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
 	size_t * temp_bytes);
 
 /**
+ * @brief Compute uncompressed sizes.
+ *
+ * @param device_compresed_ptrs The pointers on the GPU, to the compressed chunks.
+ * @param device_compressed_bytes The size of each compressed chunk on the GPU.
+ * @param device_uncompressed_bytes The actual size of each uncompressed chunk.
+ * @param batch_size The number of batch items.
+ * @param stream The stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompError_t nvcompBatchedSnappyGetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream);
+
+/**
  * @brief Perform decompression.
  *
- * @param device_in_ptrs The pointers on the GPU, to the compressed chunks.
- * @param device_in_bytes The size of each compressed chunk on the GPU.
- * @param device_out_bytes The size of each uncompressed chunk on the GPU.
+ * @param device_compresed_ptrs The pointers on the GPU, to the compressed chunks.
+ * @param device_compressed_bytes The size of each compressed chunk on the GPU.
+ * @param device_uncompressed_bytes The size of each device_uncompressed_ptr[i] buffer.
+ * @param device_actual_uncompressed_bytes The actual size of each uncompressed chunk
  * @param batch_size The number of batch items.
- * @param temp_ptr The temporary GPU space.
+ * @param device_temp_ptr The temporary GPU space, could be NULL in case temprorary space is not needed.
  * @param temp_bytes The size of the temporary GPU space.
- * @param device_out_ptr The pointers on the GPU, to where to uncompress each chunk (output).
+ * @param device_uncompressed_ptr The pointers on the GPU, to where to uncompress each chunk (output).
+ * @param device_statuses The pointers on the GPU, to where to uncompress each chunk (output).
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyDecompressAsync(
-	const void* const* device_in_ptr,
-	const size_t* device_in_bytes,
-	const size_t* device_out_bytes,
+	const void* const* device_compresed_ptrs,
+	const size_t* device_compressed_bytes,
+	const size_t* device_uncompressed_bytes,
+	size_t* device_actual_uncompressed_bytes,
 	size_t batch_size,
-	void* const temp_ptr,
+	void* const device_temp_ptr,
 	const size_t temp_bytes,
-	void* const* device_out_ptr,
+	void* const* device_uncompressed_ptr,
+	nvcompStatus_t* device_statuses,
 	cudaStream_t stream);
 
 /**
@@ -100,32 +126,38 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedSnappyCompressGetOutputSize(
-    size_t max_chunk_size,
-    size_t * max_compressed_size);
+nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
+    size_t max_chunk_size, size_t* max_compressed_size);
 
 /**
  * @brief Perform compression.
  *
- * @param device_in_ptr The pointers on the GPU, to uncompressed batched items.
- * @param device_in_bytes The size of each uncompressed batch item on the GPU.
+ * The caller is responsible for passing device_compressed_bytes of size
+ * sufficient to hold compressed data
+ *
+ * @param device_uncompressed_ptr The pointers on the GPU, to uncompressed batched items.
+ * @param device_uncompressed_bytes The size of each uncompressed batch item on the GPU.
+ * @param max_uncompressed_chunk_bytes The size of the largest uncompressed chunk.
  * @param batch_size The number of batch items.
- * @param temp_ptr The temporary GPU workspace.
+ * @param device_temp_ptr The temporary GPU workspace, could be NULL in case temprorary space is not needed.
  * @param temp_bytes The size of the temporary GPU workspace.
- * @param device_out_ptr The pointers on the GPU, to the output location for each compressed batch item (output).
- * @param device_out_bytes The compressed size of each chunk on the GPU (output).
+ * @param device_compressed_ptr The pointers on the GPU, to the output location for each compressed batch item (output).
+ * @param device_compressed_bytes The compressed size of each chunk on the GPU (output).
+ * @param format_ops Snappy compression options.
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */
 nvcompError_t nvcompBatchedSnappyCompressAsync(
-	const void* const* device_in_ptr,
-	const size_t* device_in_bytes,
+	const void* const* device_uncompressed_ptr,
+	const size_t* device_uncompressed_bytes,
+    size_t max_uncompressed_chunk_bytes,
 	size_t batch_size,
-	void* temp_ptr,
+	void* device_temp_ptr,
 	size_t temp_bytes,
-	void* const* device_out_ptr,
-	size_t* device_out_bytes,
+	void* const* device_compressed_ptr,
+	size_t* device_compressed_bytes,
+	snappy_opt_type* format_ops,
 	cudaStream_t stream);
 
 #ifdef __cplusplus

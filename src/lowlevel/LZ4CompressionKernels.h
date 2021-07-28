@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
+
 namespace nvcomp
 {
 namespace lowlevel
@@ -61,6 +63,27 @@ void lz4BatchDecompress(
     void* temp_ptr,
     const size_t temp_bytes,
     uint8_t* const* device_out_ptrs,
+    size_t* device_actual_uncompressed_bytes,
+    nvcompStatus_t* device_status_ptrs,
+    cudaStream_t stream);
+
+/**
+ * @brief Calculate the decompressed sizes of each chunk. This is 
+ * for when we do not know upfront how much space to allocate before
+ * running the decompression kernel. All pointers are GPU accessible.
+ *
+ * @param device_compressed_ptrs Pointers to compressed LZ4 chunks.
+ * @param device_compressed_bytes The size of each compressed LZ4 chunk.
+ * @param device_uncompressed_bytes The output calculated decompressed sizes
+ * for each chunk.
+ * @param batch_size The number of compressed chunks
+ * @param stream The cuda stream to run on
+ */
+void lz4BatchGetDecompressSizes(
+    const uint8_t* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
     cudaStream_t stream);
 
 size_t lz4ComputeChunksInBatch(

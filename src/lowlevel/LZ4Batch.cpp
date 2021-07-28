@@ -66,14 +66,15 @@ nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
 }
 
 nvcompError_t nvcompBatchedLZ4DecompressAsync(
-    const void* const* const device_in_ptrs,
-    const size_t* const device_in_bytes,
-    const size_t* const device_out_bytes,
-    const size_t /* max_uncompressed_chunk_bytes */,
-    const size_t batch_size,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    void* const* const device_out_ptrs,
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr,
+    size_t temp_bytes,
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream)
 {
   // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check
@@ -83,18 +84,47 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
   try {
     lz4BatchDecompress(
         CudaUtils::device_pointer(
-            reinterpret_cast<const uint8_t* const*>(device_in_ptrs)),
-        CudaUtils::device_pointer(device_in_bytes),
-        CudaUtils::device_pointer(device_out_bytes),
+            reinterpret_cast<const uint8_t* const*>(device_compressed_ptrs)),
+        CudaUtils::device_pointer(device_compressed_bytes),
+        CudaUtils::device_pointer(device_uncompressed_bytes),
         batch_size,
-        CudaUtils::device_pointer(temp_ptr),
+        CudaUtils::device_pointer(device_temp_ptr),
         temp_bytes,
         CudaUtils::device_pointer(
-            reinterpret_cast<uint8_t* const*>(device_out_ptrs)),
+            reinterpret_cast<uint8_t* const*>(device_uncompressed_ptrs)),
+        CudaUtils::device_pointer(device_actual_uncompressed_bytes),
+        CudaUtils::device_pointer(device_status_ptrs),
         stream);
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedLZ4DecompressAsync()");
+  }
+
+  return nvcompSuccess;
+}
+
+nvcompError_t nvcompBatchedLZ4GetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream)
+{
+  CHECK_NOT_NULL(device_compressed_ptrs);
+  CHECK_NOT_NULL(device_compressed_bytes);
+  CHECK_NOT_NULL(device_uncompressed_bytes);
+
+  try {
+    lz4BatchGetDecompressSizes(
+        CudaUtils::device_pointer(
+            reinterpret_cast<const uint8_t* const*>(device_compressed_ptrs)),
+        CudaUtils::device_pointer(device_compressed_bytes),
+        CudaUtils::device_pointer(device_uncompressed_bytes),
+        batch_size,
+        stream);
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(
+        e, "nvcompBatchedLZ4GetDecompressSizeAsync()");
   }
 
   return nvcompSuccess;
@@ -141,6 +171,7 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
     const size_t temp_bytes,
     void* const* const device_out_ptrs,
     size_t* const device_out_bytes,
+    nvcomp_lz4_lowlevel_opt_type* /* format_opts */,
     cudaStream_t stream)
 {
   // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check

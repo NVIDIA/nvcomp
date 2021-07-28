@@ -91,8 +91,13 @@ size_t LZ4Decompressor::calculate_workspace_size(
   const size_t pointer_bytes = sizeof(void*) * num_chunks * 2;
   // we need input and output sizes for each chunk
   const size_t size_bytes = sizeof(size_t) * num_chunks * 2;
+  // we need actual output sizes
+  const size_t actual_size_bytes = sizeof(size_t) * num_chunks;
+  // we need the error status for each chunk
+  const size_t status_bytes = sizeof(nvcompError_t) * num_chunks;
 
-  return c_api_space + pointer_bytes + size_bytes;
+  return c_api_space + pointer_bytes + size_bytes + actual_size_bytes
+         + status_bytes;
 }
 
 /******************************************************************************
@@ -185,6 +190,12 @@ void LZ4Decompressor::decompress_async(cudaStream_t stream)
   size_t* out_sizes_device;
   temp.reserve(&out_sizes_device, m_num_chunks);
 
+  size_t* actual_out_sizes_devices;
+  temp.reserve(&actual_out_sizes_devices, m_num_chunks);
+
+  nvcompStatus_t* device_status_ptrs;
+  temp.reserve(&device_status_ptrs, m_num_chunks);
+
   const dim3 block(128);
   const dim3 grid(roundUpDiv(m_num_chunks, block.x));
 
@@ -204,11 +215,12 @@ void LZ4Decompressor::decompress_async(cudaStream_t stream)
       in_ptrs_device,
       in_sizes_device,
       out_sizes_device,
-      m_chunk_size,
+      actual_out_sizes_devices,
       m_num_chunks,
       workspace,
       workspace_size,
       out_ptrs_device,
+      device_status_ptrs,
       stream));
 }
 

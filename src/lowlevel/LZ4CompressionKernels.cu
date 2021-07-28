@@ -50,6 +50,8 @@ using position_type = uint32_t;
 using double_word_type = uint64_t;
 using item_type = uint32_t;
 
+#define OOB_CHECKING 1 // Prevent's crashing of corrupt lz4 sequences
+
 namespace nvcomp
 {
 namespace lowlevel
@@ -307,10 +309,7 @@ public:
       uint8_t* const buffer,
       const uint8_t* const compData,
       const position_type length) :
-      m_offset(0),
-      m_length(length),
-      m_buffer(buffer),
-      m_compData(compData)
+      m_offset(0), m_length(length), m_buffer(buffer), m_compData(compData)
   {
     // do nothing
   }
@@ -519,8 +518,9 @@ inline __device__ uint8_t encodePair(const uint8_t t1, const uint8_t t2)
 
 inline __device__ token_type decodePair(const uint8_t num)
 {
-  return token_type{static_cast<uint8_t>((num & 0xf0) >> 4),
-                    static_cast<uint8_t>(num & 0x0f)};
+  return token_type{
+      static_cast<uint8_t>((num & 0xf0) >> 4),
+      static_cast<uint8_t>(num & 0x0f)};
 }
 
 template <int BLOCK_SIZE>
@@ -543,8 +543,9 @@ inline __device__ position_type lengthOfMatch(
 {
   assert(prev_location < next_location);
 
-  position_type match_length = length - next_location - MIN_ENDING_LITERALS ;
-  for (position_type j = 0; j + next_location + MIN_ENDING_LITERALS < length; j += blockDim.x) {
+  position_type match_length = length - next_location - MIN_ENDING_LITERALS;
+  for (position_type j = 0; j + next_location + MIN_ENDING_LITERALS < length;
+       j += blockDim.x) {
     const position_type i = threadIdx.x + j;
     int match = i + next_location + MIN_ENDING_LITERALS < length
                     ? (data[prev_location + i] != data[next_location + i])
@@ -772,15 +773,14 @@ __device__ void compressStream(
         // go to hash table for an earlier match
         position_type hashPos = hash(next);
         word_type offset = decomp_idx;
-        const int match_found = threadIdx.x < first_match_thread
-                                    ? isValidHash(
-                                          decompData,
-                                          hashTable,
-                                          next,
-                                          hashPos,
-                                          decomp_idx + threadIdx.x,
-                                          offset)
-                                    : 0;
+        const int match_found = threadIdx.x < first_match_thread ? isValidHash(
+                                    decompData,
+                                    hashTable,
+                                    next,
+                                    hashPos,
+                                    decomp_idx + threadIdx.x,
+                                    offset)
+                                                                 : 0;
 
         // determine the first thread to find a match
         const int match = warpBallot(match_found);
@@ -847,13 +847,19 @@ inline __device__ void decompressStream(
     uint8_t* buffer,
     uint8_t* decompData,
     const uint8_t* compData,
-    const position_type comp_end)
+    const position_type comp_end,
+    const position_type buf_end,
+    size_t* decompSize,
+    nvcompStatus_t* decompStatus,
+    bool output_decompressed)
 {
   BufferControl ctrl(buffer, compData, comp_end);
   ctrl.loadAt(0);
 
   position_type decomp_idx = 0;
   position_type comp_idx = 0;
+
+  bool corrupted_sequence = false;
 
   while (comp_idx < comp_end) {
     if (comp_idx + DECOMP_BUFFER_PREFETCH_DIST > ctrl.end()) {
@@ -871,14 +877,26 @@ inline __device__ void decompressStream(
     }
     const position_type literalStart = comp_idx;
 
+    // prevent OOB access when decompressing non-lz4 streams
+    // Note this will never be hit when calculating the decomp size
+    // since buf_end == UINT_MAX
+#if OOB_CHECKING
+    if (decomp_idx + num_literals > buf_end) {
+      corrupted_sequence = true;
+      break;
+    }
+#endif
+
     // copy the literals to the out stream
-    if (num_literals + comp_idx > ctrl.end()) {
-      coopCopyNoOverlap(
-          decompData + decomp_idx, compData + comp_idx, num_literals);
-    } else {
-      // our buffer can copy
-      coopCopyNoOverlap(
-          decompData + decomp_idx, ctrl.rawAt(comp_idx), num_literals);
+    if (output_decompressed) {
+      if (num_literals + comp_idx > ctrl.end()) {
+        coopCopyNoOverlap(
+            decompData + decomp_idx, compData + comp_idx, num_literals);
+      } else {
+        // our buffer can copy
+        coopCopyNoOverlap(
+            decompData + decomp_idx, ctrl.rawAt(comp_idx), num_literals);
+      }
     }
 
     comp_idx += num_literals;
@@ -887,7 +905,7 @@ inline __device__ void decompressStream(
     // Note that the last sequence stops right after literals field.
     // There are specific parsing rules to respect to be compatible with the
     // reference decoder : 1) The last 5 bytes are always literals 2) The last
-    // match cannot start within the last 12 bytes Consequently, a file with
+    // match cannot start within the last 12 bytes. Consequently, a file with
     // less then 13 bytes can only be represented as literals These rules are in
     // place to benefit speed and ensure buffer limits are never crossed.
     if (comp_idx < comp_end) {
@@ -908,33 +926,49 @@ inline __device__ void decompressStream(
         match += ctrl.readLSIC(comp_idx);
       }
 
-      // copy match
-      if (offset <= num_literals
-          && (ctrl.begin() <= literalStart
-              && ctrl.end() >= literalStart + num_literals)) {
-        // we are using literals already present in our buffer
-
-        coopCopyOverlap(
-            decompData + decomp_idx,
-            ctrl.rawAt(literalStart + (num_literals - offset)),
-            offset,
-            match);
-        // we need to sync after we copy since we use the buffer
-        syncCTA();
-      } else {
-        // we need to sync before we copy since we use decomp
-        syncCTA();
-
-        coopCopyOverlap(
-            decompData + decomp_idx,
-            decompData + decomp_idx - offset,
-            offset,
-            match);
+#if OOB_CHECKING
+      if (decomp_idx < offset || decomp_idx + match > buf_end) {
+        corrupted_sequence = true;
+        break;
       }
+#endif
+
+      // copy match
+      if (output_decompressed) {
+        if (offset <= num_literals
+            && (ctrl.begin() <= literalStart
+                && ctrl.end() >= literalStart + num_literals)) {
+          // we are using literals already present in our buffer
+          coopCopyOverlap(
+              decompData + decomp_idx,
+              ctrl.rawAt(literalStart + (num_literals - offset)),
+              offset,
+              match);
+          // we need to sync after we copy since we use the buffer
+          syncCTA();
+        } else {
+          // we need to sync before we copy since we use decomp
+          syncCTA();
+
+          coopCopyOverlap(
+              decompData + decomp_idx,
+              decompData + decomp_idx - offset,
+              offset,
+              match);
+        }
+      }
+
       decomp_idx += match;
     }
   }
-  assert(comp_idx == comp_end);
+
+  if (threadIdx.x == 0) {
+    decompSize[0] = corrupted_sequence ? 0 : decomp_idx;
+    if (output_decompressed) {
+      decompStatus[0] = corrupted_sequence ? nvcompStatusCannotDecompress
+                                           : nvcompStatusSuccess;
+    }
+  }
 }
 
 __global__ void lz4CompressBatchKernel(
@@ -960,24 +994,40 @@ __global__ void lz4CompressBatchKernel(
 __global__ void lz4DecompressBatchKernel(
     const uint8_t* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
+    const size_t* const device_out_bytes,
     const int batch_size,
-    uint8_t* const* const device_out_ptrs)
+    uint8_t* const* const device_out_ptrs,
+    size_t* device_uncompressed_bytes,
+    nvcompStatus_t* device_status_ptrs,
+    bool output_decompressed)
 {
   const int bid = blockIdx.x * DECOMP_CHUNKS_PER_BLOCK + threadIdx.y;
 
   __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
 
+  assert(!output_decompressed || device_status_ptrs != nullptr);
+  assert(!output_decompressed || device_out_ptrs != nullptr);
+
   if (bid < batch_size) {
-    uint8_t* const decomp_ptr = device_out_ptrs[bid];
+    uint8_t* const decomp_ptr
+        = device_out_ptrs == nullptr ? nullptr : device_out_ptrs[bid];
     const uint8_t* const comp_ptr = device_in_ptrs[bid];
     const position_type chunk_length
         = static_cast<position_type>(device_in_bytes[bid]);
+    const position_type output_buf_length
+        = output_decompressed
+              ? static_cast<position_type>(device_out_bytes[bid])
+              : UINT_MAX;
 
     decompressStream(
         buffer + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE,
         decomp_ptr,
         comp_ptr,
-        chunk_length);
+        chunk_length,
+        output_buf_length,
+        device_uncompressed_bytes + bid,
+        device_status_ptrs + bid,
+        output_decompressed);
   }
 }
 
@@ -1016,22 +1066,52 @@ void lz4BatchCompress(
   CudaUtils::check_last_error();
 }
 
-
 void lz4BatchDecompress(
     const uint8_t* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
-    const size_t* const /* device_out_bytes */,
+    const size_t* const device_out_bytes,
     const size_t batch_size,
     void* const /* temp_ptr */,
     const size_t /* temp_bytes */,
     uint8_t* const* const device_out_ptrs,
+    size_t* device_actual_uncompressed_bytes,
+    nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream)
 {
   const dim3 grid(roundUpDiv(batch_size, DECOMP_CHUNKS_PER_BLOCK));
   const dim3 block(DECOMP_THREADS_PER_CHUNK, DECOMP_CHUNKS_PER_BLOCK);
 
   lz4DecompressBatchKernel<<<grid, block, 0, stream>>>(
-      device_in_ptrs, device_in_bytes, batch_size, device_out_ptrs);
+      device_in_ptrs,
+      device_in_bytes,
+      device_out_bytes,
+      batch_size,
+      device_out_ptrs,
+      device_actual_uncompressed_bytes,
+      device_status_ptrs,
+      true);
+  CudaUtils::check_last_error("lz4DecompressBatchKernel()");
+}
+
+void lz4BatchGetDecompressSizes(
+    const uint8_t* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream)
+{
+  const dim3 grid(roundUpDiv(batch_size, DECOMP_CHUNKS_PER_BLOCK));
+  const dim3 block(DECOMP_THREADS_PER_CHUNK, DECOMP_CHUNKS_PER_BLOCK);
+
+  lz4DecompressBatchKernel<<<grid, block, 0, stream>>>(
+      device_compressed_ptrs,
+      device_compressed_bytes,
+      nullptr,
+      batch_size,
+      nullptr,
+      device_uncompressed_bytes,
+      nullptr,
+      false);
   CudaUtils::check_last_error("lz4DecompressBatchKernel()");
 }
 

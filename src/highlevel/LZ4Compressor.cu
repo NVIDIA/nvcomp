@@ -245,6 +245,8 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
   uint8_t* output_buffer;
   temp.reserve(&output_buffer, max_chunk_output * m_num_chunks);
 
+  nvcomp_lz4_lowlevel_opt_type format_opts{0};
+
   {
     const dim3 block(128);
     const dim3 grid(roundUpDiv(m_num_chunks, block.x));
@@ -271,6 +273,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
       workspace_size,
       reinterpret_cast<void* const*>(out_ptrs_device),
       out_sizes_device,
+      &format_opts,
       stream));
 
   // perform prefixsum on sizes
