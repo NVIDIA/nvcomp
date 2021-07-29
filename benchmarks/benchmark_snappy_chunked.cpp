@@ -70,7 +70,7 @@ void print_usage()
   printf(
       "  %-35s Output in column/csv format (default comma)\n", "--csv-output");
   printf("  %-35s Use tab separator for the output (default comma)\n", "-t, --tab");
-  printf("  %-35s Files(s) contain pages, each prefixed with int64 size\n", "-w, --file_with_page_sizes");
+  printf("  %-35s Files(s) contain pages, each prefixed with int64 size\n", "-s, --file_with_page_sizes");
   printf("  %-35s Page size to use when splitting uncompressed data (default %d)\n", "-p, --page_size", DEFAULT_PAGE_SIZE);
   exit(1);
 }
@@ -145,7 +145,7 @@ void run_benchmark(
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
 
   size_t comp_out_bytes;
-  status = nvcompBatchedSnappyCompressGetOutputSize(
+  status = nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
       max_batch_bytes_uncompressed,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
@@ -391,7 +391,7 @@ int main(int argc, char* argv[])
       separator = '\t';
       continue;
     }
-    if (strcmp(arg, "--file_with_page_sizes") == 0 || strcmp(arg, "-w") == 0) {
+    if (strcmp(arg, "--file_with_page_sizes") == 0 || strcmp(arg, "-s") == 0) {
       file_with_page_sizes = true;
       continue;
     }
