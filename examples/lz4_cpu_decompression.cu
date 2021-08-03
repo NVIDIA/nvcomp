@@ -32,10 +32,6 @@
 #include "lz4hc.h"
 #include "nvcomp/lz4.h"
 
-#define CHECK_NVCOMP_STATUS(status)                                            \
-  if ((status) != nvcompSuccess)                                               \
-    throw std::runtime_error("Failed to decompress data");
-
 BatchDataCPU GetBatchDataCPU(const BatchData& batch_data, bool copy_data)
 {
   BatchDataCPU compress_data_cpu(
@@ -68,7 +64,9 @@ static void run_example(const std::vector<std::vector<char>>& data)
   size_t comp_temp_bytes;
   nvcompError_t status = nvcompBatchedLZ4CompressGetTempSize(
       input_data.size(), chunk_size, &comp_temp_bytes);
-  CHECK_NVCOMP_STATUS(status);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedLZ4CompressGetTempSize() not successful");
+  }
 
   void* d_comp_temp;
   CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
@@ -76,7 +74,9 @@ static void run_example(const std::vector<std::vector<char>>& data)
   size_t max_out_bytes;
   status = nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
       chunk_size, &max_out_bytes);
-  CHECK_NVCOMP_STATUS(status);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedLZ4CompressGetMaxOutputChunkSize() not successful");
+  }
 
   BatchData compress_data(max_out_bytes, input_data.size());
 
@@ -88,6 +88,8 @@ static void run_example(const std::vector<std::vector<char>>& data)
   cudaEventCreate(&end);
   cudaEventRecord(start, stream);
 
+  nvcomp_lz4_lowlevel_opt_type fmt_opts;
+
   status = nvcompBatchedLZ4CompressAsync(
       input_data.ptrs(),
       input_data.sizes(),
@@ -97,9 +99,13 @@ static void run_example(const std::vector<std::vector<char>>& data)
       comp_temp_bytes,
       compress_data.ptrs(),
       compress_data.sizes(),
+      &fmt_opts,
       stream);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4CompressAsync() failed.");
+  }
+  
   cudaEventRecord(end, stream);
-  CHECK_NVCOMP_STATUS(status);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // free compression memory
@@ -153,7 +159,6 @@ static void run_example(const std::vector<std::vector<char>>& data)
   cudaEventDestroy(end);
   cudaStreamDestroy(stream);
 }
-#undef CHECK_NVCOMP_STATUS
 
 std::vector<char> readFile(const std::string& filename)
 {

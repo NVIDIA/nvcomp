@@ -31,10 +31,6 @@
 #include "lz4hc.h"
 #include "nvcomp/lz4.h"
 
-#define CHECK_NVCOMP_STATUS(status)                                            \
-  if ((status) != nvcompSuccess)                                               \
-    throw std::runtime_error("Failed to decompress data");
-
 // Benchmark performance from the binary data file fname
 static void run_example(const std::vector<std::vector<char>>& data)
 {
@@ -106,10 +102,20 @@ static void run_example(const std::vector<std::vector<char>>& data)
   size_t decomp_temp_bytes;
   nvcompError_t status = nvcompBatchedLZ4DecompressGetTempSize(
       compress_data.size(), chunk_size, &decomp_temp_bytes);
-  CHECK_NVCOMP_STATUS(status);
+  if (status != nvcompSuccess) {
+    throw std::runtime_error("nvcompBatchedLZ4DecompressGetTempSize() failed.");
+  }
 
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
+
+  size_t* d_decomp_sizes;
+  CUDA_CHECK(
+      cudaMalloc((void**)&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
+
+  nvcompStatus_t* d_status_ptrs;
+  CUDA_CHECK(cudaMalloc(
+      (void**)&d_status_ptrs, decomp_data.size() * sizeof(nvcompStatus_t)));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -118,13 +124,16 @@ static void run_example(const std::vector<std::vector<char>>& data)
       compress_data.ptrs(),
       compress_data.sizes(),
       decomp_data.sizes(),
-      chunk_size,
+      d_decomp_sizes,
       compress_data.size(),
       d_decomp_temp,
       decomp_temp_bytes,
       decomp_data.ptrs(),
+      d_status_ptrs,
       stream);
-  CHECK_NVCOMP_STATUS(status);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedLZ4DecompressAsync() not successful");
+  }
 
   // Validate decompressed data against input
   if (!(input_data_cpu == decomp_data))
@@ -135,17 +144,20 @@ static void run_example(const std::vector<std::vector<char>>& data)
   // Re-run decompression to get throughput
   cudaEventRecord(start, stream);
   status = nvcompBatchedLZ4DecompressAsync(
-      compress_data.ptrs(),
-      compress_data.sizes(),
-      decomp_data.sizes(),
-      chunk_size,
-      compress_data.size(),
-      d_decomp_temp,
-      decomp_temp_bytes,
-      decomp_data.ptrs(),
-      stream);
+    compress_data.ptrs(),
+    compress_data.sizes(),
+    decomp_data.sizes(),
+    d_decomp_sizes,
+    compress_data.size(),
+    d_decomp_temp,
+    decomp_temp_bytes,
+    decomp_data.ptrs(),
+    d_status_ptrs,
+    stream);
   cudaEventRecord(end, stream);
-  CHECK_NVCOMP_STATUS(status);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedLZ4DecompressAsync() not successful");
+  }
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -162,7 +174,6 @@ static void run_example(const std::vector<std::vector<char>>& data)
   cudaEventDestroy(end);
   cudaStreamDestroy(stream);
 }
-#undef CHECK_NVCOMP_STATUS
 
 std::vector<char> readFile(const std::string& filename)
 {
