@@ -69,7 +69,7 @@ typedef struct
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBitcompCompressConfigure(
+nvcompStatus_t nvcompBitcompCompressConfigure(
     const nvcompBitcompFormatOpts* opts,
     nvcompType_t in_type,
     size_t in_bytes,
@@ -95,7 +95,7 @@ nvcompError_t nvcompBitcompCompressConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBitcompCompressAsync(
+nvcompStatus_t nvcompBitcompCompressAsync(
     const nvcompBitcompFormatOpts* format_opts,
     nvcompType_t in_type,
     const void* uncompressed_ptr,
@@ -122,7 +122,7 @@ nvcompError_t nvcompBitcompCompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBitcompDecompressConfigure(
+nvcompStatus_t nvcompBitcompDecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
@@ -154,7 +154,7 @@ void nvcompBitcompDestroyMetadata(void* metadata_ptr);
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBitcompDecompressAsync(
+nvcompStatus_t nvcompBitcompDecompressAsync(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void* metadata_ptr,

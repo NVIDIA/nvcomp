@@ -88,7 +88,7 @@ TEST_CASE("AutoTempSize_OutputSize_C", "[small]")
   size_t temp_bytes = 0;
   size_t compressed_bytes = 0;
 
-  nvcompError_t err = nvcompCascadedCompressConfigure(
+  nvcompStatus_t err = nvcompCascadedCompressConfigure(
       NULL,
       TypeOf<T>(),
       numBytes,

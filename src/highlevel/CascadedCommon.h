@@ -84,7 +84,7 @@ void destroyConfig(nvcompIntConfig_t* config);
  * is the same as outputId in 'config' then this is the
  * final decompression stage. maxOutputSize specifies the maximum decompressed
  * chunk size (number of elements) for this stage. */
-nvcompError_t nvcompConfigAddRLE_BP(
+nvcompStatus_t nvcompConfigAddRLE_BP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -112,7 +112,7 @@ nvcompError_t nvcompConfigAddRLE_BP(
  * is the same as outputId specified in 'config' then this is the
  * final decompression stage. maxOutputSize specifies the maximum decompressed
  * chunk size (number of elements) for this stage. */
-nvcompError_t nvcompConfigAddDelta_BP(
+nvcompStatus_t nvcompConfigAddDelta_BP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -134,7 +134,7 @@ nvcompError_t nvcompConfigAddDelta_BP(
  * is the same as outputId specified in 'config' then this is the
  * final decompression stage. maxOutputSize specifies the maximum decompressed
  * chunk size (number of elements) for this stage. */
-nvcompError_t nvcompConfigAddRLE(
+nvcompStatus_t nvcompConfigAddRLE(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -157,7 +157,7 @@ nvcompError_t nvcompConfigAddRLE(
  * is the same as outputId specified in 'config' then this is the
  * final decompression stage. maxOutputSize specifies the maximum decompressed
  * chunk size (number of elements) for this stage. */
-nvcompError_t nvcompConfigAddDelta(
+nvcompStatus_t nvcompConfigAddDelta(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -177,7 +177,7 @@ nvcompError_t nvcompConfigAddDelta(
  * is the same as outputId specified in 'config' then this is the
  * final decompression stage. maxOutputSize specifies the maximum decompressed
  * chunk size (number of elements) for this stage. */
-nvcompError_t nvcompConfigAddBP(
+nvcompStatus_t nvcompConfigAddBP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -189,7 +189,7 @@ nvcompError_t nvcompConfigAddBP(
  * and accessible by the GPU, otherwise flags an error.
  * Multiple handles can be created but each handle takes resources.
  * */
-nvcompError_t nvcompCreateHandleAsync(
+nvcompStatus_t nvcompCreateHandleAsync(
     nvcompHandle_t* handle,
     nvcompIntConfig_t* const config,
     void* workspaceStorage,
@@ -201,24 +201,24 @@ nvcompError_t nvcompCreateHandleAsync(
  * will release the previous temporary storage and use the new memory space,
  * otherwise cudaErrorNotSupported will be returned and no changes to the
  * workspace will be made. */
-nvcompError_t nvcompSetWorkspace(
+nvcompStatus_t nvcompSetWorkspace(
     nvcompHandle_t handle, void* workspaceStorage, size_t workspaceBytes);
 
 /* Gets the current workspace size in bytes. */
-nvcompError_t
+nvcompStatus_t
 nvcompGetWorkspaceSize(nvcompHandle_t handle, size_t* workspaceBytes);
 
 /* Changes the stream used by the handle. */
-nvcompError_t nvcompSetStream(nvcompHandle_t handle, cudaStream_t streamId);
+nvcompStatus_t nvcompSetStream(nvcompHandle_t handle, cudaStream_t streamId);
 
 /* Gets the current stream assigned to the handle. */
-nvcompError_t nvcompGetStream(nvcompHandle_t handle, cudaStream_t* streamId);
+nvcompStatus_t nvcompGetStream(nvcompHandle_t handle, cudaStream_t* streamId);
 
 /* Sets the output length of a particular node. This is helpful when the node is
  * the output node of a RLE layer in a multi-GPU system. With this method, the
  * cudaStreamSynchronize() in nvcompDecompressLaunch() can be eliminated which
  * preserves the concurrency. */
-nvcompError_t
+nvcompStatus_t
 nvcompSetNodeLength(nvcompHandle_t handle, int nodeId, size_t output_length);
 
 /* Usage.  Submits a decompression task to the GPU asynchronously and returns
@@ -249,7 +249,7 @@ nvcompSetNodeLength(nvcompHandle_t handle, int nodeId, size_t output_length);
  * Output.  Decompressed data will be stored in outputData and the final number
  * of uncompressed elements will be written to outputSize. Note that the type
  * of output values is specified in 'config'. */
-nvcompError_t nvcompDecompressLaunch(
+nvcompStatus_t nvcompDecompressLaunch(
     nvcompHandle_t handle,
     size_t numUncompressedElements,
     void* outputData,
@@ -258,7 +258,7 @@ nvcompError_t nvcompDecompressLaunch(
     const void** hostHdrs);
 
 /* Releases all memory associated with the decompression handle. */
-nvcompError_t nvcompDestroyHandle(nvcompHandle_t handle);
+nvcompStatus_t nvcompDestroyHandle(nvcompHandle_t handle);
 
 inline nvcompType_t selectRunsType(const size_t length)
 {

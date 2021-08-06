@@ -66,12 +66,12 @@ public:
   }
 
   static void
-  api_call(nvcompError_t err, const std::string& filename, const int line);
+  api_call(nvcompStatus_t err, const std::string& filename, const int line);
 
   // NOTE: there is no C++11/C++14 standard way to get the function name.
   // In the future we could try to handle major compilers, and get the
   // name that way, as well as use the c++20 method.
-  static nvcompError_t
+  static nvcompStatus_t
   exception_to_error(const std::exception& e, const std::string& function_name);
 
 private:

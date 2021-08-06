@@ -94,7 +94,7 @@ size_t LZ4Decompressor::calculate_workspace_size(
   // we need actual output sizes
   const size_t actual_size_bytes = sizeof(size_t) * num_chunks;
   // we need the error status for each chunk
-  const size_t status_bytes = sizeof(nvcompError_t) * num_chunks;
+  const size_t status_bytes = sizeof(nvcompStatus_t) * num_chunks;
 
   return c_api_space + pointer_bytes + size_bytes + actual_size_bytes
          + status_bytes;

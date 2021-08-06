@@ -60,7 +60,7 @@ size_t snappy_get_max_compressed_length(size_t source_bytes)
  *     C-style API calls for BATCHED compression/decompress defined below.
  *****************************************************************************/
 
-nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
+nvcompStatus_t nvcompBatchedSnappyDecompressGetTempSize(
     size_t /* num_chunks */,
     size_t /* max_uncompressed_chunk_size */,
     size_t* temp_bytes)
@@ -80,7 +80,7 @@ nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyGetDecompressSizeAsync(
+nvcompStatus_t nvcompBatchedSnappyGetDecompressSizeAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,
@@ -108,7 +108,7 @@ nvcompError_t nvcompBatchedSnappyGetDecompressSizeAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyDecompressAsync(
+nvcompStatus_t nvcompBatchedSnappyDecompressAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     const size_t* device_uncompressed_bytes,
@@ -146,7 +146,7 @@ nvcompError_t nvcompBatchedSnappyDecompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
+nvcompStatus_t nvcompBatchedSnappyCompressGetTempSize(
     size_t /* batch_size */, size_t /* max_chunk_size */, size_t* temp_bytes)
 {
   try {
@@ -164,7 +164,7 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
     size_t max_chunk_size, size_t* max_compressed_size)
 {
   try {
@@ -181,7 +181,7 @@ nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedSnappyCompressAsync(
+nvcompStatus_t nvcompBatchedSnappyCompressAsync(
     const void* const* device_uncompressed_ptr,
     const size_t* device_uncompressed_bytes,
     size_t /*max_uncompressed_chunk_bytes*/,

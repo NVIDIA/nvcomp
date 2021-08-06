@@ -48,7 +48,7 @@ void Check::not_null(
 }
 
 void Check::api_call(
-    const nvcompError_t err, const std::string& filename, const int line)
+    const nvcompStatus_t err, const std::string& filename, const int line)
 {
   if (err != nvcompSuccess) {
     print_fail_position(filename, line);
@@ -56,7 +56,7 @@ void Check::api_call(
   }
 }
 
-nvcompError_t Check::exception_to_error(
+nvcompStatus_t Check::exception_to_error(
     const std::exception& e, const std::string& function_name)
 {
   std::string context;
@@ -65,7 +65,7 @@ nvcompError_t Check::exception_to_error(
   }
 
   // generic error
-  nvcompError_t err = nvcompErrorInvalidValue;
+  nvcompStatus_t err = nvcompErrorInvalidValue;
 
   // NOTE: this depends on RTTI being enabled.
   if (dynamic_cast<const NVCompException*>(&e)) {

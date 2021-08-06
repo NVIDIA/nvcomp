@@ -56,20 +56,20 @@ public:
    * @param err The error associated with the exception.
    * @param msg The error message.
    */
-  NVCompException(nvcompError_t err, const std::string& msg) :
+  NVCompException(nvcompStatus_t err, const std::string& msg) :
       std::runtime_error(msg + " : code=" + std::to_string(err) + "."),
       m_err(err)
   {
     // do nothing
   }
 
-  nvcompError_t get_error() const
+  nvcompStatus_t get_error() const
   {
     return m_err;
   }
 
 private:
-  nvcompError_t m_err;
+  nvcompStatus_t m_err;
 };
 
 /**
@@ -170,7 +170,7 @@ inline nvcompType_t TypeOf()
   }
 }
 
-inline void throwExceptionIfError(nvcompError_t error, const std::string& msg)
+inline void throwExceptionIfError(nvcompStatus_t error, const std::string& msg)
 {
   if (error != nvcompSuccess) {
     throw NVCompException(error, msg);

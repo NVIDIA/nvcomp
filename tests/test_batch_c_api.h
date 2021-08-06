@@ -60,7 +60,7 @@
 // will show up at compile time, and things should only need to change if our
 // interface changes, which should be very infrequent.
 #define GENERATE_TESTS(NAME)                                                   \
-  nvcompError_t compressGetTempSize(                                           \
+  nvcompStatus_t compressGetTempSize(                                          \
       const size_t batch_size,                                                 \
       const size_t max_uncompressed_chunk_bytes,                               \
       size_t* const temp_bytes)                                                \
@@ -68,14 +68,14 @@
     return nvcompBatched##NAME##CompressGetTempSize(                           \
         batch_size, max_uncompressed_chunk_bytes, temp_bytes);                 \
   }                                                                            \
-  nvcompError_t compressGetMaxOutputChunkSize(                                 \
+  nvcompStatus_t compressGetMaxOutputChunkSize(                                \
       const size_t max_uncompressed_chunk_bytes,                               \
       size_t* const max_compressed_bytes)                                      \
   {                                                                            \
     return nvcompBatched##NAME##CompressGetMaxOutputChunkSize(                 \
         max_uncompressed_chunk_bytes, max_compressed_bytes);                   \
   }                                                                            \
-  nvcompError_t compressAsync(                                                 \
+  nvcompStatus_t compressAsync(                                                \
       const void* const* const device_in_ptr,                                  \
       const size_t* const device_in_bytes,                                     \
       const size_t max_uncompressed_chunk_bytes,                               \
@@ -99,7 +99,7 @@
         format_opts,                                                           \
         stream);                                                               \
   }                                                                            \
-  nvcompError_t decompressGetSizeAsync(                                        \
+  nvcompStatus_t decompressGetSizeAsync(                                       \
       const void* const* const device_compressed_ptrs,                         \
       const size_t* const device_compressed_bytes,                             \
       size_t* const device_uncompressed_bytes,                                 \
@@ -113,7 +113,7 @@
         batch_size,                                                            \
         stream);                                                               \
   }                                                                            \
-  nvcompError_t decompressGetTempSize(                                         \
+  nvcompStatus_t decompressGetTempSize(                                        \
       const size_t num_chunks,                                                 \
       const size_t max_uncompressed_chunk_bytes,                               \
       size_t* const temp_bytes)                                                \
@@ -121,7 +121,7 @@
     return nvcompBatched##NAME##DecompressGetTempSize(                         \
         num_chunks, max_uncompressed_chunk_bytes, temp_bytes);                 \
   }                                                                            \
-  nvcompError_t decompressAsync(                                               \
+  nvcompStatus_t decompressAsync(                                              \
       const void* const* device_compressed_ptrs,                               \
       const size_t* device_compressed_bytes,                                   \
       const size_t* device_uncompressed_bytes,                                 \
@@ -151,16 +151,16 @@ static const int PASS_TEST = 1;
 static const int FAIL_TEST = 0;
 
 // Declear the test function wrappers
-nvcompError_t compressGetTempSize(
+nvcompStatus_t compressGetTempSize(
     const size_t batch_size,
     const size_t max_uncompressed_chunk_bytes,
     size_t* const temp_bytes);
 
-nvcompError_t compressGetMaxOutputChunkSize(
+nvcompStatus_t compressGetMaxOutputChunkSize(
     const size_t max_uncompressed_chunk_bytes,
     size_t* const max_compressed_bytes);
 
-nvcompError_t compressAsync(
+nvcompStatus_t compressAsync(
     const void* const* device_in_ptr,
     const size_t* device_in_bytes,
     size_t max_uncompressed_chunk_bytes,
@@ -172,19 +172,19 @@ nvcompError_t compressAsync(
     void* format_opts,
     cudaStream_t stream);
 
-nvcompError_t decompressGetSizeAsync(
+nvcompStatus_t decompressGetSizeAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,
     size_t batch_size,
     cudaStream_t stream);
 
-nvcompError_t decompressGetTempSize(
+nvcompStatus_t decompressGetTempSize(
     const size_t num_chunks,
     const size_t max_uncompressed_chunk_bytes,
     size_t* const temp_bytes);
 
-nvcompError_t decompressAsync(
+nvcompStatus_t decompressAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     const size_t* device_uncompressed_bytes,
@@ -269,7 +269,7 @@ int test_generic_batch_compression_and_decompression(
       sizeof(*device_batch_bytes) * batch_size,
       cudaMemcpyHostToDevice));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
@@ -398,7 +398,7 @@ int test_generic_batch_compression_and_decompression(
   CUDA_CHECK(cudaFree(device_statuses));
 
   for (size_t i = 0; i < batch_size; ++i) {
-    REQUIRE(host_statuses[i] == nvcompStatusSuccess);
+    REQUIRE(host_statuses[i] == nvcompSuccess);
   }
   free(host_statuses);
 
@@ -527,7 +527,7 @@ int test_generic_batch_decompression_errors(
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // attempt to get the size
   size_t* device_decomp_out_bytes;
@@ -641,9 +641,9 @@ int test_generic_batch_decompression_errors(
   CUDA_CHECK(cudaFree(device_statuses));
 
   for (size_t i = 0; i < batch_size; ++i) {
-    if (host_statuses[i] != nvcompStatusCannotDecompress) {
+    if (host_statuses[i] != nvcompErrorCannotDecompress) {
     }
-    REQUIRE(host_statuses[i] == nvcompStatusCannotDecompress);
+    REQUIRE(host_statuses[i] == nvcompErrorCannotDecompress);
   }
   free(host_statuses);
   CUDA_CHECK(cudaFree(device_decomp_out_bytes));

@@ -49,7 +49,7 @@
 
 using namespace nvcomp;
 
-nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
+nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
     const size_t num_chunks,
     const size_t max_uncompressed_chunk_size,
     size_t* const temp_bytes)
@@ -75,7 +75,7 @@ nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
 #endif
 }
 
-nvcompError_t nvcompBatchedGdeflateDecompressAsync(
+nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t* const device_out_bytes,
@@ -116,7 +116,7 @@ nvcompError_t nvcompBatchedGdeflateDecompressAsync(
 #endif
 }
 
-nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
+nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
     const size_t batch_size,
     const size_t max_chunk_size,
     size_t* const temp_bytes)
@@ -142,7 +142,7 @@ nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
 #endif
 }
 
-nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
     const size_t max_chunk_size, size_t* const max_compressed_size)
 {
 #ifdef ENABLE_GDEFLATE
@@ -165,7 +165,7 @@ nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
 #endif
 }
 
-nvcompError_t nvcompBatchedGdeflateCompressAsync(
+nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t max_uncompressed_chunk_size,

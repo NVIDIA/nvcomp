@@ -137,7 +137,7 @@ TEST_CASE("Metadata-fcns", "[small]")
   gpuMetadata.copyToGPU(meta_in, 0);
 
   void* meta_out;
-  nvcompError_t err = nvcompSuccess;
+  nvcompStatus_t err = nvcompSuccess;
 
   // Get temp and output sizes from metadata
   size_t temp_bytes;

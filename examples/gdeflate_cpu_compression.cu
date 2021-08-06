@@ -61,7 +61,7 @@ static void run_example(const std::vector<std::vector<char>>& data)
   // compression
 
   // Get max output size per chunk
-  nvcompError_t status;
+  nvcompStatus_t status;
   size_t max_out_bytes;
   status = nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
       chunk_size, &max_out_bytes);

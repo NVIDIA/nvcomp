@@ -71,7 +71,7 @@ int check_decompress(
   size_t output_bytes;
   void* metadata_ptr = NULL;
 
-  nvcompError_t status = nvcompDecompressGetMetadata(
+  nvcompStatus_t status = nvcompDecompressGetMetadata(
       d_comp_out, comp_out_bytes, &metadata_ptr, stream);
   REQUIRE(status == nvcompSuccess);
 
@@ -146,7 +146,7 @@ int test_cascaded(void)
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU
   size_t comp_temp_bytes;
@@ -222,7 +222,7 @@ int test_lz4(void)
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   size_t* p_comp_out_bytes;
   CUDA_CHECK(

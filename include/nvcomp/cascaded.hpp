@@ -275,8 +275,8 @@ inline void CascadedCompressor::configure(
     temp_opts = NULL;
   }
 
-  nvcompError_t status = nvcompCascadedCompressConfigure(
-        temp_opts, m_type, in_bytes, &metadata_bytes, temp_bytes, out_bytes);
+  nvcompStatus_t status = nvcompCascadedCompressConfigure(
+      temp_opts, m_type, in_bytes, &metadata_bytes, temp_bytes, out_bytes);
 
   throwExceptionIfError(status, "nvcompCascadedCompressConfigure() failed");
 }
@@ -296,7 +296,7 @@ inline void CascadedCompressor::compress_async(
     temp_opts = NULL;
   }
 
-  nvcompError_t status = nvcompCascadedCompressAsync(
+  nvcompStatus_t status = nvcompCascadedCompressAsync(
       temp_opts,
       m_type,
       in_ptr,
@@ -330,7 +330,7 @@ inline void CascadedDecompressor::configure(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = nvcompCascadedDecompressConfigure(
+  nvcompStatus_t status = nvcompCascadedDecompressConfigure(
       in_ptr,
       in_bytes,
       &m_metadata_ptr,
@@ -350,7 +350,7 @@ inline void CascadedDecompressor::decompress_async(
     const size_t out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = nvcompCascadedDecompressAsync(
+  nvcompStatus_t status = nvcompCascadedDecompressAsync(
       in_ptr,
       in_bytes,
       m_metadata_ptr,
@@ -375,7 +375,7 @@ inline CascadedSelector<T>::CascadedSelector(
 {
   size_t temp;
 
-  nvcompError_t status = nvcompCascadedSelectorConfigure(
+  nvcompStatus_t status = nvcompCascadedSelectorConfigure(
       &opts, TypeOf<T>(), input_byte_len, &temp);
   throwExceptionIfError(status, "SelectorGetTempSize failed");
 
@@ -397,7 +397,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
     cudaStream_t stream)
 {
   nvcompCascadedFormatOpts cascadedOpts;
-  nvcompError_t status = nvcompCascadedSelectorRun(
+  nvcompStatus_t status = nvcompCascadedSelectorRun(
       &opts,
       TypeOf<T>(),
       input_data,

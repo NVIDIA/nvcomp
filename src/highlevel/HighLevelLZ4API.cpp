@@ -112,7 +112,7 @@ void nvcompLZ4DestroyMetadata(void* const metadata_ptr)
   delete static_cast<LZ4Metadata*>(metadata_ptr);
 }
 
-nvcompError_t nvcompLZ4CompressConfigure(
+nvcompStatus_t nvcompLZ4CompressConfigure(
     const nvcompLZ4FormatOpts* const format_opts,
     const nvcompType_t /*in_type*/,
     const size_t in_bytes,
@@ -148,7 +148,7 @@ nvcompError_t nvcompLZ4CompressConfigure(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompLZ4CompressAsync(
+nvcompStatus_t nvcompLZ4CompressAsync(
     const nvcompLZ4FormatOpts* format_opts,
     const nvcompType_t /* in_type */,
     const void* in_ptr,
@@ -199,7 +199,7 @@ nvcompError_t nvcompLZ4CompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompLZ4DecompressConfigure(
+nvcompStatus_t nvcompLZ4DecompressConfigure(
     const void* const in_ptr,
     const size_t in_bytes,
     void** const metadata_ptr,
@@ -241,7 +241,7 @@ nvcompError_t nvcompLZ4DecompressConfigure(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompLZ4DecompressAsync(
+nvcompStatus_t nvcompLZ4DecompressAsync(
     const void* const in_ptr,
     const size_t in_bytes,
     const void* const metadata_ptr,

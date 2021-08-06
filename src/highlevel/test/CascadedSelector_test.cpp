@@ -117,7 +117,7 @@ TEST_CASE("SelectorGetTempSize_C", "[small]")
   selector_opts.num_samples = 10;
   selector_opts.seed = 1;
 
-  nvcompError_t err = nvcompCascadedSelectorConfigure(
+  nvcompStatus_t err = nvcompCascadedSelectorConfigure(
       &selector_opts, TypeOf<T>(), numBytes, &temp_bytes);
   REQUIRE(err == nvcompSuccess);
   REQUIRE(temp_bytes == 120);
@@ -176,7 +176,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
   // Should throw exception if not enough temp workspace
 
   try {
-    nvcompError_t err = nvcompCascadedSelectorRun(
+    nvcompStatus_t err = nvcompCascadedSelectorRun(
         &selector_opts,
         TypeOf<T>(),
         d_input,
@@ -195,7 +195,7 @@ TEST_CASE("SelectorSelectConfig_C", "[small]")
 
   selector_opts.num_samples = 100;
   // Should run and get a good compression ratio estimate.
-  nvcompError_t err = nvcompCascadedSelectorRun(
+  nvcompStatus_t err = nvcompCascadedSelectorRun(
       &selector_opts,
       TypeOf<T>(),
       d_input,

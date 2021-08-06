@@ -100,7 +100,7 @@ static void run_example(const std::vector<std::vector<char>>& data)
 
   // lz4 GPU decompression
   size_t decomp_temp_bytes;
-  nvcompError_t status = nvcompBatchedLZ4DecompressGetTempSize(
+  nvcompStatus_t status = nvcompBatchedLZ4DecompressGetTempSize(
       compress_data.size(), chunk_size, &decomp_temp_bytes);
   if (status != nvcompSuccess) {
     throw std::runtime_error("nvcompBatchedLZ4DecompressGetTempSize() failed.");

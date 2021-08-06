@@ -100,7 +100,7 @@ static void run_benchmark(
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Get temp size needed for compression
   size_t metadata_bytes;
