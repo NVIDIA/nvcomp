@@ -179,7 +179,7 @@ run_benchmark(const std::vector<std::vector<char>>& data, const bool warmup)
   BatchData input_data(data, chunk_size);
 
   // compression
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;

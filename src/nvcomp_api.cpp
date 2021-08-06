@@ -75,7 +75,7 @@ void warn_deprecated(
 
 } // namespace
 
-nvcompError_t nvcompDecompressGetMetadata(
+nvcompStatus_t nvcompDecompressGetMetadata(
     const void* const in_ptr,
     const size_t in_bytes,
     void** const metadata_ptr,
@@ -145,7 +145,7 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
   }
 }
 
-nvcompError_t nvcompDecompressGetTempSize(
+nvcompStatus_t nvcompDecompressGetTempSize(
     const void* const metadata_ptr, size_t* const temp_bytes)
 {
   DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
@@ -183,7 +183,7 @@ nvcompError_t nvcompDecompressGetTempSize(
   }
 }
 
-nvcompError_t nvcompDecompressGetOutputSize(
+nvcompStatus_t nvcompDecompressGetOutputSize(
     const void* const metadata_ptr, size_t* const output_bytes)
 {
   DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
@@ -205,7 +205,7 @@ nvcompError_t nvcompDecompressGetOutputSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompDecompressGetType(
+nvcompStatus_t nvcompDecompressGetType(
     const void* const metadata_ptr, nvcompType_t* const type)
 {
   DEPRECATED_FUNC(""); // no replacement
@@ -231,7 +231,7 @@ nvcompError_t nvcompDecompressGetType(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompDecompressAsync(
+nvcompStatus_t nvcompDecompressAsync(
     const void* const in_ptr,
     const size_t in_bytes,
     void* const temp_ptr,

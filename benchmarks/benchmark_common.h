@@ -190,7 +190,7 @@ static void compress_chunk(
 {
   size_t metadata_bytes;
 
-  nvcompError_t status = nvcompCascadedCompressConfigure(
+  nvcompStatus_t status = nvcompCascadedCompressConfigure(
       comp_opts,
       type,
       chunk_size,

@@ -57,7 +57,7 @@ extern "C" {
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
+nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
     size_t batch_size, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
@@ -75,7 +75,7 @@ nvcompError_t nvcompBatchedGdeflateCompressGetTempSize(
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
     size_t max_uncompressed_chunk_bytes, size_t* max_compressed_bytes);
 
 /**
@@ -100,7 +100,7 @@ nvcompError_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedGdeflateCompressAsync(
+nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
     const void* const* device_in_ptr,
     const size_t* device_in_bytes,
     size_t max_uncompressed_chunk_bytes,
@@ -122,7 +122,7 @@ nvcompError_t nvcompBatchedGdeflateCompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
+nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
     size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
@@ -150,7 +150,7 @@ nvcompError_t nvcompBatchedGdeflateDecompressGetTempSize(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedGdeflateDecompressAsync(
+nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
     const void* const* device_in_ptrs,
     const size_t* device_in_bytes,
     const size_t* device_out_bytes,

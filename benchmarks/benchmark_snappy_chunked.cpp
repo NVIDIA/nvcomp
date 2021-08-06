@@ -131,7 +131,7 @@ void run_benchmark(
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;

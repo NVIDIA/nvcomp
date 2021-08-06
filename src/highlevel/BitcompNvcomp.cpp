@@ -54,7 +54,7 @@ void nvcompBitcompDestroyMetadata(void* const metadata_ptr)
   delete static_cast<BitcompMetadata*>(metadata_ptr);
 }
 
-nvcompError_t nvcompBitcompDecompressConfigure(
+nvcompStatus_t nvcompBitcompDecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
@@ -81,7 +81,7 @@ nvcompError_t nvcompBitcompDecompressConfigure(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBitcompDecompressAsync(
+nvcompStatus_t nvcompBitcompDecompressAsync(
     const void* const in_ptr,
     size_t in_bytes,
     void* const metadata_ptr,
@@ -115,7 +115,7 @@ nvcompError_t nvcompBitcompDecompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBitcompCompressConfigure(
+nvcompStatus_t nvcompBitcompCompressConfigure(
     const nvcompBitcompFormatOpts* const /* opts */,
     const nvcompType_t /* in_type */,
     const size_t in_bytes,
@@ -138,7 +138,7 @@ nvcompError_t nvcompBitcompCompressConfigure(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBitcompCompressAsync(
+nvcompStatus_t nvcompBitcompCompressAsync(
     const nvcompBitcompFormatOpts* format_opts,
     nvcompType_t in_type,
     const void* in_ptr,

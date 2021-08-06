@@ -52,10 +52,8 @@ typedef struct snappy_opt_type {
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
-	size_t num_chunks,
-	size_t max_uncompressed_chunk_size,
-	size_t * temp_bytes);
+nvcompStatus_t nvcompBatchedSnappyDecompressGetTempSize(
+    size_t num_chunks, size_t max_uncompressed_chunk_size, size_t* temp_bytes);
 
 /**
  * @brief Compute uncompressed sizes.
@@ -68,7 +66,7 @@ nvcompError_t nvcompBatchedSnappyDecompressGetTempSize(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedSnappyGetDecompressSizeAsync(
+nvcompStatus_t nvcompBatchedSnappyGetDecompressSizeAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,
@@ -91,17 +89,17 @@ nvcompError_t nvcompBatchedSnappyGetDecompressSizeAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedSnappyDecompressAsync(
-	const void* const* device_compresed_ptrs,
-	const size_t* device_compressed_bytes,
-	const size_t* device_uncompressed_bytes,
-	size_t* device_actual_uncompressed_bytes,
-	size_t batch_size,
-	void* const device_temp_ptr,
-	const size_t temp_bytes,
-	void* const* device_uncompressed_ptr,
-	nvcompStatus_t* device_statuses,
-	cudaStream_t stream);
+nvcompStatus_t nvcompBatchedSnappyDecompressAsync(
+    const void* const* device_compresed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr,
+    const size_t temp_bytes,
+    void* const* device_uncompressed_ptr,
+    nvcompStatus_t* device_statuses,
+    cudaStream_t stream);
 
 /**
  * @brief Get temporary space required for compression.
@@ -113,10 +111,8 @@ nvcompError_t nvcompBatchedSnappyDecompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
-    size_t batch_size,
-    size_t max_chunk_size,
-    size_t * temp_bytes);
+nvcompStatus_t nvcompBatchedSnappyCompressGetTempSize(
+    size_t batch_size, size_t max_chunk_size, size_t* temp_bytes);
 
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That is, the minimum amount of output memory required to be given nvcompBatchedLZ4CompressAsync() for each batch item.
@@ -126,7 +122,7 @@ nvcompError_t nvcompBatchedSnappyCompressGetTempSize(
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
     size_t max_chunk_size, size_t* max_compressed_size);
 
 /**
@@ -148,17 +144,17 @@ nvcompError_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedSnappyCompressAsync(
-	const void* const* device_uncompressed_ptr,
-	const size_t* device_uncompressed_bytes,
+nvcompStatus_t nvcompBatchedSnappyCompressAsync(
+    const void* const* device_uncompressed_ptr,
+    const size_t* device_uncompressed_bytes,
     size_t max_uncompressed_chunk_bytes,
-	size_t batch_size,
-	void* device_temp_ptr,
-	size_t temp_bytes,
-	void* const* device_compressed_ptr,
-	size_t* device_compressed_bytes,
-	snappy_opt_type* format_ops,
-	cudaStream_t stream);
+    size_t batch_size,
+    void* device_temp_ptr,
+    size_t temp_bytes,
+    void* const* device_compressed_ptr,
+    size_t* device_compressed_bytes,
+    snappy_opt_type* format_ops,
+    cudaStream_t stream);
 
 #ifdef __cplusplus
 }

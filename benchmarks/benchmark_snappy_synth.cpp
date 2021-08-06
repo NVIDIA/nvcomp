@@ -121,7 +121,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;

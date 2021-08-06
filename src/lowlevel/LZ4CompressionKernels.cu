@@ -965,8 +965,8 @@ inline __device__ void decompressStream(
   if (threadIdx.x == 0) {
     decompSize[0] = corrupted_sequence ? 0 : decomp_idx;
     if (output_decompressed) {
-      decompStatus[0] = corrupted_sequence ? nvcompStatusCannotDecompress
-                                           : nvcompStatusSuccess;
+      decompStatus[0]
+          = corrupted_sequence ? nvcompErrorCannotDecompress : nvcompSuccess;
     }
   }
 }

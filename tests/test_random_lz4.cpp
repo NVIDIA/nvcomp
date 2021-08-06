@@ -73,7 +73,7 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    nvcompError_t status;
+    nvcompStatus_t status;
 
     LZ4Compressor compressor(chunk_size);
     size_t comp_temp_bytes;

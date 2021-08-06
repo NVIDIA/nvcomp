@@ -126,7 +126,7 @@ void test(
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    nvcompError_t status;
+    nvcompStatus_t status;
 
     // Compress on the GPU
     size_t comp_temp_bytes;
@@ -182,13 +182,13 @@ void test(
     size_t decomp_temp_bytes;
     size_t decomp_out_bytes;
 
-    nvcompError_t err = nvcompCascadedDecompressConfigure(
-        d_comp_out, 
-        comp_out_bytes, 
-        &metadata, 
-        &metadata_bytes, 
-        &decomp_temp_bytes, 
-        &decomp_out_bytes, 
+    nvcompStatus_t err = nvcompCascadedDecompressConfigure(
+        d_comp_out,
+        comp_out_bytes,
+        &metadata,
+        &metadata_bytes,
+        &decomp_temp_bytes,
+        &decomp_out_bytes,
         stream);
     REQUIRE(err == nvcompSuccess);
 
@@ -204,7 +204,7 @@ void test(
 
     auto start = std::chrono::steady_clock::now();
 
-    nvcompError_t status;
+    nvcompStatus_t status;
 
     // execute decompression (asynchronous)
     err = nvcompCascadedDecompressAsync(

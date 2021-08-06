@@ -62,7 +62,7 @@ static void run_example(const std::vector<std::vector<char>>& data)
 
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
-  nvcompError_t status = nvcompBatchedLZ4CompressGetTempSize(
+  nvcompStatus_t status = nvcompBatchedLZ4CompressGetTempSize(
       input_data.size(), chunk_size, &comp_temp_bytes);
   if( status != nvcompSuccess){
     throw std::runtime_error("ERROR: nvcompBatchedLZ4CompressGetTempSize() not successful");

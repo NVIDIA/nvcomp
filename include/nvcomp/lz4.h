@@ -94,7 +94,7 @@ int LZ4IsMetadata(const void* const metadata_ptr);
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompLZ4CompressConfigure(
+nvcompStatus_t nvcompLZ4CompressConfigure(
     const nvcompLZ4FormatOpts* format_opts,
     nvcompType_t in_type,
     size_t uncompresed_bytes,
@@ -121,7 +121,7 @@ nvcompError_t nvcompLZ4CompressConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompLZ4CompressAsync(
+nvcompStatus_t nvcompLZ4CompressAsync(
     const nvcompLZ4FormatOpts* format_opts,
     const nvcompType_t in_type,
     const void* const uncompressed_ptr,
@@ -151,7 +151,7 @@ nvcompError_t nvcompLZ4CompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompLZ4DecompressConfigure(
+nvcompStatus_t nvcompLZ4DecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
@@ -177,7 +177,7 @@ nvcompError_t nvcompLZ4DecompressConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompLZ4DecompressAsync(
+nvcompStatus_t nvcompLZ4DecompressAsync(
     const void* compressed_ptr,
     size_t compressed_bytes,
     const void* metadata_ptr,
@@ -215,7 +215,7 @@ void nvcompLZ4DestroyMetadata(void* metadata_ptr);
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
+nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
     size_t batch_size, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
@@ -233,7 +233,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
  *
  * @return The nvcompSuccess unless there is an error.
  */
-nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
     size_t max_uncompressed_chunk_bytes, size_t* max_compressed_bytes);
 
 /**
@@ -261,7 +261,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedLZ4CompressAsync(
+nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     const void* const* device_in_ptr,
     const size_t* device_in_bytes,
     size_t max_uncompressed_chunk_bytes,
@@ -284,7 +284,7 @@ nvcompError_t nvcompBatchedLZ4CompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
+nvcompStatus_t nvcompBatchedLZ4DecompressGetTempSize(
     size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
@@ -312,7 +312,7 @@ nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedLZ4DecompressAsync(
+nvcompStatus_t nvcompBatchedLZ4DecompressAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     const size_t* device_uncompressed_bytes,
@@ -340,7 +340,7 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompBatchedLZ4GetDecompressSizeAsync(
+nvcompStatus_t nvcompBatchedLZ4GetDecompressSizeAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,

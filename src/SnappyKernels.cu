@@ -1105,8 +1105,7 @@ __global__ void __launch_bounds__(96) unsnap_kernel(
     if (device_out_bytes)
       device_out_bytes[strm_id] = s->uncompressed_size - s->bytes_left;
     if (outputs)
-      outputs[strm_id]
-          = s->error ? nvcompStatusCannotDecompress : nvcompStatusSuccess;
+      outputs[strm_id] = s->error ? nvcompErrorCannotDecompress : nvcompSuccess;
   }
 }
 

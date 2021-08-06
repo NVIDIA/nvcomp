@@ -75,7 +75,7 @@ typedef struct
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedCompressConfigure(
+nvcompStatus_t nvcompCascadedCompressConfigure(
     const nvcompCascadedFormatOpts* format_opts,
     nvcompType_t type,
     size_t uncompressed_bytes,
@@ -109,7 +109,7 @@ nvcompError_t nvcompCascadedCompressConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedCompressAsync(
+nvcompStatus_t nvcompCascadedCompressAsync(
     const nvcompCascadedFormatOpts* format_opts,
     nvcompType_t type,
     const void* uncompressed_ptr,
@@ -142,7 +142,7 @@ nvcompError_t nvcompCascadedCompressAsync(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedDecompressConfigure(
+nvcompStatus_t nvcompCascadedDecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
@@ -167,7 +167,7 @@ nvcompError_t nvcompCascadedDecompressConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedDecompressAsync(
+nvcompStatus_t nvcompCascadedDecompressAsync(
     const void* compressed_ptr,
     size_t compressed_bytes,
     const void* metadata_ptr,
@@ -229,7 +229,7 @@ typedef struct
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedSelectorConfigure(
+nvcompStatus_t nvcompCascadedSelectorConfigure(
     nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
     size_t uncompressed_bytes,
@@ -252,7 +252,7 @@ nvcompError_t nvcompCascadedSelectorConfigure(
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
-nvcompError_t nvcompCascadedSelectorRun(
+nvcompStatus_t nvcompCascadedSelectorRun(
     nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
     const void* uncompressed_ptr,
@@ -262,7 +262,6 @@ nvcompError_t nvcompCascadedSelectorRun(
     nvcompCascadedFormatOpts* format_opts,
     double* est_ratio,
     cudaStream_t stream);
-
 
 #ifdef __cplusplus
 }

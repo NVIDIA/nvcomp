@@ -187,7 +187,7 @@ inline void BitcompCompressor::configure(
   nvcompBitcompFormatOpts opts{m_algorithm_type};
 
   size_t metadata_bytes;
-  nvcompError_t status = nvcompBitcompCompressConfigure(
+  nvcompStatus_t status = nvcompBitcompCompressConfigure(
       opts.algorithm_type == -1 ? nullptr : &opts,
       m_type,
       in_bytes,
@@ -207,7 +207,7 @@ inline void BitcompCompressor::compress_async(
     cudaStream_t stream)
 {
   nvcompBitcompFormatOpts opts{m_algorithm_type};
-  nvcompError_t status = nvcompBitcompCompressAsync(
+  nvcompStatus_t status = nvcompBitcompCompressAsync(
       opts.algorithm_type == -1 ? nullptr : &opts,
       m_type,
       in_ptr,
@@ -241,7 +241,7 @@ inline void BitcompDecompressor::configure(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = nvcompBitcompDecompressConfigure(
+  nvcompStatus_t status = nvcompBitcompDecompressConfigure(
       in_ptr,
       in_bytes,
       &m_metadata_ptr,
@@ -261,7 +261,7 @@ inline void BitcompDecompressor::decompress_async(
     const size_t out_bytes,
     cudaStream_t stream)
 {
-  nvcompError_t status = nvcompBitcompDecompressAsync(
+  nvcompStatus_t status = nvcompBitcompDecompressAsync(
       in_ptr,
       in_bytes,
       m_metadata_ptr,

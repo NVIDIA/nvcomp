@@ -74,7 +74,7 @@ static int check_cascaded(const nvcompCascadedFormatOpts comp_opts)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU
   size_t comp_temp_bytes;
@@ -229,7 +229,7 @@ int test_ones_init_data(void)
         cudaStream_t stream;
         CUDA_CHECK(cudaStreamCreate(&stream));
 
-        nvcompError_t status;
+        nvcompStatus_t status;
 
         // Compress on the GPU
         size_t comp_temp_bytes;
@@ -360,7 +360,7 @@ static int test_cascaded_backward_compatibility(void)
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
 
-  nvcompError_t status;
+  nvcompStatus_t status;
 
   // Compress on the GPU
   size_t comp_temp_bytes;

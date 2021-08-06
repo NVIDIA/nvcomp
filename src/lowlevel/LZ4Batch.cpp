@@ -47,7 +47,7 @@
 using namespace nvcomp;
 using namespace nvcomp::lowlevel;
 
-nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
+nvcompStatus_t nvcompBatchedLZ4DecompressGetTempSize(
     const size_t num_chunks,
     const size_t max_uncompressed_chunk_size,
     size_t* const temp_bytes)
@@ -65,7 +65,7 @@ nvcompError_t nvcompBatchedLZ4DecompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4DecompressAsync(
+nvcompStatus_t nvcompBatchedLZ4DecompressAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     const size_t* device_uncompressed_bytes,
@@ -103,7 +103,7 @@ nvcompError_t nvcompBatchedLZ4DecompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4GetDecompressSizeAsync(
+nvcompStatus_t nvcompBatchedLZ4GetDecompressSizeAsync(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,
@@ -130,7 +130,7 @@ nvcompError_t nvcompBatchedLZ4GetDecompressSizeAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
+nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
     const size_t batch_size,
     const size_t max_chunk_size,
     size_t* const temp_bytes)
@@ -147,7 +147,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetTempSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
     const size_t max_chunk_size, size_t* const max_compressed_size)
 {
   CHECK_NOT_NULL(max_compressed_size);
@@ -162,7 +162,7 @@ nvcompError_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompBatchedLZ4CompressAsync(
+nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t /* max_uncompressed_chunk_size */,

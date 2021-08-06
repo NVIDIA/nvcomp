@@ -137,10 +137,10 @@ struct nvcompIntHandle_t
 
   // main decomp functions
   template <typename outputT>
-  nvcompError_t decompCPU(
+  nvcompStatus_t decompCPU(
       nvcompDataNode_t* node, const void** inputData, const void** h_headers);
   template <typename outputT, typename runT>
-  nvcompError_t decompGPU(
+  nvcompStatus_t decompGPU(
       nvcompDataNode_t* node,
       const void** inputData,
       const void** h_headers,
@@ -151,8 +151,8 @@ struct nvcompIntHandle_t
   void* workspaceStorage = nullptr;
 
   // workspace mem management
-  nvcompError_t release();
-  nvcompError_t
+  nvcompStatus_t release();
+  nvcompStatus_t
   allocateAsync(); // new function that splits of pre-allocated memory
 
   // workspace breakdown
@@ -425,7 +425,7 @@ void destroyConfig(nvcompIntConfig_t* config)
   delete config;
 }
 
-nvcompError_t nvcompConfigAddRLE_BP(
+nvcompStatus_t nvcompConfigAddRLE_BP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -465,7 +465,7 @@ nvcompError_t nvcompConfigAddRLE_BP(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompConfigAddDelta_BP(
+nvcompStatus_t nvcompConfigAddDelta_BP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -499,7 +499,7 @@ nvcompError_t nvcompConfigAddDelta_BP(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompConfigAddBP(
+nvcompStatus_t nvcompConfigAddBP(
     nvcompIntConfig_t* const config,
     int outputId,
     size_t maxOutputSize,
@@ -603,14 +603,14 @@ size_t nvcompIntConfig_t::getWorkspaceBytes()
   return size;
 }
 
-nvcompError_t nvcompIntHandle_t::release()
+nvcompStatus_t nvcompIntHandle_t::release()
 {
   return nvcompSuccess;
 }
 
 // recursively assign memory for all nodes in our DAG
 // ** Assumes worspaceStorage is already allocated with sufficient space **
-nvcompError_t nvcompIntHandle_t::allocateAsync()
+nvcompStatus_t nvcompIntHandle_t::allocateAsync()
 {
   nvcompIntConfig_t& c = *config;
 
@@ -706,7 +706,7 @@ void nvcompIntConfig_t::optimizeLayers()
 }
 
 /* These functions may not be needed and removed to simplify codebase */
-nvcompError_t nvcompSetWorkspace(
+nvcompStatus_t nvcompSetWorkspace(
     nvcompHandle_t /*handle*/,
     void* /*workspaceStorage*/,
     size_t /*workspaceBytes*/)
@@ -715,7 +715,7 @@ nvcompError_t nvcompSetWorkspace(
   return nvcompErrorNotSupported;
 }
 
-nvcompError_t
+nvcompStatus_t
 nvcompGetWorkspaceSize(nvcompHandle_t handle, size_t* workspaceBytes)
 {
   *workspaceBytes = handles[handle].workspaceBytes;
@@ -723,14 +723,14 @@ nvcompGetWorkspaceSize(nvcompHandle_t handle, size_t* workspaceBytes)
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompSetStream(nvcompHandle_t handle, cudaStream_t streamId)
+nvcompStatus_t nvcompSetStream(nvcompHandle_t handle, cudaStream_t streamId)
 {
   handles[handle].stream = streamId;
 
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompGetStream(nvcompHandle_t handle, cudaStream_t* streamId)
+nvcompStatus_t nvcompGetStream(nvcompHandle_t handle, cudaStream_t* streamId)
 {
   *streamId = handles[handle].stream;
 
@@ -818,7 +818,7 @@ void unpackGpu(
 }
 
 template <typename outputT>
-nvcompError_t nvcompIntHandle_t::decompCPU(
+nvcompStatus_t nvcompIntHandle_t::decompCPU(
     nvcompDataNode_t* node, const void** inputHdrs, const void** inputData)
 {
   size_t maxOutputSize = config->maxOutputSize;
@@ -937,7 +937,7 @@ nvcompError_t nvcompIntHandle_t::decompCPU(
 // Assumes all workspace is pre-allocated and assigned, inputHdrs and inputData
 // are GPU-accessible, and h_headers is CPU-accessible
 template <typename outputT, typename runT>
-nvcompError_t nvcompIntHandle_t::decompGPU(
+nvcompStatus_t nvcompIntHandle_t::decompGPU(
     nvcompDataNode_t* node,
     const void** inputData,
     const void** h_headers,
@@ -1108,7 +1108,7 @@ nvcompError_t nvcompIntHandle_t::decompGPU(
   return nvcompSuccess;
 }
 
-nvcompError_t
+nvcompStatus_t
 nvcompSetNodeLength(nvcompHandle_t handle, int nodeId, size_t output_length)
 {
   nvcompIntHandle_t& h = handles[handle];
@@ -1121,7 +1121,7 @@ nvcompSetNodeLength(nvcompHandle_t handle, int nodeId, size_t output_length)
 // the new cascaded decompression API call is just a wrapper around this (though
 // heavily modified to be asynchronous).
 template <typename outputType, typename runType>
-nvcompError_t nvcompDecompressLaunch(
+nvcompStatus_t nvcompDecompressLaunch(
     nvcompHandle_t handle,
     void* outputData,
     const size_t outputSize,
@@ -1136,7 +1136,7 @@ nvcompError_t nvcompDecompressLaunch(
   nvcompDataNode_t* terminal_node = &c.nodes[c.outputId];
   terminal_node->ptr = outputData;
 
-  nvcompError_t ret = h.decompGPU<outputType, runType>(
+  nvcompStatus_t ret = h.decompGPU<outputType, runType>(
       terminal_node, inputData, h_headers, h.stream);
 
   const size_t neededBytes = terminal_node->length * sizeof(outputType);
@@ -1155,7 +1155,7 @@ nvcompError_t nvcompDecompressLaunch(
   return ret;
 }
 
-nvcompError_t nvcompDecompressLaunch(
+nvcompStatus_t nvcompDecompressLaunch(
     nvcompHandle_t handle,
     const size_t numUncompressedElements,
     void* const outputData,
@@ -1177,7 +1177,7 @@ nvcompError_t nvcompDecompressLaunch(
       h_headers);
 }
 
-nvcompError_t nvcompDestroyHandle(nvcompHandle_t handle)
+nvcompStatus_t nvcompDestroyHandle(nvcompHandle_t handle)
 {
   nvcompIntHandle_t& h = handles[handle];
   nvcompIntConfig_t& c = *h.config;
@@ -1196,7 +1196,7 @@ nvcompError_t nvcompDestroyHandle(nvcompHandle_t handle)
 
 // Modified version of handle creation function from previous API to now be
 // asynchronous Assumes workspaceStorage is already allocated.
-nvcompError_t nvcompCreateHandleAsync(
+nvcompStatus_t nvcompCreateHandleAsync(
     nvcompHandle_t* handle,
     std::unique_ptr<nvcompIntConfig_t> config,
     void* workspaceStorage,
@@ -1253,7 +1253,7 @@ void nvcompCascadedDestroyMetadata(void* const metadata_ptr)
   ::operator delete(metadata);
 }
 
-nvcompError_t nvcompCascadedDecompressConfigure(
+nvcompStatus_t nvcompCascadedDecompressConfigure(
     const void* compressed_ptr,
     size_t compressed_bytes,
     void** metadata_ptr,
@@ -1290,8 +1290,7 @@ nvcompError_t nvcompCascadedDecompressConfigure(
   return nvcompSuccess;
 }
 
-
-nvcompError_t nvcompCascadedDecompressAsync(
+nvcompStatus_t nvcompCascadedDecompressAsync(
     const void* const in_ptr,
     const size_t in_bytes,
     const void* const metadata_ptr,
@@ -1366,7 +1365,7 @@ nvcompError_t nvcompCascadedDecompressAsync(
   return nvcompSuccess;
 }
 
-nvcompError_t nvcompCascadedCompressConfigure(
+nvcompStatus_t nvcompCascadedCompressConfigure(
     const nvcompCascadedFormatOpts* format_opts,
     nvcompType_t type,
     size_t uncompressed_bytes,
@@ -1414,8 +1413,7 @@ nvcompError_t nvcompCascadedCompressConfigure(
   return nvcompSuccess;
 }
 
-
-nvcompError_t nvcompCascadedCompressAsync(
+nvcompStatus_t nvcompCascadedCompressAsync(
     const nvcompCascadedFormatOpts* const format_opts,
     const nvcompType_t in_type,
     const void* const in_ptr,
@@ -1451,18 +1449,17 @@ nvcompError_t nvcompCascadedCompressAsync(
 
       double est_ratio;
 
-      nvcompError_t err = nvcompCascadedSelectorRun(
-                              &selector_opts,
-                              in_type,
-                              in_ptr,
-                              in_bytes,
-                              temp_ptr,
-                              temp_bytes,
-                              &final_opts,
-                              &est_ratio,
-                              stream);
+      nvcompStatus_t err = nvcompCascadedSelectorRun(
+          &selector_opts,
+          in_type,
+          in_ptr,
+          in_bytes,
+          temp_ptr,
+          temp_bytes,
+          &final_opts,
+          &est_ratio,
+          stream);
 
-      
     }
     else {
       final_opts.num_RLEs = format_opts->num_RLEs;

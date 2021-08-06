@@ -256,8 +256,7 @@ inline nvcompCascadedFormatOpts CascadedSelector<T>::select_config(
 } // namespace highlevel
 } // namespace nvcomp
 
-
-nvcompError_t nvcompCascadedSelectorConfigure(
+nvcompStatus_t nvcompCascadedSelectorConfigure(
     nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
     size_t uncompressed_bytes,
@@ -319,7 +318,7 @@ nvcompCascadedFormatOpts callSelectorSelectConfig(
       stream);
 }
 
-nvcompError_t nvcompCascadedSelectorRun(
+nvcompStatus_t nvcompCascadedSelectorRun(
     nvcompCascadedSelectorOpts* opts,
     nvcompType_t type,
     const void* uncompressed_ptr,
