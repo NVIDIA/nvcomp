@@ -167,7 +167,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         comp_temp_bytes,
         d_comp_out_device,
         comp_out_bytes_device,
-        nullptr,
+        nvcompBatchedSnappyDefaultOpts,
         stream);
     REQUIRE(status == nvcompSuccess);
   }
@@ -182,7 +182,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
         comp_temp_bytes,
         d_comp_out_device,
         comp_out_bytes_device,
-        nullptr,
+        nvcompBatchedSnappyDefaultOpts,
         stream);
     REQUIRE(status == nvcompSuccess);
   }

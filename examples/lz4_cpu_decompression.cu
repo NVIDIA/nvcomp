@@ -88,8 +88,6 @@ static void run_example(const std::vector<std::vector<char>>& data)
   cudaEventCreate(&end);
   cudaEventRecord(start, stream);
 
-  nvcomp_lz4_lowlevel_opt_type fmt_opts;
-
   status = nvcompBatchedLZ4CompressAsync(
       input_data.ptrs(),
       input_data.sizes(),
@@ -99,7 +97,7 @@ static void run_example(const std::vector<std::vector<char>>& data)
       comp_temp_bytes,
       compress_data.ptrs(),
       compress_data.sizes(),
-      &fmt_opts,
+      nvcompBatchedLZ4DefaultOpts,
       stream);
   if (status != nvcompSuccess) {
     throw std::runtime_error("nvcompBatchedLZ4CompressAsync() failed.");

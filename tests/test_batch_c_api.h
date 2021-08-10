@@ -84,9 +84,10 @@
       const size_t temp_bytes,                                                 \
       void* const* device_out_ptr,                                             \
       size_t* const device_out_bytes,                                          \
-      void* format_opts,                                                       \
       cudaStream_t stream)                                                     \
   {                                                                            \
+    const nvcompBatched##NAME##Opts_t format_opts                              \
+        = nvcompBatched##NAME##DefaultOpts;                                    \
     return nvcompBatched##NAME##CompressAsync(                                 \
         device_in_ptr,                                                         \
         device_in_bytes,                                                       \
@@ -147,9 +148,6 @@
   }                                                                            \
   typedef int __nvcomp_semicolon_catch
 
-static const int PASS_TEST = 1;
-static const int FAIL_TEST = 0;
-
 // Declear the test function wrappers
 nvcompStatus_t compressGetTempSize(
     const size_t batch_size,
@@ -169,7 +167,6 @@ nvcompStatus_t compressAsync(
     size_t temp_bytes,
     void* const* device_out_ptr,
     size_t* device_out_bytes,
-    void* format_opts,
     cudaStream_t stream);
 
 nvcompStatus_t decompressGetSizeAsync(
@@ -195,6 +192,9 @@ nvcompStatus_t decompressAsync(
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream);
+
+static const int PASS_TEST = 1;
+static const int FAIL_TEST = 0;
 
 int test_generic_batch_compression_and_decompression(
     const size_t batch_size, const size_t min_size, const size_t max_size)
@@ -313,7 +313,6 @@ int test_generic_batch_compression_and_decompression(
       comp_temp_bytes,
       device_comp_out,
       device_comp_out_bytes,
-      NULL,
       stream);
   REQUIRE(status == nvcompSuccess);
   CUDA_CHECK(cudaStreamSynchronize(stream));
