@@ -38,9 +38,12 @@
 extern "C" {
 #endif
 
-typedef struct snappy_opt_type {
-	int dummy;
-} snappy_opt_type;
+typedef struct
+{
+  int reserved;
+} nvcompBatchedSnappyOpts_t;
+
+static const nvcompBatchedSnappyOpts_t nvcompBatchedSnappyDefaultOpts = {0};
 
 /**
  * @brief Get the amount of temp space required on the GPU for decompression.
@@ -153,7 +156,7 @@ nvcompStatus_t nvcompBatchedSnappyCompressAsync(
     size_t temp_bytes,
     void* const* device_compressed_ptr,
     size_t* device_compressed_bytes,
-    snappy_opt_type* format_ops,
+    nvcompBatchedSnappyOpts_t format_ops,
     cudaStream_t stream);
 
 #ifdef __cplusplus

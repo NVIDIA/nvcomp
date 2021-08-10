@@ -57,8 +57,10 @@ typedef struct
  */
 typedef struct
 {
-    int reserved;
-} nvcomp_lz4_lowlevel_opt_type;
+  int reserved;
+} nvcompBatchedLZ4Opts_t;
+
+static const nvcompBatchedLZ4Opts_t nvcompBatchedLZ4DefaultOpts = {0};
 
 /**
  * @brief Check if a given chunk of compressed data on the GPU is LZ4.
@@ -270,7 +272,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     size_t temp_bytes,
     void* const* device_out_ptr,
     size_t* device_out_bytes,
-    nvcomp_lz4_lowlevel_opt_type* format_opts,
+    nvcompBatchedLZ4Opts_t format_opts,
     cudaStream_t stream);
 
 /**

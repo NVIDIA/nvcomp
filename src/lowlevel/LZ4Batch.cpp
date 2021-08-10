@@ -171,7 +171,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     const size_t temp_bytes,
     void* const* const device_out_ptrs,
     size_t* const device_out_bytes,
-    nvcomp_lz4_lowlevel_opt_type* /* format_opts */,
+    const nvcompBatchedLZ4Opts_t /* format_opts */,
     cudaStream_t stream)
 {
   // NOTE: if we start using `max_uncompressed_chunk_bytes`, we need to check

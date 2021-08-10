@@ -190,7 +190,7 @@ nvcompStatus_t nvcompBatchedSnappyCompressAsync(
     size_t /* temp_bytes */,
     void* const* device_compressed_ptr,
     size_t* device_compressed_bytes,
-    snappy_opt_type* /*format_ops*/,
+    const nvcompBatchedSnappyOpts_t /* format_ops */,
     cudaStream_t stream)
 {
   try {
