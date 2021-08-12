@@ -2,8 +2,10 @@
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
 
-nvCOMP 2.0 includes Cascaded, LZ4, and Snappy compression methods.
-It also adds support for the external Bitcomp and GDeflate methods.
+nvCOMP 2.1.0-dev includes Cascaded, LZ4, and Snappy compression methods.
+Support for Bitcomp and GDeflate will come with the official release of 2.1.0,
+and are not supported for 2.1.0-dev.
+
 Cascaded compression methods demonstrate high performance with up to 500 GB/s
 throughput and a high compression ratio of up to 80x on numerical data from
 analytical workloads.
@@ -19,7 +21,7 @@ Below are compression ratio and performance plots for three methods available in
 
 ![decompression performance](/doc/decompression_performance_a100.svg)
 
-nvCOMP 2.0 features new flexible APIs:
+nvCOMP 2.1 features new flexible APIs:
 * [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
   metadata and chunking must be handled outside of nvCOMP, low-level nvCOMP
   APIs perform batch compression/decompression of multiple streams, they are
@@ -30,16 +32,18 @@ nvCOMP 2.0 features new flexible APIs:
   APIs are synchronous and for best performance/flexibility it’s recommended to
   use the low-level APIs.
 
-Please note, that in nvCOMP 2.0 some compressors are only available either through the Low-level API or through the High-level API.
+Please note, that in nvCOMP 2.1 some compressors are only available either through the Low-level API or through the High-level API.
 
 Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
 
-# Version 2.0 Release
+# Version 2.1 Release
 
-This release of nvCOMP introduces new interfaces and compression methods.
+This minor release of nvCOMP enhances the low-level interface by adding configuration options, new error reporting mechanism and function to calculate the size of the decompressed output
 
 ## Known issues
 
+* Bitcomp and GDeflate are not supported in the preview version of 2.1.0. They
+will be supported in the full release of 2.1.0.
 * Cascaded compression requires a large amount of temporary workspace to
 operate. Current workaround is to compress/decompress large datasets in pieces,
 re-using temporary workspace for each piece.
