@@ -1,3 +1,15 @@
+# nvcomp 2.1.0-dev (2021-08-13)
+
+- Updated batched/low-level compression interfaces to take an options parameter,
+to allow configuring future compression algorithms.
+- Updated batched/low-level decompression interfaces to output the decompressed
+size (or 0 if an error occurs).
+- Added bounds checking to batched/low-level decompression routines, such that
+if an invalid compressed data stream is provided, 0 will be written for the
+output size, rather than generating an illegal memory access.
+- Improve performance of Snappy compression by ~10% in some configurations.
+- Fix LZ4 CPU compression example.
+
 # nvcomp 2.0.2 (2021-06-30)
 
 - Add example `lz4_cpu_decompression` to compress on the GPU with nvCOMP and

@@ -106,7 +106,8 @@ Once we have everything setup, we can launch compression asynchronously.
 
 ```c++
 nvcompBatchedLZ4CompressAsync(d_comp_input, d_uncomp_sizes, chunk_size,
-    num_chunks, d_comp_temp, temp_bytes, d_comp_output, d_comp_sizes, stream);
+    num_chunks, d_comp_temp, temp_bytes, d_comp_output, d_comp_sizes,
+    nvcompBatchedLZ4DefaultOpts, stream);
 ```
 
 This call compresses each input `d_comp_input[i]`,
@@ -158,13 +159,17 @@ cudaMemcpyAsync(d_decomp_output, decomp_output,
     sizeof(*d_decomp_output)*num_chunks, cudaMemcpyHostToDevice, stream);
 ```
 
-Asynchronous decompression can then be launched.
+Asynchronous decompression can then be launched. After the compressed data
+location and the compressed data size, the next two parameters are the size of the
+allocated output buffers for writing the uncompressed data and the actual size
+of each chunk that was decompressed.
 
 ```c++
 nvcompBatchedLZ4DecompressAsync(
-    d_comp_output, d_comp_sizes, d_uncomp_sizes, chunk_size, num_chunks,
-    d_decomp_temp, temp_bytes, d_decomp_output, stream);
+    d_comp_output, d_comp_sizes, d_uncomp_sizes, d_decomp_sizes, chunk_size,
+    num_chunks, d_decomp_temp, temp_bytes, d_decomp_output, stream);
 ```
 
 This decompresses each input, `d_comp_output[i]`, and places the decompressed
-result in the corresponding output list, `d_decomp_output[i]`.
+result in the corresponding output list, `d_decomp_output[i]`. It also writes
+the size of the uncompressed data to `d_decomp_sizes[i]`.
