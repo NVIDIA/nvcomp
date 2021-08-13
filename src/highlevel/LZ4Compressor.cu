@@ -106,7 +106,7 @@ size_t LZ4Compressor::calculate_workspace_size(
   // needed workspace
   size_t staging_bytes;
   CHECK_API_CALL(nvcompBatchedLZ4CompressGetTempSize(
-      num_chunks, chunk_size, &staging_bytes));
+      num_chunks, chunk_size, nvcompBatchedLZ4DefaultOpts, &staging_bytes));
 
   // input and output pointers
   const size_t pointer_bytes = 2 * num_chunks * sizeof(uint8_t*);
@@ -117,8 +117,8 @@ size_t LZ4Compressor::calculate_workspace_size(
 
   // buffer to collect output in
   size_t max_out;
-  CHECK_API_CALL(
-      nvcompBatchedLZ4CompressGetMaxOutputChunkSize(chunk_size, &max_out));
+  CHECK_API_CALL(nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+      chunk_size, nvcompBatchedLZ4DefaultOpts, &max_out));
   size_t buffer_bytes = max_out * num_chunks;
 
   size_t prefix_bytes;
@@ -141,8 +141,8 @@ size_t LZ4Compressor::calculate_max_output_size(
   const size_t num_chunks = roundUpDiv(decomp_data_size, chunk_size);
 
   size_t max_out;
-  CHECK_API_CALL(
-      nvcompBatchedLZ4CompressGetMaxOutputChunkSize(chunk_size, &max_out));
+  CHECK_API_CALL(nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+      chunk_size, nvcompBatchedLZ4DefaultOpts, &max_out));
 
   return max_out * num_chunks;
 }
@@ -217,12 +217,15 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
   uint8_t* workspace;
   size_t workspace_size;
   CHECK_API_CALL(nvcompBatchedLZ4CompressGetTempSize(
-      m_num_chunks, m_chunk_size, &workspace_size));
+      m_num_chunks,
+      m_chunk_size,
+      nvcompBatchedLZ4DefaultOpts,
+      &workspace_size));
   temp.reserve(&workspace, workspace_size);
 
   size_t max_chunk_output;
   CHECK_API_CALL(nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-      m_chunk_size, &max_chunk_output));
+      m_chunk_size, nvcompBatchedLZ4DefaultOpts, &max_chunk_output));
 
   // these have all the same size, and generally should on all platforms as
   // the definition of size_t should make it the same size
@@ -245,7 +248,6 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
   uint8_t* output_buffer;
   temp.reserve(&output_buffer, max_chunk_output * m_num_chunks);
 
-  const nvcompBatchedLZ4Opts_t format_opts{0};
   {
     const dim3 block(128);
     const dim3 grid(roundUpDiv(m_num_chunks, block.x));
@@ -272,7 +274,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
       workspace_size,
       reinterpret_cast<void* const*>(out_ptrs_device),
       out_sizes_device,
-      format_opts,
+      nvcompBatchedLZ4DefaultOpts,
       stream));
 
   // perform prefixsum on sizes

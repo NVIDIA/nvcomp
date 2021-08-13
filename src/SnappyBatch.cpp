@@ -147,7 +147,10 @@ nvcompStatus_t nvcompBatchedSnappyDecompressAsync(
 }
 
 nvcompStatus_t nvcompBatchedSnappyCompressGetTempSize(
-    size_t /* batch_size */, size_t /* max_chunk_size */, size_t* temp_bytes)
+    const size_t /* batch_size */,
+    const size_t /* max_chunk_size */,
+    const nvcompBatchedSnappyOpts_t /* format_opts */,
+    size_t* const temp_bytes)
 {
   try {
     // error check inputs
@@ -165,7 +168,9 @@ nvcompStatus_t nvcompBatchedSnappyCompressGetTempSize(
 }
 
 nvcompStatus_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
-    size_t max_chunk_size, size_t* max_compressed_size)
+    const size_t max_chunk_size,
+    const nvcompBatchedSnappyOpts_t /* format_opts */,
+    size_t* const max_compressed_size)
 {
   try {
     // error check inputs

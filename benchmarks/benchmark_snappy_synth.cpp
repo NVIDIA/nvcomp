@@ -128,6 +128,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   status = nvcompBatchedSnappyCompressGetTempSize(
       batch_size,
       max_batch_bytes_uncompressed,
+      nvcompBatchedSnappyDefaultOpts,
       &comp_temp_bytes);
   REQUIRE(status == nvcompSuccess);
 
@@ -137,6 +138,7 @@ void run_benchmark(const std::vector<std::vector<uint8_t>>& uncompressed_data, i
   size_t comp_out_bytes;
   status = nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
       max_batch_bytes_uncompressed,
+      nvcompBatchedSnappyDefaultOpts,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 

@@ -133,6 +133,7 @@ nvcompStatus_t nvcompBatchedLZ4GetDecompressSizeAsync(
 nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
     const size_t batch_size,
     const size_t max_chunk_size,
+    const nvcompBatchedLZ4Opts_t /* format_opts */,
     size_t* const temp_bytes)
 {
   CHECK_NOT_NULL(temp_bytes);
@@ -148,7 +149,9 @@ nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
 }
 
 nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-    const size_t max_chunk_size, size_t* const max_compressed_size)
+    const size_t max_chunk_size,
+    const nvcompBatchedLZ4Opts_t /* format_opts */,
+    size_t* const max_compressed_size)
 {
   CHECK_NOT_NULL(max_compressed_size);
 

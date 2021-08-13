@@ -66,14 +66,19 @@
       size_t* const temp_bytes)                                                \
   {                                                                            \
     return nvcompBatched##NAME##CompressGetTempSize(                           \
-        batch_size, max_uncompressed_chunk_bytes, temp_bytes);                 \
+        batch_size,                                                            \
+        max_uncompressed_chunk_bytes,                                          \
+        nvcompBatched##NAME##DefaultOpts,                                      \
+        temp_bytes);                                                           \
   }                                                                            \
   nvcompStatus_t compressGetMaxOutputChunkSize(                                \
       const size_t max_uncompressed_chunk_bytes,                               \
       size_t* const max_compressed_bytes)                                      \
   {                                                                            \
     return nvcompBatched##NAME##CompressGetMaxOutputChunkSize(                 \
-        max_uncompressed_chunk_bytes, max_compressed_bytes);                   \
+        max_uncompressed_chunk_bytes,                                          \
+        nvcompBatched##NAME##DefaultOpts,                                      \
+        max_compressed_bytes);                                                 \
   }                                                                            \
   nvcompStatus_t compressAsync(                                                \
       const void* const* const device_in_ptr,                                  \
@@ -86,8 +91,6 @@
       size_t* const device_out_bytes,                                          \
       cudaStream_t stream)                                                     \
   {                                                                            \
-    const nvcompBatched##NAME##Opts_t format_opts                              \
-        = nvcompBatched##NAME##DefaultOpts;                                    \
     return nvcompBatched##NAME##CompressAsync(                                 \
         device_in_ptr,                                                         \
         device_in_bytes,                                                       \
@@ -97,7 +100,7 @@
         temp_bytes,                                                            \
         device_out_ptr,                                                        \
         device_out_bytes,                                                      \
-        format_opts,                                                           \
+        nvcompBatched##NAME##DefaultOpts,                                      \
         stream);                                                               \
   }                                                                            \
   nvcompStatus_t decompressGetSizeAsync(                                       \
