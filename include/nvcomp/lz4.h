@@ -212,13 +212,17 @@ void nvcompLZ4DestroyMetadata(void* metadata_ptr);
  * @param batch_size The number of items in the batch.
  * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the
  * batch.
+ * @param format_opts The LZ4 compression options to use.
  * @param temp_bytes The size of the required GPU workspace for compression
  * (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
-    size_t batch_size, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
+    size_t batch_size,
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedLZ4Opts_t format_opts,
+    size_t* temp_bytes);
 
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That
@@ -230,13 +234,16 @@ nvcompStatus_t nvcompBatchedLZ4CompressGetTempSize(
  * recommended.
  *
  * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the batch.
+ * @param format_opts The LZ4 compression options to use.
  * @param max_compressed_byes The maximum compressed size of the largest chunk
  * (output).
  *
  * @return The nvcompSuccess unless there is an error.
  */
 nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-    size_t max_uncompressed_chunk_bytes, size_t* max_compressed_bytes);
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedLZ4Opts_t format_opts,
+    size_t* max_compressed_bytes);
 
 /**
  * @brief Perform compression asynchronously. All pointers must point to GPU
@@ -258,7 +265,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
  * each compressed batch item (output). This pointer must be GPU accessible.
  * @param device_out_bytes The compressed size of each chunk on the GPU
  * (output). This pointer must be GPU accessible.
- * @param format_opts The LZ4 compression options to use
+ * @param format_opts The LZ4 compression options to use.
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.

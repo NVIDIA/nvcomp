@@ -109,24 +109,34 @@ nvcompStatus_t nvcompBatchedSnappyDecompressAsync(
  *
  * @param batch_size The number of items in the batch.
  * @param max_chunk_size The maximum size of a chunk in the batch.
+ * @param format_ops Snappy compression options.
  * @param temp_bytes The size of the required GPU workspace for compression
  * (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompStatus_t nvcompBatchedSnappyCompressGetTempSize(
-    size_t batch_size, size_t max_chunk_size, size_t* temp_bytes);
+    size_t batch_size,
+    size_t max_chunk_size,
+    nvcompBatchedSnappyOpts_t format_ops,
+    size_t* temp_bytes);
 
 /**
- * @brief Get the maximum size any chunk could compress to in the batch. That is, the minimum amount of output memory required to be given nvcompBatchedLZ4CompressAsync() for each batch item.
+ * @brief Get the maximum size any chunk could compress to in the batch. That
+ * is, the minimum amount of output memory required to be given
+ * nvcompBatchedSnappyCompressAsync() for each batch item.
  *
  * @param max_chunk_size The maximum size of a chunk in the batch.
- * @param max_compressed_size The maximum compressed size of the largest chunk (output).
+ * @param format_ops Snappy compression options.
+ * @param max_compressed_size The maximum compressed size of the largest chunk
+ * (output).
  *
  * @return The nvcompSuccess unless there is an error.
  */
 nvcompStatus_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
-    size_t max_chunk_size, size_t* max_compressed_size);
+    size_t max_chunk_size,
+    nvcompBatchedSnappyOpts_t format_opts,
+    size_t* max_compressed_size);
 
 /**
  * @brief Perform compression.

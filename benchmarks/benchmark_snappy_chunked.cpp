@@ -138,6 +138,7 @@ void run_benchmark(
   status = nvcompBatchedSnappyCompressGetTempSize(
       batch_size,
       max_batch_bytes_uncompressed,
+      nvcompBatchedSnappyDefaultOpts,
       &comp_temp_bytes);
   REQUIRE(status == nvcompSuccess);
 
@@ -147,6 +148,7 @@ void run_benchmark(
   size_t comp_out_bytes;
   status = nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
       max_batch_bytes_uncompressed,
+      nvcompBatchedSnappyDefaultOpts,
       &comp_out_bytes);
   REQUIRE(status == nvcompSuccess);
 
