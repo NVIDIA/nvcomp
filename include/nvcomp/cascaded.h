@@ -61,12 +61,13 @@ typedef struct
 
 /**
  * @brief Configure the Cascaded compressor and return temp and output
- * sizes needed to perform the compression.  If no format is provided (i.e., NULL),
- * temporary and output size estimates are based on the format that would require
- * the largest allocation.
+ * sizes needed to perform the compression.  If no format is provided (i.e.,
+ * NULL), temporary and output size estimates are based on the format that would
+ * require the largest allocation.
  *
- * @param format_opts The cascaded format options.  If set to NULL, temporary storage
- * sizes are allocated to enable running the CascadedSelector during compression.
+ * @param format_opts The cascaded format options.  If set to NULL, temporary
+ * storage sizes are allocated to enable running the CascadedSelector during
+ * compression.
  * @param type The data type of the uncompressed data.
  * @param uncompressed_bytes The size of the uncompressed data on the device.
  * @param metadata_bytes The bytes needed to store the metadata (output)
@@ -84,12 +85,13 @@ nvcompStatus_t nvcompCascadedCompressConfigure(
     size_t* compressed_bytes);
 
 /**
- * @brief Perform asynchronous compression. The pointers `compressed_ptr` and 
- * `compressed_bytes` must be to preallocated memory directly accessible by the GPU.
- * If no format is provided (i.e., NULL), the CascadedSelector is also run to determine 
- * the best compression format and the function synchronizes on the stream.
- * 
- * 
+ * @brief Perform asynchronous compression. The pointers `compressed_ptr` and
+ * `compressed_bytes` must be to preallocated memory directly accessible by the
+ * GPU. If no format is provided (i.e., NULL), the CascadedSelector is also run
+ * to determine the best compression format and the function synchronizes on the
+ * stream.
+ *
+ *
  * NOTE: Currently, cascaded compression is limited to 2^31-1 bytes. To
  * compress larger data, break it up into chunks.
  *
@@ -102,9 +104,9 @@ nvcompStatus_t nvcompCascadedCompressConfigure(
  * @param temp_ptr The temporary workspace on the device.
  * @param temp_bytes The size of the temporary workspace in bytes.
  * @param compressed_ptr The location to write compresesd data to on the device.
- * @param compressed_bytes The size of the output location on input, and the size of
- * the compressed data on output. This pointer must be preallocated and directly 
- * accessible by the GPU.
+ * @param compressed_bytes The size of the output location on input, and the
+ * size of the compressed data on output. This pointer must be preallocated and
+ * directly accessible by the GPU.
  * @param stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -222,7 +224,8 @@ typedef struct
  * @brief Configure the cascaded selector and get the temp memory size needed
  * to run the cascaded selector.
  *
- * @param opts The configuration options for the selector (if null, default values used).
+ * @param opts The configuration options for the selector (if null, default
+ * values used).
  * @param type The data type of the uncompressed data.
  * @param uncompressed_bytes The size of the uncompressed data in bytes.
  * @param temp_bytes The size of the temporary workspace in bytes (output).
@@ -239,7 +242,8 @@ nvcompStatus_t nvcompCascadedSelectorConfigure(
  * @brief Run the cascaded selector to determine the best cascaded compression
  * configuration and estimated compression ratio.
  *
- * @param opts The configuration options for the selector (if null, default values are used).
+ * @param opts The configuration options for the selector (if null, default
+ * values are used).
  * @param type The data type of the uncompressed data.
  * @param uncompressed_ptr The uncompressed data on the device.
  * @param uncompressed_bytes The size of the uncompressed data in bytes.
@@ -261,6 +265,130 @@ nvcompStatus_t nvcompCascadedSelectorRun(
     size_t temp_bytes,
     nvcompCascadedFormatOpts* format_opts,
     double* est_ratio,
+    cudaStream_t stream);
+
+/******************************************************************************
+ * Batched compression/decompression interface
+ *****************************************************************************/
+
+/**
+ * @brief Perform batched asynchronous compression.
+ *
+ * NOTE: Unlike `nvcompCascadedCompressAsync`, a valid compression format must
+ * be supplied to `format_opts`.
+ *
+ * NOTE: The current implementation does not support uncompressed size larger
+ * than 4,294,967,295 bytes (max uint32_t).
+ *
+ * @param[in] device_uncompressed_ptrs Array with size \p batch_size of pointers
+ * to the uncompressed partitions. Both the pointers and the uncompressed data
+ * should reside in device-accessible memory. The uncompressed data must start
+ * at locations with alignments of the data type.
+ * @param[in] device_uncompressed_bytes Sizes of the uncompressed partitions in
+ * bytes. The sizes should reside in device-accessible memory.
+ * @param[in] max_uncompressed_chunk_bytes This argument is not used.
+ * @param[in] batch_size Number of partitions to compress.
+ * @param[in] device_temp_ptr This argument is not used.
+ * @param[in] temp_bytes This argument is not used.
+ * @param[out] device_compressed_ptrs Array with size \p batch_size of pointers
+ * to the output compressed buffers. Both the pointers and the compressed
+ * buffers should reside in device-accessible memory. Each compressed buffer
+ * should be preallocated with size at least (8B + the uncompressed size). Each
+ * compressed buffer should start at a location with alignment of both 4B and
+ * the data type.
+ * @param[out] device_compressed_bytes Number of bytes decompressed of all
+ * partitions. The buffer should be preallocated in device-accessible memory.
+ * @param[in] format_opts The cascaded format options. The format must be valid.
+ * @param[in] type The data type of the uncompressed data.
+ * @param[in] stream The cuda stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompStatus_t nvcompBatchedCascadedCompressAsync(
+    const void* const* device_uncompressed_ptrs,
+    const size_t* device_uncompressed_bytes,
+    size_t max_uncompressed_chunk_bytes, // not used
+    size_t batch_size,
+    void* device_temp_ptr, // not used
+    size_t temp_bytes,     // not used
+    void* const* device_compressed_ptrs,
+    size_t* device_compressed_bytes,
+    const nvcompCascadedFormatOpts* format_opts,
+    nvcompType_t type,
+    cudaStream_t stream);
+
+/**
+ * @brief Perform batched asynchronous decompression.
+ *
+ * NOTE: This function is used to decompress compressed buffers produced by
+ * `nvcompBatchedCascadedCompressAsync`. Currently it is not compatible with
+ * compressed buffers produced by `nvcompCascadedCompressAsync`.
+ *
+ * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
+ * in device-accessible memory to compressed buffers. Each compressed buffer
+ * should reside in device-accessible memory and start at a location with
+ * alignment of both 4B and the data type.
+ * @param[in] device_compressed_bytes Sizes of the compressed buffers in bytes.
+ * The sizes should reside in device-accessible memory.
+ * @param[in] device_uncompressed_bytes Sizes of the output uncompressed
+ * buffers in bytes. The sizes should reside in device-accessible memory. If the
+ * size is not large enough to hold all decompressed elements, the decompressor
+ * will set the status specified in \p device_statuses corresponding to the
+ * overflow partition to `nvcompErrorCannotDecompress`.
+ * @param[out] device_actual_uncompressed_bytes Array with size \p batch_size of
+ * the actual number of bytes decompressed for every partitions. This argument
+ * needs to be preallocated.
+ * @param[in] batch_size Number of partitions to decompress.
+ * @param[in] device_temp_ptr This argument is not used.
+ * @param[in] temp_bytes This argument is not used.
+ * @param[out] device_uncompressed_ptrs Array with size \p batch_size of
+ * pointers in device-accessible memory to decompressed data. Each uncompressed
+ * buffer needs to be preallocated in device-accessible memory, and start at a
+ * location with alignment of the data type.
+ * @param[out] device_statuses Array with size \p batch_size of statuses in
+ * device-accessible memory. This argument needs to be preallocated. For each
+ * partition, if the decompression is successful, the status will be set to
+ * `nvcompSuccess`. If the decompression is not successful, for example due to
+ * the corrupted input or out-of-bound errors, the status will be set to
+ * `nvcompErrorCannotDecompress`.
+ * @param[in] format_opts The cascaded format options. The format must be valid.
+ * @param[in] type The data type of the uncompressed data.
+ * @param[in] stream The cuda stream to operate on.
+ */
+nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr, // not used
+    size_t temp_bytes,           // not used
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_statuses,
+    const nvcompCascadedFormatOpts* format_opts,
+    nvcompType_t type,
+    cudaStream_t stream);
+
+/**
+ * @brief Asynchronously get the number of bytes of the uncompressed data in
+ * every partitions.
+ *
+ * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
+ * in device-accessible memory to compressed buffers.
+ * @param[in] device_compressed_bytes Sizes of the compressed buffers in bytes.
+ * The sizes should reside in device-accessible memory.
+ * @param[out] device_uncompressed_bytes Sizes of the uncompressed data in
+ * bytes. If there is an error when retrieving the size of a partition, the
+ * uncompressed size of that partition will be set to 0. This argument needs to
+ * be prealloated in device-accessible memory.
+ * @param[in] batch_size Number of partitions to check sizes.
+ * @param[in] stream The cuda stream to operate on.
+ */
+nvcompStatus_t nvcompBatchedCascadedGetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
     cudaStream_t stream);
 
 #ifdef __cplusplus

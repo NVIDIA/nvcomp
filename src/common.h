@@ -126,6 +126,39 @@ constexpr __host__ __device__ U roundUpTo(U const num, T const chunk)
   return roundUpDiv(num, chunk) * chunk;
 }
 
+/**
+ * @brief Calculate the first aligned location after `ptr`.
+ *
+ * @tparam T Type such that the alignment requirement is satisfied.
+ * @param ptr Input pointer.
+ * @return The first pointer after `ptr` that satisfy the alignment requirement.
+ */
+template <typename T>
+constexpr __host__ __device__ T* roundUpToAlignment(void* ptr)
+{
+  return reinterpret_cast<T*>(
+      roundUpTo(reinterpret_cast<uintptr_t>(ptr), sizeof(T)));
+}
+
+template <typename T>
+constexpr __host__ __device__ const T* roundUpToAlignment(const void* ptr)
+{
+  return reinterpret_cast<const T*>(
+      roundUpTo(reinterpret_cast<uintptr_t>(ptr), sizeof(T)));
+}
+
+/**
+ * @brief Provide a type that is the larger of `U` and `T` in terms of size.
+ */
+template <typename U, typename T>
+struct make_larger
+{
+  typedef std::conditional_t<(sizeof(U) >= sizeof(T)), U, T> type;
+};
+
+template <typename U, typename T>
+using larger_t = typename make_larger<U, T>::type;
+
 } // namespace
 
 __inline__ size_t sizeOfnvcompType(nvcompType_t type)
