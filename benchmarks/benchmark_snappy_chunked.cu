@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,12 @@
  */
 
 #include "benchmark_template_chunked.cuh"
-#include "nvcomp/lz4.h"
+#include "nvcomp/snappy.h"
 
 GENERATE_CHUNKED_BENCHMARK(
-    nvcompBatchedLZ4CompressGetTempSize,
-    nvcompBatchedLZ4CompressGetMaxOutputChunkSize,
-    nvcompBatchedLZ4CompressAsync,
-    nvcompBatchedLZ4DecompressGetTempSize,
-    nvcompBatchedLZ4DecompressAsync,
-    nvcompBatchedLZ4DefaultOpts);
+    nvcompBatchedSnappyCompressGetTempSize,
+    nvcompBatchedSnappyCompressGetMaxOutputChunkSize,
+    nvcompBatchedSnappyCompressAsync,
+    nvcompBatchedSnappyDecompressGetTempSize,
+    nvcompBatchedSnappyDecompressAsync,
+    nvcompBatchedSnappyDefaultOpts);
