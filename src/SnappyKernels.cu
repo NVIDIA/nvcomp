@@ -930,8 +930,8 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
             out[i * 32u + t] = b[i];
           dist += LITERAL_SECTORS * 32u;
           out += LITERAL_SECTORS * 32u;
-          blen -= LITERAL_SECTORS * 32u;
         }
+        blen %= LITERAL_SECTORS * 32u;
         if (dist + blen < current_prefetch_wrpos) {
           for(int i = 0; i < LITERAL_SECTORS; ++i)
             if (i * 32u + t < blen)
