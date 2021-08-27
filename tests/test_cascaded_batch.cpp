@@ -268,8 +268,7 @@ void test_predefined_cases(int use_bp)
 
   // Launch batched compression
 
-  nvcompCascadedFormatOpts comp_opts
-      = {.num_RLEs = 2, .num_deltas = 1, .use_bp = use_bp};
+  nvcompCascadedFormatOpts comp_opts = {2, 1, use_bp};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,
@@ -552,8 +551,7 @@ void test_fallback_path()
 
   // Launch batched cascaded compression
 
-  nvcompCascadedFormatOpts comp_opts
-      = {.num_RLEs = 2, .num_deltas = 1, .use_bp = 0};
+  nvcompCascadedFormatOpts comp_opts = {2, 1, 0};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,
@@ -736,8 +734,7 @@ void test_out_of_bound(int use_bp)
   size_t* compressed_bytes_device;
   CUDA_CHECK(cudaMalloc(&compressed_bytes_device, sizeof(size_t)));
 
-  nvcompCascadedFormatOpts comp_opts
-      = {.num_RLEs = 2, .num_deltas = 1, .use_bp = use_bp};
+  nvcompCascadedFormatOpts comp_opts = {2, 1, use_bp};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,

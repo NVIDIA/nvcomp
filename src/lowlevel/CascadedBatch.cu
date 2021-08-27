@@ -1381,7 +1381,7 @@ void cascaded_batched_compression_typed(
 
 template <typename data_type>
 void cascaded_batched_decompression_typed(
-    const nvcompCascadedFormatOpts* format_opts,
+    const nvcompCascadedFormatOpts* /*format_opts*/,
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
     const size_t* device_uncompressed_bytes,
