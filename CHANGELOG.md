@@ -1,4 +1,4 @@
-# nvcomp 2.1.0-dev (2021-08-13)
+# nvcomp 2.1.0-dev (2021-09-11)
 
 - Updated batched/low-level compression interfaces to take an options parameter,
 to allow configuring future compression algorithms.
@@ -9,6 +9,7 @@ if an invalid compressed data stream is provided, 0 will be written for the
 output size, rather than generating an illegal memory access.
 - Improve performance of Snappy compression by ~10% in some configurations.
 - Fix LZ4 CPU compression example.
+- Updated CMakeLists to compile nvcomp with -fPIC enabled
 
 # nvcomp 2.0.2 (2021-06-30)
 
