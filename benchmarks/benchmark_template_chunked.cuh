@@ -339,7 +339,7 @@ run_benchmark_template(
     // Compress on the GPU using batched API
     size_t comp_temp_bytes;
     status = BatchedCompressGetTempSize(
-        chunk_size, batch_size, format_opts, &comp_temp_bytes);
+        batch_size, chunk_size, format_opts, &comp_temp_bytes);
     benchmark_assert(status == nvcompSuccess,
         "BatchedCompressGetTempSize() failed.");
 
