@@ -175,6 +175,125 @@ nvcompStatus_t nvcompBitcompDecompressAsync(
  */
 int nvcompIsBitcompData(const void* const in_ptr, size_t in_bytes);
 
+/******************************************************************************
+ * Batched compression/decompression interface
+ *****************************************************************************/
+
+/**
+ * @brief Perform batched asynchronous compression.
+ *
+ * NOTE: The maximum number of batch partitions is 2^31.
+ * 
+ * NOTE: Unlike `nvcompBitcompCompressAsync`, a valid compression format must
+ * be supplied to `format_opts`.
+ *
+ * @param[in] device_uncompressed_ptrs Array with size \p batch_size of pointers
+ * to the uncompressed partitions. Both the pointers and the uncompressed data
+ * should reside in device-accessible memory. The uncompressed data must start
+ * at locations with alignments of the data type.
+ * @param[in] device_uncompressed_bytes Sizes of the uncompressed partitions in
+ * bytes. The sizes should reside in device-accessible memory.
+ * @param[in] max_uncompressed_chunk_bytes This argument is not used.
+ * @param[in] batch_size Number of partitions to compress.
+ * @param[in] device_temp_ptr This argument is not used.
+ * @param[in] temp_bytes This argument is not used.
+ * @param[out] device_compressed_ptrs Array with size \p batch_size of pointers
+ * to the output compressed buffers. Both the pointers and the compressed
+ * buffers should reside in device-accessible memory. Each compressed buffer
+ * should be preallocated with size at least (8B + the uncompressed size). Each
+ * compressed buffer should start at a location with 64-bit alignment.
+ * @param[out] device_compressed_bytes Compressed sizes in bytes for all
+ * partitions. The buffer should be preallocated in device-accessible memory.
+ * @param[in] format_opts The bitcomp format options. The format must be valid.
+ * @param[in] type The data type of the uncompressed data.
+ * @param[in] stream The cuda stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompStatus_t nvcompBatchedBitcompCompressAsync(
+    const void* const* device_uncompressed_ptrs,
+    const size_t* device_uncompressed_bytes,
+    size_t max_uncompressed_chunk_bytes, // not used
+    size_t batch_size,
+    void* device_temp_ptr, // not used
+    size_t temp_bytes,     // not used
+    void* const* device_compressed_ptrs,
+    size_t* device_compressed_bytes,
+    const nvcompBitcompFormatOpts* format_opts,
+    nvcompType_t type,
+    cudaStream_t stream);
+
+/**
+ * @brief Perform batched asynchronous decompression.
+ *
+ * NOTE: This function is used to decompress compressed buffers produced by
+ * `nvcompBatchedBitcompCompressAsync`. It can also decompress buffers
+ * compressed with `nvcompBitcompCompressAsync` or the standalone Bitcomp library.
+ *
+ * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
+ * in device-accessible memory to compressed buffers. Each compressed buffer
+ * should reside in device-accessible memory and start at a location which is
+ * 64-bit aligned.
+ * @param[in] device_compressed_bytes This argument is not used.
+ * @param[in] device_uncompressed_bytes Sizes of the output uncompressed
+ * buffers in bytes. The sizes should reside in device-accessible memory. If the
+ * size is not large enough to hold all decompressed elements, the decompressor
+ * will set the status specified in \p device_statuses corresponding to the
+ * overflow partition to `nvcompErrorCannotDecompress`.
+ * @param[out] device_actual_uncompressed_bytes Array with size \p batch_size of
+ * the actual number of bytes decompressed for every partitions. This argument
+ * needs to be preallocated.
+ * @param[in] batch_size Number of partitions to decompress.
+ * @param[in] device_temp_ptr This argument is not used.
+ * @param[in] temp_bytes This argument is not used.
+ * @param[out] device_uncompressed_ptrs This argument is not used.
+ * @param[out] device_statuses Array with size \p batch_size of statuses in
+ * device-accessible memory. This argument needs to be preallocated. For each
+ * partition, if the decompression is successful, the status will be set to
+ * `nvcompSuccess`. If the decompression is not successful, for example due to
+ * the corrupted input or out-of-bound errors, the status will be set to
+ * `nvcompErrorCannotDecompress`.
+ * @param[in] format_opts The bitcomp format options. The format must be valid.
+ * @param[in] type The data type of the uncompressed data.
+ * @param[in] stream The cuda stream to operate on.
+ */
+nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr, // not used
+    size_t temp_bytes,           // not used
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_statuses,
+    const nvcompBitcompFormatOpts* format_opts,
+    nvcompType_t type,
+    cudaStream_t stream);
+
+/**
+ * @brief Asynchronously get the number of bytes of the uncompressed data in
+ * every partitions.
+ *
+ * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
+ * in device-accessible memory to compressed buffers.
+ * @param[in] device_compressed_bytes Sizes of the compressed buffers in bytes.
+ * The sizes should reside in device-accessible memory.
+ * @param[out] device_uncompressed_bytes Sizes of the uncompressed data in
+ * bytes. If there is an error when retrieving the size of a partition, the
+ * uncompressed size of that partition will be set to 0. This argument needs to
+ * be prealloated in device-accessible memory.
+ * @param[in] batch_size Number of partitions to check sizes.
+ * @param[in] stream The cuda stream to operate on.
+ */
+nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream);
+
+
 #ifdef __cplusplus
 }
 #endif
