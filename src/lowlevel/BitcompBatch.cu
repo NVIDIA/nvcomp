@@ -31,8 +31,7 @@
 #include "nvcomp/bitcomp.h"
 #include "type_macros.h"
 
-//#ifdef ENABLE_BITCOMP
-
+#ifdef ENABLE_BITCOMP
 #include <bitcomp.h>
 
 nvcompStatus_t nvcompBatchedBitcompCompressAsync(
@@ -205,6 +204,15 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
     const size_t* device_compressed_bytes,
     size_t* device_uncompressed_bytes,
     size_t batch_size,
-    cudaStream_t stream);
+    cudaStream_t stream)
+{
+    if (bitcompBatchGetUncompressedSizesAsync(
+            device_compressed_ptrs,
+            device_uncompressed_bytes,
+            batch_size,
+            stream) != BITCOMP_SUCCESS)
+        return nvcompErrorInternal;
+    return nvcompSuccess;
+}
 
-//#endif
+#endif

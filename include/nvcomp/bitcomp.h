@@ -277,8 +277,7 @@ nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
  *
  * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
  * in device-accessible memory to compressed buffers.
- * @param[in] device_compressed_bytes Sizes of the compressed buffers in bytes.
- * The sizes should reside in device-accessible memory.
+ * @param[in] device_compressed_bytes This argument is not used.
  * @param[out] device_uncompressed_bytes Sizes of the uncompressed data in
  * bytes. If there is an error when retrieving the size of a partition, the
  * uncompressed size of that partition will be set to 0. This argument needs to
