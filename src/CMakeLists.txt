@@ -33,6 +33,7 @@ endif()
 
 include_directories("./")
 
+set_property(TARGET nvcomp PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
