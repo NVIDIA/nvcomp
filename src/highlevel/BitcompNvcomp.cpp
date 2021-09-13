@@ -187,14 +187,11 @@ nvcompStatus_t nvcompBitcompCompressAsync(
     return nvcompErrorInternal;
   if (bitcompSetStream(handle, stream) != BITCOMP_SUCCESS)
     return nvcompErrorInvalidValue;
-  if (bitcompCompressLossless(handle, in_ptr, static_cast<char*>(out_ptr))
-      != BITCOMP_SUCCESS)
+  if (bitcompCompressLossless(handle, in_ptr, out_ptr) != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
   if (bitcompDestroyPlan(handle) != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
-  if (bitcompGetCompressedSizeAsync(
-          static_cast<char*>(out_ptr), out_bytes, stream)
-      != BITCOMP_SUCCESS)
+  if (bitcompGetCompressedSizeAsync(out_ptr, out_bytes, stream) != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
   return nvcompSuccess;
 }
@@ -208,7 +205,7 @@ int nvcompIsBitcompData(const void* const in_ptr, size_t in_bytes)
   bitcompAlgorithm_t algo;
   compressedSize = in_bytes;
   ier = bitcompGetCompressedInfo(
-      static_cast<const char*>(in_ptr),
+      in_ptr,
       &compressedSize,
       &uncompressedSize,
       &dataType,
