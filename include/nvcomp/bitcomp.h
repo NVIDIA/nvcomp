@@ -180,6 +180,22 @@ int nvcompIsBitcompData(const void* const in_ptr, size_t in_bytes);
  *****************************************************************************/
 
 /**
+ * @brief Get the maximum size any chunk could compress to in the batch. That
+ * is, the minimum amount of output memory required to be given
+ * nvcompBatchedSnappyCompressAsync() for each batch item.
+ *
+ * @param max_chunk_size The maximum size of a chunk in the batch.
+ * @param format_ops Snappy compression options.
+ * @param max_compressed_size The maximum compressed size of the largest chunk
+ * (output).
+ *
+ * @return The nvcompSuccess unless there is an error.
+ */
+nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
+    size_t max_chunk_size,
+    nvcompBitcompFormatOpts format_opts,
+    size_t* max_compressed_size);
+/**
  * @brief Perform batched asynchronous compression.
  *
  * NOTE: The maximum number of batch partitions is 2^31.
@@ -259,7 +275,7 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
  */
 nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     const void* const* device_compressed_ptrs,
-    const size_t* device_compressed_bytes,
+    const size_t* device_compressed_bytes, // not used
     const size_t* device_uncompressed_bytes,
     size_t* device_actual_uncompressed_bytes,
     size_t batch_size,

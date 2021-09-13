@@ -34,6 +34,15 @@
 #ifdef ENABLE_BITCOMP
 #include <bitcomp.h>
 
+nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
+    size_t max_chunk_size,
+    nvcompBitcompFormatOpts format_opts,
+    size_t* max_compressed_size)
+{
+  *max_compressed_size = bitcompMaxBuflen(max_chunk_size);
+  return nvcompSuccess;
+}
+
 nvcompStatus_t nvcompBatchedBitcompCompressAsync(
     const void* const* device_uncompressed_ptrs,
     const size_t* device_uncompressed_bytes,
