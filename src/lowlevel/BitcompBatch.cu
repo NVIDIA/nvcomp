@@ -176,8 +176,9 @@ nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     if (format_opts)
         algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
     bitcompHandle_t plan;
-    if (bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo) != BITCOMP_SUCCESS ||
-        bitcompSetStream(plan, stream) != BITCOMP_SUCCESS)
+    if (bitcompCreateBatchPlan(&plan, batch_size, dataType,
+                                BITCOMP_LOSSLESS, algo) != BITCOMP_SUCCESS
+        || bitcompSetStream(plan, stream) != BITCOMP_SUCCESS)
     return nvcompErrorInternal;
 
     // Launch the Bitcomp async batch decompression with extra checks
