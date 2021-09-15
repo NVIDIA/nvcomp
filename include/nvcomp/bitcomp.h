@@ -308,6 +308,20 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
     size_t batch_size,
     cudaStream_t stream);
 
+/**
+ * @brief Return the temp size needed for Bitcomp compression.
+ * Bitcomp currently doesn't use any temp memory.
+ * 
+ * @param[in] batch_size  Number of batches
+ * @param[in] max_chunk_bytes Size in bytes of the largest chunk
+ * @param[in] format_opts Bitcomp options
+ * @param[out] temp_bytes The temp size
+ */
+nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
+    size_t batch_size,
+    size_t max_chunk_bytes,
+    nvcompBitcompFormatOpts format_opts,
+    size_t * temp_bytes);
 
 #ifdef __cplusplus
 }

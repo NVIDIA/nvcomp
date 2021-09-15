@@ -225,4 +225,14 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
     return nvcompSuccess;
 }
 
+nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
+    size_t batch_size,
+    size_t max_chunk_bytes,
+    nvcompBitcompFormatOpts format_opts,
+    size_t * temp_bytes)
+  {
+    *temp_bytes = 0;
+    return nvcompSuccess;
+  }
+
 #endif
