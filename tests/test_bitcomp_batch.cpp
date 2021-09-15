@@ -241,6 +241,7 @@ int test_bitcomp_batch(
   CUDA_CHECK(cudaMemcpy(d_input_ptrs, input_ptrs.data(), pointer_bytes, cudaMemcpyDefault));
   CUDA_CHECK(cudaMemcpy(d_comp_ptrs, comp_ptrs.data(), pointer_bytes, cudaMemcpyDefault));
   CUDA_CHECK(cudaMemcpy(d_input_sizes, input_sizes.data(), batchsize_bytes, cudaMemcpyDefault));
+  std::vector<size_t> decomp_sizes(batches);
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
@@ -259,8 +260,15 @@ int test_bitcomp_batch(
       TypeOf<T>(),
       stream);
 
-  // Overwrite input
+  // Query the uncompressed sizes, make sure it matches the input sizes
+  nvcompBatchedBitcompGetDecompressSizeAsync (d_comp_ptrs, d_comp_sizes, d_decomp_sizes, batches, stream);
+  CUDA_CHECK (cudaStreamSynchronize (stream));
+  CUDA_CHECK(cudaMemcpy(decomp_sizes.data(), d_decomp_sizes, batchsize_bytes, cudaMemcpyDefault));
+  REQUIRE (decomp_sizes == input_sizes);
+
+  // Overwrite input and input sizes
   cudaMemsetAsync(d_input_data, 0xee, input_bytes, stream);
+  cudaMemsetAsync(d_decomp_sizes, 0xee, batchsize_bytes, stream);
 
   // Decompress async, back into input
   nvcompBatchedBitcompDecompressAsync(
@@ -283,7 +291,6 @@ int test_bitcomp_batch(
   std::vector<T> res(input.size());
   CUDA_CHECK(cudaMemcpy(res.data(), d_input_data, input_bytes, cudaMemcpyDefault));
   REQUIRE (res == input);
-  std::vector<size_t> decomp_sizes(batches);
   CUDA_CHECK(cudaMemcpy(decomp_sizes.data(), d_decomp_sizes, batchsize_bytes, cudaMemcpyDefault));
   REQUIRE (decomp_sizes == input_sizes);
   std::vector<nvcompStatus_t> decomp_statuses(batches);
