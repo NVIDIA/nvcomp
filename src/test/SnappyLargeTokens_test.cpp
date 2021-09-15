@@ -32,7 +32,7 @@
 
 #include "cuda_runtime.h"
 
-#include "../../tests/catch.hpp"
+#include "tests/catch.hpp"
 
 #include "CudaUtils.h"
 #include "SnappyKernels.h"
