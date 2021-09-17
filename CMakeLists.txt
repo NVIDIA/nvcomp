@@ -82,19 +82,20 @@ if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11" AND NOT DEFINED CUB_DIR)
       "from 'https://github.com/thrust/cub'.")
 endif()
 find_path(CUB_HEADER NAMES "cub/cub.cuh" PATHS "${CUB_DIR}" "${CUDAToolkit_INCLUDE_DIRS}")
-IF(NOT CUB_HEADER)
+if(NOT CUB_HEADER)
   message(FATAL_ERROR "Unable to locate 'cub/cub.cuh'. Please specify a path "
       "to cub via 'CUB_DIR'")
-ENDIF()
+endif()
 
 if(NOT DEFINED NVCOMP_EXTS_ROOT AND DEFINED ENV{NVCOMP_EXTS_ROOT})
   set(NVCOMP_EXTS_ROOT "$ENV{NVCOMP_EXTS_ROOT}")
 endif()
 
 if( DEFINED NVCOMP_EXTS_ROOT )
+  unset( NVCOMP_FIND_QUIET )
   set( ENV{GDEFLATE_ROOT} ${NVCOMP_EXTS_ROOT} )
   set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
-ENDIF()
+endif()
 
 find_package(bitcomp ${NVCOMP_FIND_QUIET})
 if (bitcomp_FOUND)
