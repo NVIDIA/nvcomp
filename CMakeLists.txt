@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-LIST( APPEND CMAKE_MODULE_PATH
+list( APPEND CMAKE_MODULE_PATH
   ${CMAKE_SOURCE_DIR}/cmake
 )
 
@@ -38,7 +38,9 @@ else()
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+set(NVCOMP_FIND_QUIET "QUIET")
 if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
+  unset(NVCOMP_FIND_QUIET )
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     # g++ warnings
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
@@ -94,13 +96,13 @@ if( DEFINED NVCOMP_EXTS_ROOT )
   set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
 ENDIF()
 
-find_package(bitcomp)
+find_package(bitcomp ${NVCOMP_FIND_QUIET})
 if (bitcomp_FOUND)
   message (STATUS "Found bitcomp")
   add_definitions(-DENABLE_BITCOMP)
 endif()
 
-find_package(gdeflate)
+find_package(gdeflate ${NVCOMP_FIND_QUIET})
 if (GDEFLATE_FOUND)
   add_definitions(-DENABLE_GDEFLATE)
 endif()
