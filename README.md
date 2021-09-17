@@ -2,9 +2,9 @@
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
 
-nvCOMP 2.1.0-dev includes Cascaded, LZ4, and Snappy compression methods.
+nvCOMP 2.1.0-rc includes Cascaded, LZ4, and Snappy compression methods.
 Support for Bitcomp and GDeflate will come with the official release of 2.1.0,
-and are not supported for 2.1.0-dev.
+and are not supported for 2.1.0-rc.
 
 Cascaded compression methods demonstrate high performance with up to 500 GB/s
 throughput and a high compression ratio of up to 80x on numerical data from
