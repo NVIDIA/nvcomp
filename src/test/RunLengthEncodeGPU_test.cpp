@@ -28,7 +28,7 @@
 
 #define CATCH_CONFIG_MAIN
 
-#include "../../tests/catch.hpp"
+#include "tests/catch.hpp"
 #include "RunLengthEncodeGPU.h"
 #include "common.h"
 #include "nvcomp.hpp"
