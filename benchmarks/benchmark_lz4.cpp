@@ -44,6 +44,7 @@ static void print_usage()
   printf("Usage: benchmark_lz4 [OPTIONS]\n");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
+  printf("  %-35s Data type (default 'char', options are 'char', 'short', 'int')\n", "-t, --type");
   printf(
       "  %-35s Output GPU memory allocation sizes (default off)\n",
       "-m --memory");
@@ -51,7 +52,7 @@ static void print_usage()
 }
 
 // Benchmark performance from the binary data file fname
-static void run_benchmark(char* fname, int verbose_memory)
+static void run_benchmark(char* fname, int verbose_memory, nvcompType_t in_type)
 {
   using T = uint8_t;
 
@@ -77,7 +78,7 @@ static void run_benchmark(char* fname, int verbose_memory)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-  LZ4Compressor compressor(1 << 16);
+  LZ4Compressor compressor(1 << 16, in_type);
 
   size_t comp_temp_bytes;
   size_t comp_out_bytes;
@@ -211,7 +212,7 @@ int main(int argc, char* argv[])
   char* fname = NULL;
   int gpu_num = 0;
   int verbose_memory = 0;
-  std::string dtype = "int";
+  nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
   // Parse command-line arguments
   char** argv_end = argv + argc;
@@ -242,6 +243,20 @@ int main(int argc, char* argv[])
       gpu_num = atoi(optarg);
       continue;
     }
+    if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
+      if (strcmp(optarg, "char") == 0) {
+        data_type = NVCOMP_TYPE_CHAR;
+      } else if (strcmp(optarg, "short") == 0) {
+        data_type = NVCOMP_TYPE_SHORT;
+      } else if (strcmp(optarg, "int") == 0) {
+        data_type = NVCOMP_TYPE_INT;
+      } else {
+        print_usage();
+        return 1;
+      }
+      continue;
+    }
+
     print_usage();
     return 1;
   }
@@ -252,7 +267,7 @@ int main(int argc, char* argv[])
 
   cudaSetDevice(gpu_num);
 
-  run_benchmark(fname, verbose_memory);
+  run_benchmark(fname, verbose_memory, data_type);
 
   return 0;
 }

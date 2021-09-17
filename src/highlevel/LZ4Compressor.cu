@@ -154,10 +154,12 @@ size_t LZ4Compressor::calculate_max_output_size(
 LZ4Compressor::LZ4Compressor(
     const uint8_t* decomp_data,
     const size_t decomp_data_size,
-    const size_t chunk_size) :
+    const size_t chunk_size,
+    const nvcompType_t data_type) :
     m_input_ptr(decomp_data),
     m_input_size(decomp_data_size),
     m_chunk_size(chunk_size),
+    m_data_type(data_type),
     m_num_chunks(roundUpDiv(decomp_data_size, chunk_size)),
     m_output_ptr(nullptr),
     m_output_offsets(nullptr),
@@ -214,18 +216,20 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
 
   TempSpaceBroker temp(m_workspace, m_workspace_size);
 
+  nvcompBatchedLZ4Opts_t opts = { .data_type = m_data_type };
+
   uint8_t* workspace;
   size_t workspace_size;
   CHECK_API_CALL(nvcompBatchedLZ4CompressGetTempSize(
       m_num_chunks,
       m_chunk_size,
-      nvcompBatchedLZ4DefaultOpts,
+      opts,
       &workspace_size));
   temp.reserve(&workspace, workspace_size);
 
   size_t max_chunk_output;
   CHECK_API_CALL(nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-      m_chunk_size, nvcompBatchedLZ4DefaultOpts, &max_chunk_output));
+      m_chunk_size, opts, &max_chunk_output));
 
   // these have all the same size, and generally should on all platforms as
   // the definition of size_t should make it the same size
@@ -274,7 +278,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
       workspace_size,
       reinterpret_cast<void* const*>(out_ptrs_device),
       out_sizes_device,
-      nvcompBatchedLZ4DefaultOpts,
+      opts,
       stream));
 
   // perform prefixsum on sizes

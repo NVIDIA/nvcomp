@@ -525,7 +525,7 @@ static void run_lz4_benchmark(
     // Create compressor each chunk
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx] = new LZ4Compressor(1 << 16);
+      compressors[idx] = new LZ4Compressor(1 << 16, NVCOMP_TYPE_CHAR);
     }
   }
 
