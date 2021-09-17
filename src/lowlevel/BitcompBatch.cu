@@ -34,6 +34,14 @@
 #ifdef ENABLE_BITCOMP
 #include <bitcomp.h>
 
+#define BTCHK(call)                                                            \
+  {                                                                            \
+    bitcompResult_t err = call;                                                \
+    if (BITCOMP_SUCCESS != err) {                                              \
+      return nvcompErrorInternal;                                              \
+    }                                                                          \
+  }
+
 nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
     size_t max_chunk_size,
     nvcompBitcompFormatOpts format_opts,
@@ -89,22 +97,19 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
     if (format_opts)
         algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
     bitcompHandle_t plan;
-    if (bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo) != BITCOMP_SUCCESS ||
-        bitcompSetStream(plan, stream) != BITCOMP_SUCCESS)
-    return nvcompErrorInternal;
+    BTCHK(bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo));
+    BTCHK(bitcompSetStream(plan, stream));
 
     // Launch the Bitcomp async batch compression
-    if (bitcompBatchCompressLossless(
-            plan,
-            device_uncompressed_ptrs,
-            device_compressed_ptrs,
-            device_uncompressed_bytes,
-            device_compressed_bytes) != BITCOMP_SUCCESS)
-        return nvcompErrorInternal;
+    BTCHK(bitcompBatchCompressLossless(
+        plan,
+        device_uncompressed_ptrs,
+        device_compressed_ptrs,
+        device_uncompressed_bytes,
+        device_compressed_bytes));
 
     // Once launched, the handle can be destroyed
-    if (bitcompDestroyPlan (plan) != BITCOMP_SUCCESS)
-        return nvcompErrorInternal;
+    BTCHK(bitcompDestroyPlan (plan));
     
     return nvcompSuccess;
 }
@@ -176,36 +181,32 @@ nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     if (format_opts)
         algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
     bitcompHandle_t plan;
-    if (bitcompCreateBatchPlan(&plan, batch_size, dataType,
-                                BITCOMP_LOSSLESS, algo) != BITCOMP_SUCCESS
-        || bitcompSetStream(plan, stream) != BITCOMP_SUCCESS)
-    return nvcompErrorInternal;
+    BTCHK(bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo));
+    BTCHK(bitcompSetStream(plan, stream));
 
     // Launch the Bitcomp async batch decompression with extra checks
-    if (bitcompBatchUncompressCheck(
-            plan,
-            device_compressed_ptrs,
-            device_uncompressed_ptrs,
-            device_uncompressed_bytes,
-            (bitcompResult_t *)device_statuses) != BITCOMP_SUCCESS)
-      return nvcompErrorInternal;
+    BTCHK(bitcompBatchUncompressCheck(
+        plan,
+        device_compressed_ptrs,
+        device_uncompressed_ptrs,
+        device_uncompressed_bytes,
+        (bitcompResult_t*)device_statuses));
 
     // Need a separate kernel to query the actual uncompressed size,
     // as bitcomp doesn't write the uncompressed size during decompression
-    if (bitcompBatchGetUncompressedSizesAsync(
-            device_compressed_ptrs,
-            device_actual_uncompressed_bytes,
-            batch_size,
-            stream) != BITCOMP_SUCCESS)
-        return nvcompErrorInternal;
+    BTCHK(bitcompBatchGetUncompressedSizesAsync(
+        device_compressed_ptrs,
+        device_actual_uncompressed_bytes,
+        batch_size,
+        stream));
 
     // Also launch a kernel to convert the output statuses
-    int blocks = (batch_size + 511) / 512;
-    convertOutputStatuses <<<blocks,512,0,stream>>> (device_statuses, batch_size);
+    const int threads = 512;
+    int blocks = (batch_size - 1) / threads + 1;
+    convertOutputStatuses <<<blocks,threads,0,stream>>> (device_statuses, batch_size);
 
     // Once launched, the handle can be destroyed
-    if (bitcompDestroyPlan(plan) != BITCOMP_SUCCESS)
-        return nvcompErrorInternal;
+    BTCHK(bitcompDestroyPlan(plan));
     return nvcompSuccess;
 }
 
@@ -216,13 +217,11 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
     size_t batch_size,
     cudaStream_t stream)
 {
-    if (bitcompBatchGetUncompressedSizesAsync(
-            device_compressed_ptrs,
-            device_uncompressed_bytes,
-            batch_size,
-            stream) != BITCOMP_SUCCESS)
-        return nvcompErrorInternal;
-    return nvcompSuccess;
+  BTCHK(bitcompBatchGetUncompressedSizesAsync(
+      device_compressed_ptrs,
+      device_uncompressed_bytes,
+      batch_size, stream));
+  return nvcompSuccess;
 }
 
 nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
