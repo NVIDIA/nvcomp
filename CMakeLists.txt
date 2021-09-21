@@ -175,7 +175,10 @@ install(EXPORT nvcomp-exports
         DESTINATION   "${INSTALL_CONFIGDIR}")
 
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nvcomp)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.hpp
+              ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
               "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake"
         DESTINATION "${INSTALL_CONFIGDIR}")
