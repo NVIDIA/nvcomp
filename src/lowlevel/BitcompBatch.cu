@@ -54,10 +54,10 @@ nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
 nvcompStatus_t nvcompBatchedBitcompCompressAsync(
     const void* const* device_uncompressed_ptrs,
     const size_t* device_uncompressed_bytes,
-    size_t max_uncompressed_chunk_bytes, // not used
+    size_t, // max_uncompressed_chunk_bytes, not used
     size_t batch_size,
-    void* device_temp_ptr, // not used
-    size_t temp_bytes,     // not used
+    void*,  // device_temp_ptr, not used
+    size_t, // temp_bytes, not used
     void* const* device_compressed_ptrs,
     size_t* device_compressed_bytes,
     const nvcompBitcompFormatOpts* format_opts,
@@ -136,12 +136,12 @@ __global__ void convertOutputStatuses (nvcompStatus_t *statuses, size_t batch_si
 
 nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     const void* const* device_compressed_ptrs,
-    const size_t* device_compressed_bytes, // not used
+    const size_t*, // device_compressed_bytes, not used
     const size_t* device_uncompressed_bytes,
     size_t* device_actual_uncompressed_bytes,
     size_t batch_size,
-    void* const device_temp_ptr, // not used
-    size_t temp_bytes,           // not used
+    void* const, // device_temp_ptr, not used
+    size_t,      // temp_bytes, not used
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_statuses,
     const nvcompBitcompFormatOpts* format_opts,
