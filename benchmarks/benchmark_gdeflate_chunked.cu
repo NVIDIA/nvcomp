@@ -26,7 +26,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "benchmark_template_chunked.cuh"
 #include "nvcomp/gdeflate.h"
-#include "test_batch_c_api.h"
 
-GENERATE_TESTS(Gdeflate);
+GENERATE_CHUNKED_BENCHMARK(
+    nvcompBatchedGdeflateCompressGetTempSize,
+    nvcompBatchedGdeflateCompressGetMaxOutputChunkSize,
+    nvcompBatchedGdeflateCompressAsync,
+    nvcompBatchedGdeflateDecompressGetTempSize,
+    nvcompBatchedGdeflateDecompressAsync,
+    nvcompBatchedGdeflateDefaultOpts);

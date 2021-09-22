@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,48 @@
  */
 
 #include "nvcomp/gdeflate.h"
-#include "test_batch_c_api.h"
 
-GENERATE_TESTS(Gdeflate);
+#include "Check.h"
+#include "CudaUtils.h"
+#include "common.h"
+#include "nvcomp.h"
+#include "nvcomp.hpp"
+#include "type_macros.h"
+
+#include <cassert>
+
+#ifdef ENABLE_GDEFLATE
+#include "gdeflate.h"
+#include "gdeflateKernels.h"
+
+namespace nvcomp
+{
+
+// The Bitcomp batch decompression outputs bitcompResult_t statuses.
+// Need to convert them to nvcompStatus_t.
+__global__ void convertGdeflateOutputStatusesKernel(nvcompStatus_t *statuses, size_t batch_size) {
+  static_assert (sizeof (nvcompStatus_t) == sizeof (gdeflate::gdeflateStatus_t));
+
+  size_t index = (size_t)blockIdx.x * (size_t)blockDim.x + (size_t)threadIdx.x;
+  if (index >= batch_size)
+    return;
+
+  auto ier = reinterpret_cast<gdeflate::gdeflateStatus_t *>(statuses)[index];
+  nvcompStatus_t nvcomp_err = nvcompSuccess;
+  if (ier != gdeflate::gdeflateSuccess)
+    nvcomp_err = nvcompErrorCannotDecompress;
+  statuses[index] = nvcomp_err;
+}
+
+void convertGdeflateOutputStatuses(
+    nvcompStatus_t *statuses,
+    size_t batch_size,
+    cudaStream_t stream) {
+    const int threads = 512;
+    int blocks = (batch_size - 1) / threads + 1;
+    convertGdeflateOutputStatusesKernel<<<blocks,threads,0,stream>>>(statuses, batch_size);
+}
+
+} // namespace nvcomp
+
+#endif
