@@ -1,4 +1,4 @@
-# nvcomp 2.1.0-rc (2021-09-17)
+# nvcomp 2.1.0-rc (2021-09-22)
 
 - Updated batched/low-level compression interfaces to take an options parameter,
 to allow configuring future compression algorithms.
@@ -19,6 +19,8 @@ when the user didn't indicate they wanted to include them.
 - Add an optimization to the LZ4 compressor based on specification of input data as
 char, short, or int, rather than just treating the input as raw bytes. 
 - Fix temp allocation size bug in `benchmark_template_chunked`.
+- Update CMakeLists to allow install into include folder that the user does not have 
+ownership of.
 
 # nvcomp 2.0.2 (2021-06-30)
 
