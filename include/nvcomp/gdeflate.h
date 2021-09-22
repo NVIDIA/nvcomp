@@ -43,6 +43,21 @@ extern "C" {
  *****************************************************************************/
 
 /**
+ * GDeflate compression options for the low-level API
+ */
+typedef struct
+{
+/**
+ * Compression algorithm to use. Permitted values are:
+ * 0 : high-throughput, low compression ratio (default)
+ * 1 : low-throughput, high compression ratio
+ */
+  int algo;
+} nvcompBatchedGdeflateOpts_t;
+
+static const nvcompBatchedGdeflateOpts_t nvcompBatchedGdeflateDefaultOpts = {0};
+
+/**
  * @brief Get temporary space required for compression.
  *
  * Chunk size must not exceed
@@ -52,13 +67,17 @@ extern "C" {
  * @param batch_size The number of items in the batch.
  * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the
  * batch.
+ * @param format_opts The GDeflate compression options to use.
  * @param temp_bytes The size of the required GPU workspace for compression
  * (output).
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
-    size_t batch_size, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
+    size_t batch_size,
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedGdeflateOpts_t format_opts,
+    size_t* temp_bytes);
 
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That
@@ -70,13 +89,16 @@ nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
  * recommended.
  *
  * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the batch.
+ * @param format_opts The GDeflate compression options to use.
  * @param max_compressed_byes The maximum compressed size of the largest chunk
  * (output).
  *
  * @return The nvcompSuccess unless there is an error.
  */
 nvcompStatus_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
-    size_t max_uncompressed_chunk_bytes, size_t* max_compressed_bytes);
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedGdeflateOpts_t format_opts,
+    size_t* max_compressed_bytes);
 
 /**
  * @brief Perform compression asynchronously. All pointers must point to GPU
@@ -96,6 +118,7 @@ nvcompStatus_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
  * each compressed batch item (output). This pointer must be GPU accessible.
  * @param device_out_bytes The compressed size of each chunk on the GPU
  * (output). This pointer must be GPU accessible.
+ * @param format_opts The GDeflate compression options to use.
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
@@ -109,7 +132,9 @@ nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
     size_t temp_bytes,
     void* const* device_out_ptr,
     size_t* device_out_bytes,
+    nvcompBatchedGdeflateOpts_t format_opts,
     cudaStream_t stream);
+
 
 /**
  * @brief Get the amount of temp space required on the GPU for decompression.
@@ -123,46 +148,73 @@ nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
-    size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
+    size_t num_chunks,
+    size_t max_uncompressed_chunk_bytes,
+    size_t* temp_bytes);
 
 /**
  * @brief Perform decompression asynchronously. All pointers must be GPU
- * accessible.
+ * accessible. In the case where a chunk of compressed data is not a valid GDeflate
+ * stream, 0 will be written for the size of the invalid chunk and
+ * nvcompStatusCannotDecompress will be flagged for that chunk.
  *
- * @param device_in_ptrs The pointers on the GPU, to the compressed chunks.
- * This pointer must be accessible from the GPU.
- * @param device_in_bytes The size of each compressed chunk on the GPU.
- * @param device_out_bytes The size of each uncompressed chunk on the GPU.
- * @param max_uncompressed_chunk_bytes The maximum size in bytes of the largest
- * chunk in the batch. This parameter is currently unused, so if it is not set
- * with the maximum size, it should be set to zero. If a future version makes
- * use of it, it will return an error if it is set to zero.
+ * @param device_compressed_ptrs The pointers on the GPU, to the compressed
+ * chunks. This pointer must be accessible from the GPU.
+ * @param device_compressed_bytes The size of each compressed chunk on the GPU.
+ * This pointer must be GPU accessible.
+ * @param device_uncompressed_bytes The decompressed buffer size. This is needed
+ * to prevent OOB accesses. This pointer must be GPU accessible.
+ * @param device_actual_uncompressed_bytes The actual calculated decompressed
+ * size of each chunk. This pointer must be accessible from the GPU.
  * @param batch_size The number of batch items.
- * @param device_temp_ptr The temporary GPU space. This parameter is currently
- * unused and can be nullptr. If a future version makes use of it, it will
- * return an error if set to nullptr.
- * @param temp_bytes The size of the temporary GPU space. This parameter is
- * currently unused, so can be set to 0. If a future version makes use of it,
- * it will return an error if set to 0.
- * @param device_out_ptr The pointers on the GPU, to where to uncompress each
- * chunk (output). This pointer must be accessible from the GPU.
+ * @param device_temp_ptr The temporary GPU space.
+ * @param temp_bytes The size of the temporary GPU space.
+ * @param device_uncompressed_ptrs The pointers on the GPU, to where to
+ * uncompress each chunk (output). This pointer must be accessible from the GPU.
+ * @param device_status_ptrs The status for each chunk of whether it was
+ * decompressed or not. This pointer must be accessible from the GPU.
  * @param stream The stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
 nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
-    const void* const* device_in_ptrs,
-    const size_t* device_in_bytes,
-    const size_t* device_out_bytes,
-    size_t max_uncompressed_chunk_bytes,
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
     size_t batch_size,
     void* const device_temp_ptr,
-    const size_t temp_bytes,
-    void* const* device_out_ptr,
+    size_t temp_bytes,
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream);
+
+/**
+ * @brief Calculates the decompressed size of each chunk asynchronously. This is
+ * needed when we do not know the expected output size. All pointers must be GPU
+ * accessible. Note, if the stream is corrupt, the sizes will be garbage.
+ *
+ * @param device_compress_ptrs The compressed chunks of data. List of pointers
+ * must be GPU accessible along with each chunk.
+ * @param device_compressed_bytes The size of each compressed chunk. Must be GPU
+ * accessible.
+ * @param device_uncompressed_bytes The calculated decompressed size of each
+ * chunk. Must be GPU accessible.
+ * @param batch_size The number of chunks
+ * @param stream The stream to operate on.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompStatus_t nvcompBatchedGdeflateGetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream);
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif // NVCOMP_GDEFLATE_H

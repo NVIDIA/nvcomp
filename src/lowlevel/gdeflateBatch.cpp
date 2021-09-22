@@ -45,9 +45,25 @@
 
 #ifdef ENABLE_GDEFLATE
 #include "gdeflate.h"
+#include "gdeflateKernels.h"
 #endif
 
 using namespace nvcomp;
+
+gdeflate::gdeflate_compression_algo getGdeflateEnumFromFormatOpts(nvcompBatchedGdeflateOpts_t format_opts) {
+  gdeflate::gdeflate_compression_algo algo;
+  switch(format_opts.algo) {
+    case (0) :
+      algo = gdeflate::HASH_BASED;
+      break;
+    case(1) :
+      algo = gdeflate::OPTIMAL_PARSE;
+      break;
+    default :
+      throw std::invalid_argument("Invalid format_opts.algo value (not 0 or 1)");
+  }
+  return algo;
+}
 
 nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
     const size_t num_chunks,
@@ -76,14 +92,15 @@ nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
 }
 
 nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
-    const void* const* const device_in_ptrs,
-    const size_t* const device_in_bytes,
-    const size_t* const device_out_bytes,
-    const size_t max_uncompressed_chunk_bytes,
-    const size_t batch_size,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    void* const* const device_out_ptrs,
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr,
+    size_t temp_bytes,
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream)
 {
 #ifdef ENABLE_GDEFLATE
@@ -92,24 +109,62 @@ nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
   // they are not finding the maximum size.
 
   try {
-    gdeflate::decompressAsync(device_in_ptrs, device_in_bytes, device_out_bytes,
-        max_uncompressed_chunk_bytes, batch_size, temp_ptr, temp_bytes,
-        device_out_ptrs, stream);
+    // Use device_status_ptrs as temp space to store gdeflate statuses
+    static_assert(sizeof(nvcompStatus_t) == sizeof(gdeflate::gdeflateStatus_t));
+    auto device_statuses = reinterpret_cast<gdeflate::gdeflateStatus_t*>(device_status_ptrs);
+
+    // Run the decompression kernel
+    gdeflate::decompressAsync(device_compressed_ptrs, device_compressed_bytes,
+        device_uncompressed_bytes, device_actual_uncompressed_bytes,
+        0, batch_size, device_temp_ptr, temp_bytes,
+        device_uncompressed_ptrs, device_statuses, stream);
+
+    // Launch a kernel to convert the output statuses
+    convertGdeflateOutputStatuses(device_status_ptrs, batch_size, stream);
+
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedGdeflateDecompressAsync()");
   }
 
   return nvcompSuccess;
 #else
-    (void)device_in_ptrs;
-    (void)device_in_bytes;
-    (void)device_out_bytes;
-    (void)max_uncompressed_chunk_bytes;
-    (void)batch_size;
-    (void)temp_ptr;
-    (void)temp_bytes;
-    (void)device_out_ptrs;
-    (void)stream;
+  (void)device_compressed_ptrs;
+  (void)device_compressed_bytes;
+  (void)device_uncompressed_bytes;
+  (void)device_actual_uncompressed_bytes;
+  (void)batch_size;
+  (void)device_temp_ptr;
+  (void)temp_bytes;
+  (void)device_uncompressed_ptrs;
+  (void)device_status_ptrs;
+  (void)stream;
+  std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
+            << "Please check the README for configuration instructions" << std::endl;
+  return nvcompErrorNotSupported;
+#endif
+}
+
+nvcompStatus_t nvcompBatchedGdeflateGetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream) {
+#ifdef ENABLE_GDEFLATE
+  try {
+    gdeflate::getDecompressSizeAsync(device_compressed_ptrs, device_compressed_bytes,
+        device_uncompressed_bytes, batch_size, stream);
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(e, "nvcompBatchedGdeflateDecompressAsync()");
+  }
+
+  return nvcompSuccess;
+#else
+  (void)device_compressed_ptrs;
+  (void)device_compressed_bytes;
+  (void)device_uncompressed_bytes;
+  (void)batch_size;
+  (void)stream;
   std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
             << "Please check the README for configuration instructions" << std::endl;
   return nvcompErrorNotSupported;
@@ -119,13 +174,16 @@ nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
 nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
     const size_t batch_size,
     const size_t max_chunk_size,
+    nvcompBatchedGdeflateOpts_t format_opts,
     size_t* const temp_bytes)
 {
 #ifdef ENABLE_GDEFLATE
   CHECK_NOT_NULL(temp_bytes);
 
+
   try {
-    gdeflate::compressGetTempSize(batch_size, max_chunk_size, temp_bytes);
+    gdeflate::gdeflate_compression_algo algo = getGdeflateEnumFromFormatOpts(format_opts);
+    gdeflate::compressGetTempSize(batch_size, max_chunk_size, temp_bytes, algo);
   } catch (const std::exception& e) {
     return Check::exception_to_error(
         e, "nvcompBatchedGdeflateCompressGetTempSize()");
@@ -135,6 +193,7 @@ nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
 #else
   (void)batch_size;
   (void)max_chunk_size;
+  (void)format_opts;
   (void)temp_bytes;
   std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
             << "Please check the README for configuration instructions" << std::endl;
@@ -143,7 +202,9 @@ nvcompStatus_t nvcompBatchedGdeflateCompressGetTempSize(
 }
 
 nvcompStatus_t nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
-    const size_t max_chunk_size, size_t* const max_compressed_size)
+    size_t max_chunk_size,
+    nvcompBatchedGdeflateOpts_t /* format_opts */,
+    size_t* max_compressed_size)
 {
 #ifdef ENABLE_GDEFLATE
   CHECK_NOT_NULL(max_compressed_size);
@@ -174,12 +235,14 @@ nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
     const size_t temp_bytes,
     void* const* const device_out_ptrs,
     size_t* const device_out_bytes,
+    nvcompBatchedGdeflateOpts_t format_opts,
     cudaStream_t stream)
 {
 #ifdef ENABLE_GDEFLATE
   try {
+    gdeflate::gdeflate_compression_algo algo = getGdeflateEnumFromFormatOpts(format_opts);
     gdeflate::compressAsync(device_in_ptrs, device_in_bytes, max_uncompressed_chunk_size,
-        batch_size, temp_ptr, temp_bytes, device_out_ptrs, device_out_bytes, stream);
+        batch_size, temp_ptr, temp_bytes, device_out_ptrs, device_out_bytes, algo, stream);
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedGdeflateCompressAsync()");
   }
@@ -194,6 +257,7 @@ nvcompStatus_t nvcompBatchedGdeflateCompressAsync(
   (void)temp_bytes;
   (void)device_out_ptrs;
   (void)device_out_bytes;
+  (void)format_opts;
   (void)stream;
   std::cerr << "ERROR: nvcomp configured without gdeflate support\n"
             << "Please check the README for configuration instructions" << std::endl;

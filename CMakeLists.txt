@@ -10,10 +10,6 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-LIST( APPEND CMAKE_MODULE_PATH
-  ${CMAKE_SOURCE_DIR}/cmake
-)
-
 find_package(CUDAToolkit REQUIRED)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
@@ -90,7 +86,7 @@ if(NOT DEFINED NVCOMP_EXTS_ROOT AND DEFINED ENV{NVCOMP_EXTS_ROOT})
 endif()
 
 if( DEFINED NVCOMP_EXTS_ROOT )
-  set( ENV{GDEFLATE_ROOT} ${NVCOMP_EXTS_ROOT} )
+  set( ENV{gdeflate_ROOT} ${NVCOMP_EXTS_ROOT} )
   set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
 ENDIF()
 
@@ -101,8 +97,12 @@ if (bitcomp_FOUND)
 endif()
 
 find_package(gdeflate)
-if (GDEFLATE_FOUND)
+if (gdeflate_FOUND)
+  message (STATUS "Found gdeflate")
   add_definitions(-DENABLE_GDEFLATE)
+
+  # Find ZLIB for CPU compression
+  find_package(ZLIB)
 endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

@@ -49,9 +49,9 @@ if (bitcomp_FOUND)
   target_link_libraries(nvcomp PRIVATE bitcomp)
 endif()
 
-if (GDEFLATE_FOUND)
-  target_include_directories(nvcomp INTERFACE ${GDEFLATE_INCLUDE_DIRS})
-  target_link_libraries(nvcomp PRIVATE ${GDEFLATE_LIBRARIES})
+if (gdeflate_FOUND)
+  target_include_directories(nvcomp PRIVATE ${GDEFLATE_INCLUDE_DIRS})
+  target_link_libraries(nvcomp PRIVATE gdeflate)
 endif()
 
 if (BUILD_TESTS)

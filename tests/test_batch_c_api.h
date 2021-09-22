@@ -277,6 +277,7 @@ int test_generic_batch_compression_and_decompression(
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
   status = compressGetTempSize(batch_size, max_chunk_size, &comp_temp_bytes);
+  if (max_chunk_size > 1<<16) printf("max_chunk_size = %lu\n", max_chunk_size);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;
@@ -702,10 +703,10 @@ int main(int argc, char** argv)
 
   // these macros count the number of failed tests
   TEST(1, 100, 100, num_tests, num_failed_tests);
-  TEST(1, 100000, 100000, num_tests, num_failed_tests);
+  TEST(1, (1<<16) / sizeof(int), (1<<16) / sizeof(int), num_tests, num_failed_tests);
   TEST(11, 1000, 10000, num_tests, num_failed_tests);
-  TEST(127, 10000, 100000, num_tests, num_failed_tests);
-  TEST(1025, 100, 100000, num_tests, num_failed_tests);
+  TEST(127, 10000, (1<<16) / sizeof(int), num_tests, num_failed_tests);
+  TEST(1025, 100, (1<<16) / sizeof(int), num_tests, num_failed_tests);
   TEST(10025, 100, 1000, num_tests, num_failed_tests);
 
   if (num_failed_tests == 0) {
