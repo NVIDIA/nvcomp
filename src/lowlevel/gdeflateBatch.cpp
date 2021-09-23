@@ -112,7 +112,8 @@ nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
 
   try {
     // Use device_status_ptrs as temp space to store gdeflate statuses
-    static_assert(sizeof(nvcompStatus_t) == sizeof(gdeflate::gdeflateStatus_t));
+    static_assert(sizeof(nvcompStatus_t) == sizeof(gdeflate::gdeflateStatus_t),
+        "Mismatched sizes of nvcompStatus_t and gdeflateStatus_t");
     auto device_statuses = reinterpret_cast<gdeflate::gdeflateStatus_t*>(device_status_ptrs);
 
     // Run the decompression kernel
