@@ -172,7 +172,7 @@ inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0, NVCOMP_TYPE_CHAR)
 inline void LZ4Compressor::configure(
     const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
 {
-  nvcompLZ4FormatOpts opts = { .chunk_size = m_chunk_size };
+  nvcompLZ4FormatOpts opts{m_chunk_size};
 
   size_t metadata_bytes;
   nvcompStatus_t status = nvcompLZ4CompressConfigure(
@@ -194,7 +194,7 @@ inline void LZ4Compressor::compress_async(
     size_t* const out_bytes,
     cudaStream_t stream)
 {
-  nvcompLZ4FormatOpts opts = { .chunk_size = m_chunk_size };
+  nvcompLZ4FormatOpts opts{m_chunk_size};
   nvcompStatus_t status = nvcompLZ4CompressAsync(
       opts.chunk_size == 0 ? nullptr : &opts,
       m_data_type,
