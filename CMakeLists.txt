@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+list( APPEND CMAKE_MODULE_PATH
+  ${CMAKE_SOURCE_DIR}/cmake
+)
+
 find_package(CUDAToolkit REQUIRED)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
@@ -34,7 +38,9 @@ else()
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+set(NVCOMP_FIND_QUIET "QUIET")
 if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
+  unset(NVCOMP_FIND_QUIET )
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     # g++ warnings
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
@@ -76,27 +82,28 @@ if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "11" AND NOT DEFINED CUB_DIR)
       "from 'https://github.com/thrust/cub'.")
 endif()
 find_path(CUB_HEADER NAMES "cub/cub.cuh" PATHS "${CUB_DIR}" "${CUDAToolkit_INCLUDE_DIRS}")
-IF(NOT CUB_HEADER)
+if(NOT CUB_HEADER)
   message(FATAL_ERROR "Unable to locate 'cub/cub.cuh'. Please specify a path "
       "to cub via 'CUB_DIR'")
-ENDIF()
+endif()
 
 if(NOT DEFINED NVCOMP_EXTS_ROOT AND DEFINED ENV{NVCOMP_EXTS_ROOT})
   set(NVCOMP_EXTS_ROOT "$ENV{NVCOMP_EXTS_ROOT}")
 endif()
 
 if( DEFINED NVCOMP_EXTS_ROOT )
+  unset( NVCOMP_FIND_QUIET )
   set( ENV{gdeflate_ROOT} ${NVCOMP_EXTS_ROOT} )
   set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
-ENDIF()
+endif()
 
-find_package(bitcomp)
+find_package(bitcomp ${NVCOMP_FIND_QUIET})
 if (bitcomp_FOUND)
   message (STATUS "Found bitcomp")
   add_definitions(-DENABLE_BITCOMP)
 endif()
 
-find_package(gdeflate)
+find_package(gdeflate ${NVCOMP_FIND_QUIET})
 if (gdeflate_FOUND)
   message (STATUS "Found gdeflate")
   add_definitions(-DENABLE_GDEFLATE)
@@ -175,7 +182,10 @@ install(EXPORT nvcomp-exports
         DESTINATION   "${INSTALL_CONFIGDIR}")
 
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nvcomp)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.hpp
+              ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
               "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake"
         DESTINATION "${INSTALL_CONFIGDIR}")

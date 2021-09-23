@@ -57,10 +57,10 @@ typedef struct
  */
 typedef struct
 {
-  int reserved;
+  nvcompType_t data_type;
 } nvcompBatchedLZ4Opts_t;
 
-static const nvcompBatchedLZ4Opts_t nvcompBatchedLZ4DefaultOpts = {0};
+static const nvcompBatchedLZ4Opts_t nvcompBatchedLZ4DefaultOpts = {NVCOMP_TYPE_CHAR};
 
 /**
  * @brief Check if a given chunk of compressed data on the GPU is LZ4.

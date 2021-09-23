@@ -50,6 +50,7 @@
 
 using namespace nvcomp;
 
+#ifdef ENABLE_GDEFLATE
 gdeflate::gdeflate_compression_algo getGdeflateEnumFromFormatOpts(nvcompBatchedGdeflateOpts_t format_opts) {
   gdeflate::gdeflate_compression_algo algo;
   switch(format_opts.algo) {
@@ -64,6 +65,7 @@ gdeflate::gdeflate_compression_algo getGdeflateEnumFromFormatOpts(nvcompBatchedG
   }
   return algo;
 }
+#endif
 
 nvcompStatus_t nvcompBatchedGdeflateDecompressGetTempSize(
     const size_t num_chunks,

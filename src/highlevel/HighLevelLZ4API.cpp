@@ -114,7 +114,7 @@ void nvcompLZ4DestroyMetadata(void* const metadata_ptr)
 
 nvcompStatus_t nvcompLZ4CompressConfigure(
     const nvcompLZ4FormatOpts* const format_opts,
-    const nvcompType_t /*in_type*/,
+    const nvcompType_t in_type,
     const size_t in_bytes,
     size_t* const metadata_bytes,
     size_t* const temp_bytes,
@@ -126,6 +126,10 @@ nvcompStatus_t nvcompLZ4CompressConfigure(
     CHECK_NOT_NULL(out_bytes);
 
     const size_t chunk_bytes = get_chunk_size_or_default(format_opts);
+
+    if (chunk_bytes % sizeOfnvcompType(in_type) != 0) {
+      throw std::invalid_argument("Chunk size needs to be a multiple of the input data type");
+    }
 
     *metadata_bytes = sizeof(LZ4Metadata);
 
@@ -150,7 +154,7 @@ nvcompStatus_t nvcompLZ4CompressConfigure(
 
 nvcompStatus_t nvcompLZ4CompressAsync(
     const nvcompLZ4FormatOpts* format_opts,
-    const nvcompType_t /* in_type */,
+    const nvcompType_t in_type,
     const void* in_ptr,
     const size_t in_bytes,
     void* const temp_ptr,
@@ -171,7 +175,8 @@ nvcompStatus_t nvcompLZ4CompressAsync(
     LZ4Compressor compressor(
         CudaUtils::device_pointer(static_cast<const uint8_t*>(in_ptr)),
         in_bytes,
-        chunk_bytes);
+        chunk_bytes,
+        in_type);
     compressor.configure_workspace(
         CudaUtils::device_pointer(temp_ptr), temp_bytes);
 

@@ -77,7 +77,7 @@ void run_benchmark(const std::vector<uint8_t>& data)
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), num_bytes, cudaMemcpyHostToDevice));
 
-  LZ4Compressor compressor(CHUNK_SIZE);
+  LZ4Compressor compressor(CHUNK_SIZE, NVCOMP_TYPE_CHAR);
 
   size_t comp_temp_bytes;
   size_t comp_out_bytes;
