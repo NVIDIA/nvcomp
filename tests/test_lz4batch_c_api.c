@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define CRASH_SAFE
+
 #include "nvcomp/lz4.h"
 #include "test_batch_c_api.h"
 

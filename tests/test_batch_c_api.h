@@ -669,7 +669,7 @@ int test_generic_batch_decompression_errors(
   return PASS_TEST;
 }
 
-#define TEST(bs, min, max, num_tests, rv)                                      \
+#define TEST(bs, min, max, num_tests, rv, crash_safe)                          \
   do {                                                                         \
     ++(num_tests);                                                             \
     if (!test_generic_batch_compression_and_decompression(bs, min, max)) {     \
@@ -680,13 +680,15 @@ int test_generic_batch_decompression_errors(
           (int)(max));                                                         \
       ++(rv);                                                                  \
     }                                                                          \
-    if (!test_generic_batch_decompression_errors(bs, min, max)) {              \
-      printf(                                                                  \
-          "decompression errors test failed %dx[%d:%d]\n",                     \
-          (int)(bs),                                                           \
-          (int)(min),                                                          \
-          (int)(max));                                                         \
-      ++(rv);                                                                  \
+    if (crash_safe) {                                                          \
+      if (!test_generic_batch_decompression_errors(bs, min, max)) {            \
+        printf(                                                                \
+            "decompression errors test failed %dx[%d:%d]\n",                   \
+            (int)(bs),                                                         \
+            (int)(min),                                                        \
+            (int)(max));                                                       \
+        ++(rv);                                                                \
+      }                                                                        \
     }                                                                          \
   } while (0)
 
@@ -700,13 +702,19 @@ int main(int argc, char** argv)
   int num_tests = 0;
   int num_failed_tests = 0;
 
+#ifdef CRASH_SAFE
+  const int crash_safe = 1;
+#else
+  const int crash_safe = 0;
+#endif
+
   // these macros count the number of failed tests
-  TEST(1, 100, 100, num_tests, num_failed_tests);
-  TEST(1, 100000, 100000, num_tests, num_failed_tests);
-  TEST(11, 1000, 10000, num_tests, num_failed_tests);
-  TEST(127, 10000, 100000, num_tests, num_failed_tests);
-  TEST(1025, 100, 100000, num_tests, num_failed_tests);
-  TEST(10025, 100, 1000, num_tests, num_failed_tests);
+  TEST(1, 100, 100, num_tests, num_failed_tests, crash_safe);
+  TEST(1, 100000, 100000, num_tests, num_failed_tests, crash_safe);
+  TEST(11, 1000, 10000, num_tests, num_failed_tests, crash_safe);
+  TEST(127, 10000, 100000, num_tests, num_failed_tests, crash_safe);
+  TEST(1025, 100, 100000, num_tests, num_failed_tests, crash_safe);
+  TEST(10025, 100, 1000, num_tests, num_failed_tests, crash_safe);
 
   if (num_failed_tests == 0) {
     printf(
