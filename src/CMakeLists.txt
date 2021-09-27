@@ -31,14 +31,14 @@ else()
   endif()
 endif()
 
-include_directories("./")
+include_directories("${nvcomp_SOURCE_DIR}/src")
 
 set_property(TARGET nvcomp PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
 target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>")
+    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/include>")
 if(DEFINED CUB_DIR)
   target_include_directories(nvcomp PRIVATE "${CUB_DIR}")
 endif()
