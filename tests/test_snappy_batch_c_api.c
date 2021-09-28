@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define CRASH_SAFE
+
 #include "nvcomp/snappy.h"
 #include "test_batch_c_api.h"
 
