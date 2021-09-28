@@ -16,7 +16,7 @@ if (gdeflate_FOUND AND ZLIB_FOUND)
     target_link_libraries(${BARE_NAME} PRIVATE gdeflate_cpu ZLIB::ZLIB)
   endforeach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
 else()
-  message(WARNING "Cannot build gdeflate CPU example without gdeflate and zlib libraries.")
+  message(WARNING "Skipping building gdeflate CPU example, as gdeflate and/or zlib libraries are not found.")
 endif()
 
 option (BUILD_GDS_EXAMPLE "Build NVCOMP + GDS example" OFF)
