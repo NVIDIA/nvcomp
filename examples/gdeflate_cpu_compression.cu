@@ -27,18 +27,8 @@
  */
 #include "BatchData.h"
 
-#include "gdeflate.h"
+#include "gdeflate_cpu.h"
 #include "nvcomp/gdeflate.h"
-
-#ifdef ENABLE_GDEFLATE
-#define CHECK_NVCOMP_STATUS(status)                                            \
-  if ((status) != nvcompSuccess)                                               \
-    throw std::runtime_error("Failed to decompress data");
-#else
-#define CHECK_NVCOMP_STATUS(status)                                            \
-  if ((status) != nvcompSuccess)                                               \
-    throw std::runtime_error("nvcomp not configured with gdeflate support");
-#endif
 
 // Benchmark performance from the binary data file fname
 static void run_example(const std::vector<std::vector<char>>& data)
@@ -64,8 +54,10 @@ static void run_example(const std::vector<std::vector<char>>& data)
   nvcompStatus_t status;
   size_t max_out_bytes;
   status = nvcompBatchedGdeflateCompressGetMaxOutputChunkSize(
-      chunk_size, &max_out_bytes);
-  CHECK_NVCOMP_STATUS(status);
+      chunk_size, nvcompBatchedGdeflateDefaultOpts, &max_out_bytes);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedGdeflateCompressGetMaxOutputChunkSize() not successful");
+  }
 
   // Allocate and prepare output/compressed batch
   BatchDataCPU compress_data_cpu(max_out_bytes, input_data_cpu.size());
@@ -113,9 +105,20 @@ static void run_example(const std::vector<std::vector<char>>& data)
   size_t decomp_temp_bytes;
   status = nvcompBatchedGdeflateDecompressGetTempSize(
       compress_data.size(), chunk_size, &decomp_temp_bytes);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedGdeflateDecompressGetTempSize() not successful");
+  }
 
   void* d_decomp_temp;
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
+
+  size_t* d_decomp_sizes;
+  CUDA_CHECK(
+      cudaMalloc((void**)&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
+
+  nvcompStatus_t* d_statuses;
+  CUDA_CHECK(cudaMalloc(
+      (void**)&d_statuses, decomp_data.size() * sizeof(nvcompStatus_t)));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -124,12 +127,16 @@ static void run_example(const std::vector<std::vector<char>>& data)
       compress_data.ptrs(),
       compress_data.sizes(),
       decomp_data.sizes(),
-      chunk_size,
+      d_decomp_sizes,
       compress_data.size(),
       d_decomp_temp,
       decomp_temp_bytes,
       decomp_data.ptrs(),
+      d_statuses,
       stream);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedGdeflateDecompressAsync() not successful");
+  }
 
   // Validate decompressed data against input
   if (!(input_data_cpu == decomp_data))
@@ -143,16 +150,19 @@ static void run_example(const std::vector<std::vector<char>>& data)
       compress_data.ptrs(),
       compress_data.sizes(),
       decomp_data.sizes(),
-      chunk_size,
+      d_decomp_sizes,
       compress_data.size(),
       d_decomp_temp,
       decomp_temp_bytes,
       decomp_data.ptrs(),
+      d_statuses,
       stream);
   cudaEventRecord(end, stream);
+  if( status != nvcompSuccess){
+    throw std::runtime_error("ERROR: nvcompBatchedGdeflateDecompressAsync() not successful");
+  }
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
-  CHECK_NVCOMP_STATUS(status);
 
   float ms;
   cudaEventElapsedTime(&ms, start, end);
@@ -162,12 +172,13 @@ static void run_example(const std::vector<std::vector<char>>& data)
             << std::endl;
 
   cudaFree(d_decomp_temp);
+  cudaFree(d_decomp_sizes);
+  cudaFree(d_statuses);
 
   cudaEventDestroy(start);
   cudaEventDestroy(end);
   cudaStreamDestroy(stream);
 }
-#undef CHECK_NVCOMP_STATUS
 
 std::vector<char> readFile(const std::string& filename)
 {

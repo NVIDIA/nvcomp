@@ -93,7 +93,7 @@ endif()
 
 if( DEFINED NVCOMP_EXTS_ROOT )
   unset( NVCOMP_FIND_QUIET )
-  set( ENV{GDEFLATE_ROOT} ${NVCOMP_EXTS_ROOT} )
+  set( ENV{gdeflate_ROOT} ${NVCOMP_EXTS_ROOT} )
   set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
 endif()
 
@@ -104,8 +104,12 @@ if (bitcomp_FOUND)
 endif()
 
 find_package(gdeflate ${NVCOMP_FIND_QUIET})
-if (GDEFLATE_FOUND)
+if (gdeflate_FOUND)
+  message (STATUS "Found gdeflate")
   add_definitions(-DENABLE_GDEFLATE)
+
+  # Find ZLIB for CPU compression
+  find_package(ZLIB)
 endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
