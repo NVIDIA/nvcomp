@@ -38,13 +38,19 @@
   {                                                                            \
     bitcompResult_t err = call;                                                \
     if (BITCOMP_SUCCESS != err) {                                              \
+      if (err == BITCOMP_INVALID_PARAMETER)                                    \
+        return nvcompErrorInvalidValue;                                        \
+      else if (err == BITCOMP_INVALID_COMPRESSED_DATA)                         \
+        return nvcompErrorCannotDecompress;                                    \
+      else if (err == BITCOMP_INVALID_ALIGNMENT)                               \
+        return nvcompErrorCannotDecompress;                                    \
       return nvcompErrorInternal;                                              \
     }                                                                          \
   }
 
 nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
     size_t max_chunk_size,
-    nvcompBitcompFormatOpts format_opts,
+    nvcompBatchedBitcompFormatOpts format_opts,
     size_t* max_compressed_size)
 {
   *max_compressed_size = bitcompMaxBuflen(max_chunk_size);
@@ -60,78 +66,75 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
     size_t, // temp_bytes, not used
     void* const* device_compressed_ptrs,
     size_t* device_compressed_bytes,
-    const nvcompBitcompFormatOpts* format_opts,
-    nvcompType_t type,
+    const nvcompBatchedBitcompFormatOpts format_opts,
     cudaStream_t stream)
 {
-    // Convert the NVCOMP type to a BITCOMP type
-    bitcompDataType_t dataType;
-    switch (type) {
-    case NVCOMP_TYPE_CHAR:
-      dataType = BITCOMP_SIGNED_8BIT;
-      break;
-    case NVCOMP_TYPE_USHORT:
-      dataType = BITCOMP_UNSIGNED_16BIT;
-      break;
-    case NVCOMP_TYPE_SHORT:
-      dataType = BITCOMP_SIGNED_16BIT;
-      break;
-    case NVCOMP_TYPE_UINT:
-      dataType = BITCOMP_UNSIGNED_32BIT;
-      break;
-    case NVCOMP_TYPE_INT:
-      dataType = BITCOMP_SIGNED_32BIT;
-      break;
-    case NVCOMP_TYPE_ULONGLONG:
-      dataType = BITCOMP_UNSIGNED_64BIT;
-      break;
-    case NVCOMP_TYPE_LONGLONG:
-      dataType = BITCOMP_SIGNED_64BIT;
-      break;
-    default:
-      dataType = BITCOMP_UNSIGNED_8BIT;
-    }
+  // Convert the NVCOMP type to a BITCOMP type
+  bitcompDataType_t dataType;
+  switch (format_opts.data_type) {
+  case NVCOMP_TYPE_CHAR:
+    dataType = BITCOMP_SIGNED_8BIT;
+    break;
+  case NVCOMP_TYPE_USHORT:
+    dataType = BITCOMP_UNSIGNED_16BIT;
+    break;
+  case NVCOMP_TYPE_SHORT:
+    dataType = BITCOMP_SIGNED_16BIT;
+    break;
+  case NVCOMP_TYPE_UINT:
+    dataType = BITCOMP_UNSIGNED_32BIT;
+    break;
+  case NVCOMP_TYPE_INT:
+    dataType = BITCOMP_SIGNED_32BIT;
+    break;
+  case NVCOMP_TYPE_ULONGLONG:
+    dataType = BITCOMP_UNSIGNED_64BIT;
+    break;
+  case NVCOMP_TYPE_LONGLONG:
+    dataType = BITCOMP_SIGNED_64BIT;
+    break;
+  default:
+    dataType = BITCOMP_UNSIGNED_8BIT;
+  }
 
-    // Create a Bitcomp batch handle, associate it to the stream
-    bitcompAlgorithm_t algo = BITCOMP_DEFAULT_ALGO;
-    if (format_opts)
-        algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
-    bitcompHandle_t plan;
-    BTCHK(bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo));
-    BTCHK(bitcompSetStream(plan, stream));
+  // Create a Bitcomp batch handle, associate it to the stream
+  bitcompAlgorithm_t algo = static_cast<bitcompAlgorithm_t>(format_opts.algorithm_type);
+  bitcompHandle_t plan;
+  BTCHK(bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo));
+  BTCHK(bitcompSetStream(plan, stream));
 
-    // Launch the Bitcomp async batch compression
-    BTCHK(bitcompBatchCompressLossless(
-        plan,
-        device_uncompressed_ptrs,
-        device_compressed_ptrs,
-        device_uncompressed_bytes,
-        device_compressed_bytes));
+  // Launch the Bitcomp async batch compression
+  BTCHK(bitcompBatchCompressLossless(
+      plan,
+      device_uncompressed_ptrs,
+      device_compressed_ptrs,
+      device_uncompressed_bytes,
+      device_compressed_bytes));
 
-    // Once launched, the handle can be destroyed
-    BTCHK(bitcompDestroyPlan (plan));
-    
-    return nvcompSuccess;
+  // Once launched, the handle can be destroyed
+  BTCHK(bitcompDestroyPlan (plan));
+  
+  return nvcompSuccess;
 }
 
 // The Bitcomp batch decompression outputs bitcompResult_t statuses.
 // Need to convert them to nvcompStatus_t.
 __global__ void convertOutputStatuses (nvcompStatus_t *statuses, size_t batch_size)
 {
-    static_assert (sizeof (nvcompStatus_t) == sizeof (bitcompResult_t));
-    size_t index = (size_t)blockIdx.x * (size_t)blockDim.x + (size_t)threadIdx.x;
-    if (index >= batch_size)
-        return;
-    bitcompResult_t ier = reinterpret_cast<bitcompResult_t *>(statuses)[index];
-    nvcompStatus_t nvcomp_err = nvcompSuccess;
-    if (ier != BITCOMP_SUCCESS)
-    {
-        if (ier == BITCOMP_INVALID_PARAMETER)
-            nvcomp_err = nvcompErrorInvalidValue;
-        else
-            nvcomp_err = nvcompErrorCannotDecompress;
-    }
-    statuses[index] = nvcomp_err;
+  static_assert (sizeof (nvcompStatus_t) == sizeof (bitcompResult_t));
+  size_t index = (size_t)blockIdx.x * (size_t)blockDim.x + (size_t)threadIdx.x;
+  if (index >= batch_size)
+      return;
+  bitcompResult_t ier = reinterpret_cast<bitcompResult_t *>(statuses)[index];
+  nvcompStatus_t nvcomp_err = nvcompSuccess;
+  if (ier != BITCOMP_SUCCESS)
+  {
+      if (ier == BITCOMP_INVALID_PARAMETER)
+          nvcomp_err = nvcompErrorInvalidValue;
+      else
+          nvcomp_err = nvcompErrorCannotDecompress;
+  }
+  statuses[index] = nvcomp_err;
 }
 
 nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
@@ -144,70 +147,44 @@ nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     size_t,      // temp_bytes, not used
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_statuses,
-    const nvcompBitcompFormatOpts* format_opts,
-    nvcompType_t type,
     cudaStream_t stream)
 {
-    // Convert the NVCOMP type to a BITCOMP type
-    bitcompDataType_t dataType;
-    switch (type) {
-    case NVCOMP_TYPE_CHAR:
-      dataType = BITCOMP_SIGNED_8BIT;
-      break;
-    case NVCOMP_TYPE_USHORT:
-      dataType = BITCOMP_UNSIGNED_16BIT;
-      break;
-    case NVCOMP_TYPE_SHORT:
-      dataType = BITCOMP_SIGNED_16BIT;
-      break;
-    case NVCOMP_TYPE_UINT:
-      dataType = BITCOMP_UNSIGNED_32BIT;
-      break;
-    case NVCOMP_TYPE_INT:
-      dataType = BITCOMP_SIGNED_32BIT;
-      break;
-    case NVCOMP_TYPE_ULONGLONG:
-      dataType = BITCOMP_UNSIGNED_64BIT;
-      break;
-    case NVCOMP_TYPE_LONGLONG:
-      dataType = BITCOMP_SIGNED_64BIT;
-      break;
-    default:
-      dataType = BITCOMP_UNSIGNED_8BIT;
-    }
+  // Synchronize the stream to make sure the compressed data is visible
+  if (cudaStreamSynchronize(stream) != cudaSuccess)
+    return nvcompErrorCudaError;
 
-    // Create a Bitcomp batch handle, associate it to the stream
-    bitcompAlgorithm_t algo = BITCOMP_DEFAULT_ALGO;
-    if (format_opts)
-        algo = static_cast<bitcompAlgorithm_t>(format_opts->algorithm_type);
-    bitcompHandle_t plan;
-    BTCHK(bitcompCreateBatchPlan(&plan, batch_size, dataType, BITCOMP_LOSSLESS, algo));
-    BTCHK(bitcompSetStream(plan, stream));
+  // Create a Bitcomp batch handle from the compressed data.
+  bitcompHandle_t plan;
+  BTCHK(bitcompCreateBatchPlanFromCompressedData(&plan, device_compressed_ptrs, batch_size));
 
-    // Launch the Bitcomp async batch decompression with extra checks
-    BTCHK(bitcompBatchUncompressCheck(
-        plan,
-        device_compressed_ptrs,
-        device_uncompressed_ptrs,
-        device_uncompressed_bytes,
-        (bitcompResult_t*)device_statuses));
+  // Associate the handle to the stream
+  BTCHK(bitcompSetStream(plan, stream));
 
-    // Need a separate kernel to query the actual uncompressed size,
-    // as bitcomp doesn't write the uncompressed size during decompression
-    BTCHK(bitcompBatchGetUncompressedSizesAsync(
-        device_compressed_ptrs,
-        device_actual_uncompressed_bytes,
-        batch_size,
-        stream));
+  // Launch the Bitcomp async batch decompression with extra checks
+  BTCHK(bitcompBatchUncompressCheck(
+      plan,
+      device_compressed_ptrs,
+      device_uncompressed_ptrs,
+      device_uncompressed_bytes,
+      (bitcompResult_t*)device_statuses));
 
-    // Also launch a kernel to convert the output statuses
-    const int threads = 512;
-    int blocks = (batch_size - 1) / threads + 1;
-    convertOutputStatuses <<<blocks,threads,0,stream>>> (device_statuses, batch_size);
+  // Need a separate kernel to query the actual uncompressed size,
+  // as bitcomp doesn't write the uncompressed size during decompression
+  BTCHK(bitcompBatchGetUncompressedSizesAsync(
+      device_compressed_ptrs,
+      device_actual_uncompressed_bytes,
+      batch_size,
+      stream));
 
-    // Once launched, the handle can be destroyed
-    BTCHK(bitcompDestroyPlan(plan));
-    return nvcompSuccess;
+  // Also launch a kernel to convert the output statuses
+  const int threads = 512;
+  int blocks = (batch_size - 1) / threads + 1;
+  convertOutputStatuses<<<blocks, threads, 0, stream>>>(
+      device_statuses, batch_size);
+
+  // Once launched, the handle can be destroyed
+  BTCHK(bitcompDestroyPlan(plan));
+  return nvcompSuccess;
 }
 
 nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
@@ -225,13 +202,22 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
 }
 
 nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
-    size_t batch_size,
-    size_t max_chunk_bytes,
-    nvcompBitcompFormatOpts format_opts,
-    size_t * temp_bytes)
-  {
-    *temp_bytes = 0;
-    return nvcompSuccess;
-  }
+    size_t,
+    size_t,
+    nvcompBatchedBitcompFormatOpts,
+    size_t* temp_bytes)
+{
+  *temp_bytes = 0;
+  return nvcompSuccess;
+}
+
+nvcompStatus_t nvcompBatchedBitcompDecompressGetTempSize(
+    size_t,
+    size_t,
+    size_t* temp_bytes)
+{
+  *temp_bytes = 0;
+  return nvcompSuccess;
+}
 
 #endif

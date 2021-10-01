@@ -198,8 +198,9 @@ int test_bitcomp_batch(
   CUDA_CHECK(cudaMalloc(&d_input_data, input_bytes));
   CUDA_CHECK(cudaMemcpy(d_input_data, input.data(), input_bytes, cudaMemcpyDefault));
 
-  nvcompBitcompFormatOpts bitcomp_opts;
+  nvcompBatchedBitcompFormatOpts bitcomp_opts;
   bitcomp_opts.algorithm_type = 0; // Using default algorithm
+  bitcomp_opts.data_type = TypeOf<T>();
 
   // Compute the output size of each batch and total size for the output buffer
   size_t total_output_size = 0;
@@ -256,8 +257,7 @@ int test_bitcomp_batch(
       0,       // temp_bytes: not used
       d_comp_ptrs,
       d_comp_sizes,
-      &bitcomp_opts,
-      TypeOf<T>(),
+      bitcomp_opts,
       stream);
 
   // Query the uncompressed sizes, make sure it matches the input sizes
@@ -281,8 +281,6 @@ int test_bitcomp_batch(
       0,       // temp_bytes: not used
       d_input_ptrs,
       d_decomp_statuses,
-      &bitcomp_opts,
-      TypeOf<T>(),
       stream);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));

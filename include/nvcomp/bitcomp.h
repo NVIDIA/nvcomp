@@ -55,6 +55,8 @@ typedef struct
   int algorithm_type;
 } nvcompBitcompFormatOpts;
 
+static const nvcompBitcompFormatOpts nvcompBitcompDefaultOpts = {0};
+
 /**
  * @brief Get the temporary workspace size required to perform compression.
  *
@@ -180,6 +182,26 @@ int nvcompIsBitcompData(const void* const in_ptr, size_t in_bytes);
  *****************************************************************************/
 
 /**
+ * @brief Structure for configuring Bitcomp compression.
+ */
+typedef struct
+{
+  /**
+   * @brief Bitcomp algorithm options.
+   *  algorithm_type: The type of Bitcomp algorithm used.
+   *    0 : Default algorithm, usually gives the best compression ratios
+   *    1 : "Sparse" algorithm, works well on sparse data (with lots of zeroes).
+   *        and is usually a faster than the default algorithm.
+   *  data_type is one of nvcomp's possible data types
+   */
+  int algorithm_type;
+  nvcompType_t data_type;
+} nvcompBatchedBitcompFormatOpts;
+
+static const nvcompBatchedBitcompFormatOpts nvcompBatchedBitcompDefaultOpts
+    = {.algorithm_type = 0, .data_type = NVCOMP_TYPE_UCHAR};
+
+/**
  * @brief Get the maximum size any chunk could compress to in the batch. That
  * is, the minimum amount of output memory required to be given
  * nvcompBatchedSnappyCompressAsync() for each batch item.
@@ -193,7 +215,7 @@ int nvcompIsBitcompData(const void* const in_ptr, size_t in_bytes);
  */
 nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
     size_t max_chunk_size,
-    nvcompBitcompFormatOpts format_opts,
+    nvcompBatchedBitcompFormatOpts format_opts,
     size_t* max_compressed_size);
 /**
  * @brief Perform batched asynchronous compression.
@@ -235,8 +257,7 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
     size_t temp_bytes,     // not used
     void* const* device_compressed_ptrs,
     size_t* device_compressed_bytes,
-    const nvcompBitcompFormatOpts* format_opts,
-    nvcompType_t type,
+    const nvcompBatchedBitcompFormatOpts format_opts,
     cudaStream_t stream);
 
 /**
@@ -245,6 +266,11 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
  * NOTE: This function is used to decompress compressed buffers produced by
  * `nvcompBatchedBitcompCompressAsync`. It can also decompress buffers
  * compressed with `nvcompBitcompCompressAsync` or the standalone Bitcomp library.
+ * 
+ * NOTE: The function is not completely asynchronous, as it needs to look
+ * at the compressed data in order to create the proper bitcomp handle.
+ * The stream is synchronized, the data is examined, then the asynchronous
+ * decompression is launched.
  *
  * @param[in] device_compressed_ptrs Array with size \p batch_size of pointers
  * in device-accessible memory to compressed buffers. Each compressed buffer
@@ -269,8 +295,6 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
  * `nvcompSuccess`. If the decompression is not successful, for example due to
  * the corrupted input or out-of-bound errors, the status will be set to
  * `nvcompErrorCannotDecompress`.
- * @param[in] format_opts The bitcomp format options. The format must be valid.
- * @param[in] type The data type of the uncompressed data.
  * @param[in] stream The cuda stream to operate on.
  */
 nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
@@ -283,8 +307,6 @@ nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
     size_t temp_bytes,           // not used
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_statuses,
-    const nvcompBitcompFormatOpts* format_opts,
-    nvcompType_t type,
     cudaStream_t stream);
 
 /**
@@ -320,7 +342,21 @@ nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
 nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
     size_t batch_size,
     size_t max_chunk_bytes,
-    nvcompBitcompFormatOpts format_opts,
+    nvcompBatchedBitcompFormatOpts format_opts,
+    size_t * temp_bytes);
+
+/**
+ * @brief Return the temp size needed for Bitcomp decompression.
+ * Bitcomp currently doesn't use any temp memory.
+ * 
+ * @param[in] batch_size  Number of batches
+ * @param[in] max_chunk_bytes Size in bytes of the largest chunk
+ * @param[in] format_opts Bitcomp options
+ * @param[out] temp_bytes The temp size
+ */
+nvcompStatus_t nvcompBatchedBitcompDecompressGetTempSize(
+    size_t batch_size,
+    size_t max_chunk_bytes,
     size_t * temp_bytes);
 
 #ifdef __cplusplus
