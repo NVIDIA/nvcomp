@@ -372,6 +372,32 @@ int test_generic_batch_compression_and_decompression(
       sizeof(*device_decomp_out) * batch_size,
       cudaMemcpyHostToDevice));
 
+  // Test functionality with null device_statuses and device_decomp_out_bytes
+  // TODO: gdeflate might not support this functionality yet
+  status = decompressAsync(
+      (const void* const*)device_comp_out,
+      device_comp_out_bytes,
+      device_batch_bytes,
+      NULL,
+      batch_size,
+      device_temp_ptr,
+      temp_bytes,
+      (void* const*)device_decomp_out,
+      NULL,
+      stream);
+  REQUIRE(status == nvcompSuccess);
+  // Verify correctness
+  for (size_t i = 0; i < batch_size; i++) {
+    CUDA_CHECK(cudaMemcpy(
+        host_output[i],
+        host_decomp_out[i],
+        host_batch_bytes[i],
+        cudaMemcpyDeviceToHost));
+    for (size_t j = 0; j < host_batch_bytes[i] / sizeof(T); ++j) {
+      REQUIRE(host_output[i][j] == host_input[i][j]);
+    }
+  }
+
   nvcompStatus_t* device_statuses;
   CUDA_CHECK(cudaMalloc(
       (void**)&device_statuses, sizeof(*device_statuses) * batch_size));
