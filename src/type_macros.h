@@ -36,6 +36,37 @@
  * DEFINES ********************************************************************
  *****************************************************************************/
 
+#define NVCOMP_TYPE_THREE_SWITCH_FIRST_ONLY(                                   \
+    type_var, second_type, third_arg, func, ...)                               \
+  do {                                                                         \
+    switch (type_var) {                                                        \
+    case NVCOMP_TYPE_CHAR:                                                     \
+      func<int8_t, second_type, third_arg>(__VA_ARGS__);                       \
+      break;                                                                   \
+    case NVCOMP_TYPE_UCHAR:                                                    \
+      func<uint8_t, second_type, third_arg>(__VA_ARGS__);                      \
+      break;                                                                   \
+    case NVCOMP_TYPE_SHORT:                                                    \
+      func<int16_t, second_type, third_arg>(__VA_ARGS__);                      \
+      break;                                                                   \
+    case NVCOMP_TYPE_USHORT:                                                   \
+      func<uint16_t, second_type, third_arg>(__VA_ARGS__);                     \
+      break;                                                                   \
+    case NVCOMP_TYPE_INT:                                                      \
+      func<int32_t, second_type, third_arg>(__VA_ARGS__);                      \
+      break;                                                                   \
+    case NVCOMP_TYPE_UINT:                                                     \
+      func<uint32_t, second_type, third_arg>(__VA_ARGS__);                     \
+      break;                                                                   \
+    case NVCOMP_TYPE_LONGLONG:                                                 \
+      func<int64_t, second_type, third_arg>(__VA_ARGS__);                      \
+      break;                                                                   \
+    case NVCOMP_TYPE_ULONGLONG:                                                \
+      func<uint64_t, second_type, third_arg>(__VA_ARGS__);                     \
+      break;                                                                   \
+    }                                                                          \
+  } while (0)
+
 #define NVCOMP_TYPE_TWO_SWITCH_FIRST_ONLY(type_var, second_type, func, ...)    \
   do {                                                                         \
     switch (type_var) {                                                        \
