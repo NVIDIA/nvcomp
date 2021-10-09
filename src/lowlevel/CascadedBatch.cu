@@ -40,6 +40,32 @@ using nvcomp::roundUpDiv;
 using nvcomp::roundUpTo;
 using nvcomp::roundUpToAlignment;
 
+template <typename T>
+__device__ inline nvcompType_t d_TypeOf()
+{
+  if (std::is_same<T, int8_t>::value) {
+    return NVCOMP_TYPE_CHAR;
+  } else if (std::is_same<T, uint8_t>::value) {
+    return NVCOMP_TYPE_UCHAR;
+  } else if (std::is_same<T, int16_t>::value) {
+    return NVCOMP_TYPE_SHORT;
+  } else if (std::is_same<T, uint16_t>::value) {
+    return NVCOMP_TYPE_USHORT;
+  } else if (std::is_same<T, int32_t>::value) {
+    return NVCOMP_TYPE_INT;
+  } else if (std::is_same<T, uint32_t>::value) {
+    return NVCOMP_TYPE_UINT;
+  } else if (std::is_same<T, int64_t>::value) {
+    return NVCOMP_TYPE_LONGLONG;
+  } else if (std::is_same<T, uint64_t>::value) {
+    return NVCOMP_TYPE_ULONGLONG;
+  } else {
+    return NVCOMP_TYPE_CHAR;
+  }
+
+// TODO - perform error checking and notify user if incorrect type is given
+}
+
 constexpr int default_chunk_size = 4096;
 // Partition metadata contains 8B: 4B for the numbers of every cascaded
 // compression layers and another 4B for uncompressed bytes.
@@ -722,7 +748,7 @@ __global__ void cascaded_compression_kernel(
     const size_type* uncompressed_bytes,
     void* const* compressed_data,
     size_type* compressed_bytes,
-    nvcompCascadedFormatOpts comp_opts)
+    nvcompBatchedCascadedOpts_t comp_opts)
 {
   using run_type = uint16_t;
   constexpr int chunk_num_elements = chunk_size / sizeof(data_type);
@@ -987,7 +1013,7 @@ __global__ void cascaded_compression_kernel(
         partition_metadata_ptr[0] = comp_opts.num_RLEs;
         partition_metadata_ptr[1] = comp_opts.num_deltas;
         partition_metadata_ptr[2] = comp_opts.use_bp;
-        partition_metadata_ptr[3] = 0;
+        partition_metadata_ptr[3] = (d_TypeOf<data_type>());
         compressed_bytes[partition_idx]
             = reinterpret_cast<uintptr_t>(current_output_ptr)
               - reinterpret_cast<uintptr_t>(output_buffer);
@@ -1004,7 +1030,15 @@ __global__ void cascaded_compression_kernel(
 }
 
 /**
- * @brief Batched cascaded decompression kernel.
+ * @brief Helper macro to determine the shared memory requirement
+ * based on the chunk size.
+ */
+#define NVCOMP_COMPUTE_SHMEM_SIZE(chunk_size)           \
+  roundUpTo(6 * chunk_size + 112, 8);                   
+
+/**
+ * @brief Device function to perform batched cascaded decompression for
+ * a given datatype
  *
  * @tparam data_type Data type of each uncompressed element.
  * @tparam threadblock_size Number of threads in a threadblock. This argument
@@ -1023,6 +1057,7 @@ __global__ void cascaded_compression_kernel(
  * bytes.
  * @param[out] actual_decompressed_bytes Actual number of bytes decompressed for
  * all partitions.
+ * @param[in] shmem Allocated shared memory buffer for use in decompression.
  * @param[out] statuses Whether the compressions are successful.
  */
 template <
@@ -1030,15 +1065,17 @@ template <
     typename size_type,
     int threadblock_size,
     int chunk_size = default_chunk_size>
-__global__ void cascaded_decompression_kernel(
+__device__ void cascaded_decompression_fcn(
     int batch_size,
     const void* const* compressed_data,
     const size_type* compressed_bytes,
-    data_type* const* decompressed_data,
+    void* const* decompressed_data,
     const size_type* decompressed_buffer_bytes,
     size_type* actual_decompressed_bytes,
+    void* shmem,
     nvcompStatus_t* statuses)
 {
+
   using run_type = uint16_t;
   constexpr int chunk_num_elements = chunk_size / sizeof(data_type);
 
@@ -1050,7 +1087,8 @@ __global__ void cascaded_decompression_kernel(
   // We assume the data type is at most 8B large, so we use uint64_t here to
   // make sure the storage starts at an 8-byte alignment location.
   // Here we assume the metadata is at most 64B.
-  __shared__ uint64_t chunk_metadata_storage[64 / sizeof(uint64_t)];
+  uint64_t* chunk_metadata_storage = static_cast<uint64_t*>(shmem);
+  shmem = static_cast<void*>(static_cast<uint8_t*>(shmem) + 64);
   auto chunk_metadata = reinterpret_cast<uint32_t*>(chunk_metadata_storage);
 
   // `shared_element_storage_0` and `shared_element_storage_1` are shared memory
@@ -1064,11 +1102,18 @@ __global__ void cascaded_decompression_kernel(
   constexpr size_t storage_num_elements = roundUpDiv(
       chunk_size + 4 + sizeof(data_type), sizeof(shared_storage_type));
 
-  __shared__ shared_storage_type shared_element_storage_0[storage_num_elements];
+  shared_storage_type* shared_element_storage_0
+      = static_cast<shared_storage_type*>(shmem);
+  shmem = static_cast<void*>(
+      static_cast<shared_storage_type*>(shmem) + storage_num_elements);
   data_type* shared_element_buffer_0
       = reinterpret_cast<data_type*>(shared_element_storage_0);
 
-  __shared__ shared_storage_type shared_element_storage_1[storage_num_elements];
+  shared_storage_type* shared_element_storage_1
+      = static_cast<shared_storage_type*>(shmem);
+  shmem = static_cast<void*>(
+      static_cast<shared_storage_type*>(shmem) + storage_num_elements);
+
   data_type* shared_element_buffer_1
       = reinterpret_cast<data_type*>(shared_element_storage_1);
 
@@ -1076,13 +1121,15 @@ __global__ void cascaded_decompression_kernel(
   // `temp_count_array` is used for bit-unpacking when loading RLE counts. Since
   // run_type should be no larger than 4B, we use `uint32_t` to guarantee 4B
   // aligned (which implies run_type aligned as well).
-  __shared__ uint32_t count_array[chunk_num_elements * sizeof(run_type) / 4];
-  __shared__ uint32_t
-      temp_count_array[chunk_num_elements * sizeof(run_type) / 4];
+  uint32_t* count_array = static_cast<uint32_t*>(shmem);
+  shmem = static_cast<void*>(
+      static_cast<uint8_t*>(shmem) + (chunk_num_elements * sizeof(run_type)));
+  uint32_t* temp_count_array = static_cast<uint32_t*>(shmem);
+  shmem = static_cast<void*>(
+      static_cast<uint8_t*>(shmem) + (chunk_num_elements * sizeof(run_type)));
 
-  // RLE offsets, assuming there are at most 7 RLE layers.
-  constexpr size_t max_num_rle_layers = 7;
-  __shared__ uint32_t rle_offsets[max_num_rle_layers + 1];
+  // RLE offsets
+  uint32_t* rle_offsets = static_cast<uint32_t*>(shmem);
 
   for (int partition_idx = blockIdx.x; partition_idx < batch_size;
        partition_idx += gridDim.x) {
@@ -1101,7 +1148,8 @@ __global__ void cascaded_decompression_kernel(
         = static_cast<const uint32_t*>(compressed_data[partition_idx]);
     const uint32_t* partition_end_ptr
         = partition_start_ptr + compressed_bytes[partition_idx] / 4;
-    data_type* decompressed_ptr = decompressed_data[partition_idx];
+    data_type* decompressed_ptr
+        = ((data_type* const*)decompressed_data)[partition_idx];
     size_type decompressed_num_elements = 0;
 
     const uint8_t* partition_metadata_ptr
@@ -1109,7 +1157,9 @@ __global__ void cascaded_decompression_kernel(
     int num_RLEs = partition_metadata_ptr[0];
     int num_deltas = partition_metadata_ptr[1];
     int bitpacking = partition_metadata_ptr[2];
-    assert(num_RLEs <= max_num_rle_layers);
+
+    // Max number of RLE layers is 7
+    assert(num_RLEs <= 7);
 
     const uint32_t num_uncompressed_elements
         = partition_start_ptr[1] / sizeof(data_type);
@@ -1337,6 +1387,73 @@ __global__ void cascaded_decompression_kernel(
   }
 }
 
+/**
+ * @brief Kernel to perform batched cascaded decompression. Simply extracts the
+ * datatype from the metadata of the compressed buffer and calls a device
+ * function based on that.
+ *
+ * @tparam size_type Data type used for size measures, typically size_t is used.
+ * @tparam threadblock_size Number of threads in a threadblock. This argument
+ * must match the configuration specified when launching this kernel.
+ * @tparam chunk_size Number of bytes for each uncompressed chunk to fit inside
+ * shared memory. This argument must match the chunk size specified during
+ * compression.
+ *
+ * @param[in] batch_size Number of partitions to decompress.
+ * @param[in] compressed_data Array of size \p batch_size where each element is
+ * a pointer to the compressed data of a partition.
+ * @param[in] compressed_bytes Sizes of the compressed buffers corresponding to
+ * \p compressed_data.
+ * @param[out] decompressed_data Pointers to the output decompressed buffers.
+ * @param[in] decompressed_buffer_bytes Sizes of the decompressed buffers in
+ * bytes.
+ * @param[out] actual_decompressed_bytes Actual number of bytes decompressed for
+ * all partitions.
+ */
+template <
+    typename size_type,
+    int threadblock_size,
+    int chunk_size = default_chunk_size>
+__global__ void cascaded_decompression_kernel(
+    int batch_size,
+    const void* const* compressed_data,
+    const size_type* compressed_bytes,
+    void* const* decompressed_data,
+    const size_type* decompressed_buffer_bytes,
+    size_type* actual_decompressed_bytes,
+    nvcompStatus_t* statuses)
+{
+  // Extract datatype from compressed data
+  const uint32_t* partition_start_ptr
+      = static_cast<const uint32_t*>(((uint32_t* const*)(compressed_data))[0]);
+  const uint8_t* partition_metadata_ptr
+      = reinterpret_cast<const uint8_t*>(partition_start_ptr);
+  const auto type = static_cast<nvcompType_t>(partition_metadata_ptr[3]);
+
+  // Allocate maximum amount of shared memory needed for any supported datatype
+  // Size is calculated by the maximum shared memory that will be needed during
+  // compression for any datatype, since it is selected determined dynamically.
+//  const int shmem_size = compute_shmem_size(chunk_size);
+  const int shmem_size = NVCOMP_COMPUTE_SHMEM_SIZE(chunk_size);
+  __shared__ uint8_t shmem[shmem_size];
+
+  // Call device function based on datatype used, and pass in allocated shared
+  // memory
+  NVCOMP_TYPE_THREE_SWITCH_FIRST_ONLY(
+      type,
+      size_type,
+      threadblock_size,
+      cascaded_decompression_fcn,
+      batch_size,
+      compressed_data,
+      compressed_bytes,
+      decompressed_data,
+      decompressed_buffer_bytes,
+      actual_decompressed_bytes,
+      (void*)shmem,
+      statuses);
+}
+
 __global__ void get_decompress_size_kernel(
     const void* const* device_compressed_ptrs,
     const size_t* device_compressed_bytes,
@@ -1360,7 +1477,7 @@ __global__ void get_decompress_size_kernel(
 
 template <typename data_type>
 void cascaded_batched_compression_typed(
-    const nvcompCascadedFormatOpts* format_opts,
+    const nvcompBatchedCascadedOpts_t format_opts,
     const void* const* device_uncompressed_ptrs,
     const size_t* device_uncompressed_bytes,
     size_t batch_size,
@@ -1376,34 +1493,33 @@ void cascaded_batched_compression_typed(
           device_uncompressed_bytes,
           device_compressed_ptrs,
           device_compressed_bytes,
-          *format_opts);
-}
-
-template <typename data_type>
-void cascaded_batched_decompression_typed(
-    const nvcompCascadedFormatOpts* /*format_opts*/,
-    const void* const* device_compressed_ptrs,
-    const size_t* device_compressed_bytes,
-    const size_t* device_uncompressed_bytes,
-    size_t* device_actual_uncompressed_bytes,
-    size_t batch_size,
-    void* const* device_uncompressed_ptrs,
-    nvcompStatus_t* device_statuses,
-    cudaStream_t stream)
-{
-  constexpr int threadblock_size = 128;
-  cascaded_decompression_kernel<data_type, size_t, threadblock_size>
-      <<<batch_size, threadblock_size, 0, stream>>>(
-          batch_size,
-          device_compressed_ptrs,
-          device_compressed_bytes,
-          reinterpret_cast<data_type* const*>(device_uncompressed_ptrs),
-          device_uncompressed_bytes,
-          device_actual_uncompressed_bytes,
-          device_statuses);
+          format_opts);
 }
 
 } // namespace
+
+nvcompStatus_t nvcompBatchedCascadedCompressGetTempSize(
+    size_t batch_size,
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedCascadedOpts_t format_opts,
+    size_t* temp_bytes)
+{
+
+  *temp_bytes = 0;
+
+  return nvcompSuccess;
+}
+
+nvcompStatus_t nvcompBatchedCascadedCompressGetMaxOutputChunkSize(
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedCascadedOpts_t format_opts,
+    size_t* max_compressed_bytes)
+{
+
+  *max_compressed_bytes = roundUpTo(max_uncompressed_chunk_bytes, 4) + 8;
+
+  return nvcompSuccess;
+}
 
 nvcompStatus_t nvcompBatchedCascadedCompressAsync(
     const void* const* device_uncompressed_ptrs,
@@ -1414,12 +1530,11 @@ nvcompStatus_t nvcompBatchedCascadedCompressAsync(
     size_t temp_bytes,     // not used
     void* const* device_compressed_ptrs,
     size_t* device_compressed_bytes,
-    const nvcompCascadedFormatOpts* format_opts,
-    nvcompType_t type,
+    const nvcompBatchedCascadedOpts_t format_opts,
     cudaStream_t stream)
 {
   NVCOMP_TYPE_ONE_SWITCH(
-      type,
+      format_opts.type,
       cascaded_batched_compression_typed,
       format_opts,
       device_uncompressed_ptrs,
@@ -1429,6 +1544,13 @@ nvcompStatus_t nvcompBatchedCascadedCompressAsync(
       device_compressed_bytes,
       stream);
 
+  return nvcompSuccess;
+}
+
+nvcompStatus_t nvcompBatchedCascadedDecompressGetTempSize(
+    size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes)
+{
+  *temp_bytes = 0;
   return nvcompSuccess;
 }
 
@@ -1442,22 +1564,21 @@ nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
     size_t temp_bytes,
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_statuses,
-    const nvcompCascadedFormatOpts* format_opts,
-    nvcompType_t type,
     cudaStream_t stream)
 {
-  NVCOMP_TYPE_ONE_SWITCH(
-      type,
-      cascaded_batched_decompression_typed,
-      format_opts,
-      device_compressed_ptrs,
-      device_compressed_bytes,
-      device_uncompressed_bytes,
-      device_actual_uncompressed_bytes,
-      batch_size,
-      device_uncompressed_ptrs,
-      device_statuses,
-      stream);
+
+  // Just call kernel to perform compression. Macro for datatype happens within
+  // kernel
+  constexpr int threadblock_size = 128;
+  cascaded_decompression_kernel<size_t, threadblock_size>
+      <<<batch_size, threadblock_size, 0, stream>>>(
+          batch_size,
+          device_compressed_ptrs,
+          device_compressed_bytes,
+          device_uncompressed_ptrs,
+          device_uncompressed_bytes,
+          device_actual_uncompressed_bytes,
+          device_statuses);
 
   return nvcompSuccess;
 }

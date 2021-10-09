@@ -32,7 +32,6 @@
 #include "catch.hpp"
 #include "nvcomp.hpp"
 #include "nvcomp/cascaded.hpp"
-
 #include <cuda_runtime.h>
 
 #include <cstdint>
@@ -85,9 +84,12 @@ void verify_compression_output(
       compressed_bytes,
       cudaMemcpyDeviceToHost));
 
-  // Check the partition header stores 2 RLE layers, 1 Delta layer and no
-  // bitpacking
-  REQUIRE(compressed_data_host[0] == (2 + (1 << 8) + (0 << 16)));
+  // Check the partition header stores 2 RLE layers, 1 Delta layer, no
+  // bitpacking, and the input datatype
+  REQUIRE(
+      compressed_data_host[0]
+      == (2 + (1 << 8) + (0 << 16)
+          + (((uint32_t)nvcomp::TypeOf<data_type>()) << 24)));
 
   // Calculate the location of the first chunk and test array offsets
   uint32_t* chunk_start_ptr = reinterpret_cast<uint32_t*>(
@@ -268,7 +270,8 @@ void test_predefined_cases(int use_bp)
 
   // Launch batched compression
 
-  nvcompCascadedFormatOpts comp_opts = {2, 1, use_bp};
+  nvcompBatchedCascadedOpts_t comp_opts
+      = {batch_size, nvcomp::TypeOf<data_type>(), 2, 1, use_bp};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,
@@ -279,8 +282,7 @@ void test_predefined_cases(int use_bp)
       0,       // not used
       compressed_ptrs_device,
       compressed_bytes_device,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
+      comp_opts,
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -411,8 +413,6 @@ void test_predefined_cases(int use_bp)
       0,       // not used
       decompressed_ptrs_device,
       compression_statuses_device,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -551,7 +551,8 @@ void test_fallback_path()
 
   // Launch batched cascaded compression
 
-  nvcompCascadedFormatOpts comp_opts = {2, 1, 0};
+  nvcompBatchedCascadedOpts_t comp_opts
+      = {batch_size, nvcomp::TypeOf<data_type>(), 2, 1, true};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,
@@ -562,8 +563,7 @@ void test_fallback_path()
       0,       // not used
       compressed_ptrs_device,
       compressed_bytes_device,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
+      comp_opts,
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -637,8 +637,6 @@ void test_fallback_path()
       0,       // not used
       decompressed_ptrs_device,
       compression_statuses_device,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -694,6 +692,7 @@ void test_out_of_bound(int use_bp)
       std::vector<data_type>{1, 2, 3, 4, 5, 6},
       std::vector<size_t>{10, 6, 15, 1, 13, 9});
   const size_t uncompressed_byte = input_host.size() * sizeof(data_type);
+  const size_t batch_size = input_host.size();
 
   void* uncompressed_data;
   CUDA_CHECK(cudaMalloc(&uncompressed_data, uncompressed_byte));
@@ -734,7 +733,8 @@ void test_out_of_bound(int use_bp)
   size_t* compressed_bytes_device;
   CUDA_CHECK(cudaMalloc(&compressed_bytes_device, sizeof(size_t)));
 
-  nvcompCascadedFormatOpts comp_opts = {2, 1, use_bp};
+  nvcompBatchedCascadedOpts_t comp_opts
+      = {batch_size, nvcomp::TypeOf<data_type>(), 2, 1, use_bp};
 
   auto status = nvcompBatchedCascadedCompressAsync(
       uncompressed_ptrs_device,
@@ -745,8 +745,7 @@ void test_out_of_bound(int use_bp)
       0,       // not used
       compressed_ptrs_device,
       compressed_bytes_device,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
+      comp_opts,
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -852,8 +851,6 @@ void test_out_of_bound(int use_bp)
       0,       // not used
       test_decompressed_ptrs_device,
       decompression_statuses,
-      &comp_opts,
-      nvcomp::TypeOf<data_type>(),
       0);
 
   REQUIRE(status == nvcompSuccess);
@@ -909,7 +906,6 @@ TEST_CASE("BatchedCascadedCompressor predefined-cases", "[nvcomp]")
   test_predefined_cases<uint64_t>(0);
   test_predefined_cases<uint64_t>(1);
 }
-
 TEST_CASE("BatchedCascadedCompressor fallback-path", "[nvcomp]")
 {
   test_fallback_path<int8_t>();

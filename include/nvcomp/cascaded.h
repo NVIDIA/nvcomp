@@ -272,6 +272,87 @@ nvcompStatus_t nvcompCascadedSelectorRun(
  *****************************************************************************/
 
 /**
+ * @brief Structure that stores the compression configuration
+ */
+typedef struct
+{
+  /**
+   * @brief The size of each chunk of data to decompress indepentently with
+   * Cascaded compression. Chunk size should be in the range of [512, 16384]
+   * depending on the datatype of the input and the shared memory size of
+   * the GPU being used.
+   * Recommended size is 4096.
+   */
+  size_t chunk_size;
+
+  /**
+   * @brief The datatype used to define the bit-width for compression
+   */
+  nvcompType_t type;
+
+  /**
+   * @brief The number of Run Length Encodings to perform.
+   */
+  int num_RLEs;
+
+  /**
+   * @brief The number of Delta Encodings to perform.
+   */
+  int num_deltas;
+
+  /**
+   * @brief Whether or not to bitpack the final layers.
+   */
+  int use_bp;
+} nvcompBatchedCascadedOpts_t;
+
+// Default options for batched compression
+static const nvcompBatchedCascadedOpts_t nvcompBatchedCascadedDefaultOpts
+    = {4096, NVCOMP_TYPE_INT, 2, 1, 1};
+
+/**
+ * @brief Get temporary space required for compression.
+ *
+ * NOTE: Batched Cascaded compression does not require temp space, so
+ * this will set temp_bytes=0, unless an error is found with the format_opts.
+ *
+ * @param batch_size The number of items in the batch.
+ * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the
+ * batch.
+ * @param format_opts The Cascaded compression options and datatype to use.
+ * @param temp_bytes The size of the required GPU workspace for compression
+ * (output).
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompStatus_t nvcompBatchedCascadedCompressGetTempSize(
+    size_t batch_size,
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedCascadedOpts_t format_opts,
+    size_t* temp_bytes);
+
+/**
+ * @brief Get the maximum size any chunk could compress to in the batch. That
+ * is, the minimum amount of output memory required to be given
+ * nvcompBatchedCascadedCompressAsync() for each batch item.
+ *
+ * Chunk size must be limited by the shared memory available on the GPU
+ * being used.  In general, it must not exceed 16384, but 4096 bytes is
+ * recommended.
+ *
+ * @param max_uncompressed_chunk_bytes The maximum size of a chunk in the batch.
+ * @param format_opts The Cascaded compression options to use.
+ * @param max_compressed_byes The maximum compressed size of the largest chunk
+ * (output).
+ *
+ * @return The nvcompSuccess unless there is an error.
+ */
+nvcompStatus_t nvcompBatchedCascadedCompressGetMaxOutputChunkSize(
+    size_t max_uncompressed_chunk_bytes,
+    nvcompBatchedCascadedOpts_t format_opts,
+    size_t* max_compressed_bytes);
+
+/**
  * @brief Perform batched asynchronous compression.
  *
  * NOTE: Unlike `nvcompCascadedCompressAsync`, a valid compression format must
@@ -299,7 +380,6 @@ nvcompStatus_t nvcompCascadedSelectorRun(
  * @param[out] device_compressed_bytes Number of bytes decompressed of all
  * partitions. The buffer should be preallocated in device-accessible memory.
  * @param[in] format_opts The cascaded format options. The format must be valid.
- * @param[in] type The data type of the uncompressed data.
  * @param[in] stream The cuda stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
@@ -313,9 +393,22 @@ nvcompStatus_t nvcompBatchedCascadedCompressAsync(
     size_t temp_bytes,     // not used
     void* const* device_compressed_ptrs,
     size_t* device_compressed_bytes,
-    const nvcompCascadedFormatOpts* format_opts,
-    nvcompType_t type,
+    const nvcompBatchedCascadedOpts_t format_opts,
     cudaStream_t stream);
+
+/**
+ * @brief Get the amount of temp space required on the GPU for decompression.
+ *
+ * @param num_chunks The number of items in the batch.
+ * @param max_uncompressed_chunk_bytes The size of the largest chunk in bytes
+ * when uncompressed.
+ * @param temp_bytes The amount of temporary GPU space that will be required to
+ * decompress.
+ *
+ * @return nvcompSuccess if successful, and an error code otherwise.
+ */
+nvcompStatus_t nvcompBatchedCascadedDecompressGetTempSize(
+    size_t num_chunks, size_t max_uncompressed_chunk_bytes, size_t* temp_bytes);
 
 /**
  * @brief Perform batched asynchronous decompression.
@@ -351,8 +444,6 @@ nvcompStatus_t nvcompBatchedCascadedCompressAsync(
  * `nvcompSuccess`. If the decompression is not successful, for example due to
  * the corrupted input or out-of-bound errors, the status will be set to
  * `nvcompErrorCannotDecompress`.
- * @param[in] format_opts The cascaded format options. The format must be valid.
- * @param[in] type The data type of the uncompressed data.
  * @param[in] stream The cuda stream to operate on.
  */
 nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
@@ -365,8 +456,6 @@ nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
     size_t temp_bytes,           // not used
     void* const* device_uncompressed_ptrs,
     nvcompStatus_t* device_statuses,
-    const nvcompCascadedFormatOpts* format_opts,
-    nvcompType_t type,
     cudaStream_t stream);
 
 /**
