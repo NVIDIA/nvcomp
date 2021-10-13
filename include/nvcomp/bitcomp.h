@@ -199,7 +199,7 @@ typedef struct
 } nvcompBatchedBitcompFormatOpts;
 
 static const nvcompBatchedBitcompFormatOpts nvcompBatchedBitcompDefaultOpts
-    = {.algorithm_type = 0, .data_type = NVCOMP_TYPE_UCHAR};
+    = {0, NVCOMP_TYPE_UCHAR};
 
 /**
  * @brief Get the maximum size any chunk could compress to in the batch. That

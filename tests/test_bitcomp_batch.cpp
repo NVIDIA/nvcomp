@@ -181,7 +181,7 @@ std::vector<batch_info> generate_offsets(split_type split, size_t size)
  *****************************************************************************/
 
 template <typename T>
-int test_bitcomp_batch(
+void test_bitcomp_batch(
     std::vector<T> input, split_type split)
 {
   int err = 0;

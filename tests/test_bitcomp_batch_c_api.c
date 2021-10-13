@@ -26,7 +26,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef ENABLE_BITCOMP
+
 #include "nvcomp/bitcomp.h"
 #include "test_batch_c_api.h"
 
 GENERATE_TESTS(Bitcomp);
+
+#else
+#include <stdio.h>
+int main()
+{
+    printf ("Bitcomp not enabled, skipping tests\n");
+    return 0;
+}
+#endif
