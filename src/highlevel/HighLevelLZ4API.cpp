@@ -63,10 +63,7 @@ void check_format_opts(const nvcompLZ4FormatOpts* const format_opts)
 {
   CHECK_NOT_NULL(format_opts);
 
-  if (format_opts->chunk_size < lz4MinChunkSize()) {
-    throw std::runtime_error(
-        "LZ4 minimum chunk size is " + std::to_string(lz4MinChunkSize()));
-  } else if (format_opts->chunk_size > lz4MaxChunkSize()) {
+  if (format_opts->chunk_size > lz4MaxChunkSize()) {
     throw std::runtime_error(
         "LZ4 maximum chunk size is " + std::to_string(lz4MaxChunkSize()));
   }

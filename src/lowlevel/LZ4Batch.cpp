@@ -168,7 +168,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
 nvcompStatus_t nvcompBatchedLZ4CompressAsync(
     const void* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
-    const size_t /* max_uncompressed_chunk_size */,
+    const size_t max_uncompressed_chunk_size,
     const size_t batch_size,
     void* const temp_ptr,
     const size_t temp_bytes,
@@ -186,6 +186,7 @@ nvcompStatus_t nvcompBatchedLZ4CompressAsync(
         CudaUtils::device_pointer(
             reinterpret_cast<const uint8_t* const*>(device_in_ptrs)),
         CudaUtils::device_pointer(device_in_bytes),
+        max_uncompressed_chunk_size,
         batch_size,
         temp_ptr,
         temp_bytes,
