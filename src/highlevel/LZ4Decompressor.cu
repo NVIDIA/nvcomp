@@ -193,8 +193,8 @@ void LZ4Decompressor::decompress_async(cudaStream_t stream)
   size_t* actual_out_sizes_devices;
   temp.reserve(&actual_out_sizes_devices, m_num_chunks);
 
-  nvcompStatus_t* device_status_ptrs;
-  temp.reserve(&device_status_ptrs, m_num_chunks);
+  nvcompStatus_t* device_statuses;
+  temp.reserve(&device_statuses, m_num_chunks);
 
   const dim3 block(128);
   const dim3 grid(roundUpDiv(m_num_chunks, block.x));
@@ -220,7 +220,7 @@ void LZ4Decompressor::decompress_async(cudaStream_t stream)
       workspace,
       workspace_size,
       out_ptrs_device,
-      device_status_ptrs,
+      device_statuses,
       stream));
 }
 

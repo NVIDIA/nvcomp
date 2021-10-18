@@ -84,7 +84,7 @@ nvcompStatus_t nvcompDecompressGetMetadata(
   DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
 
   cudaStreamSynchronize(stream);
-  if (LZ4IsData(in_ptr, in_bytes, stream)) {
+  if (nvcompLZ4IsData(in_ptr, in_bytes, stream)) {
     size_t metadata_bytes, temp_bytes, uncompressed_bytes;
     return nvcompLZ4DecompressConfigure(
         in_ptr,
@@ -132,7 +132,7 @@ void nvcompDecompressDestroyMetadata(void* const metadata_ptr)
 #ifdef ENABLE_BITCOMP
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
 #endif
-  if (LZ4IsMetadata(metadata_ptr)) {
+  if (nvcompLZ4IsMetadata(metadata_ptr)) {
     nvcompLZ4DestroyMetadata(metadata_ptr);
   }
 #ifdef ENABLE_BITCOMP
@@ -151,7 +151,7 @@ nvcompStatus_t nvcompDecompressGetTempSize(
   DEPRECATED_FUNC("nvcomp*DecompressConfigure()");
 
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
-  if (LZ4IsMetadata(metadata_ptr)) {
+  if (nvcompLZ4IsMetadata(metadata_ptr)) {
     try {
       size_t metadata_bytes = sizeof(LZ4Metadata);
       size_t uncompressed_bytes;
@@ -219,7 +219,7 @@ nvcompStatus_t nvcompDecompressGetType(
     return nvcompErrorInvalidValue;
   }
 
-  if (LZ4IsMetadata(metadata_ptr)) {
+  if (nvcompLZ4IsMetadata(metadata_ptr)) {
     // LZ4 always operates on bytes
     *type = NVCOMP_TYPE_CHAR;
   }
@@ -244,7 +244,7 @@ nvcompStatus_t nvcompDecompressAsync(
   DEPRECATED_FUNC("nvcomp*DecompressAsync()");
 
   const Metadata* const metadata = static_cast<const Metadata*>(metadata_ptr);
-  if (LZ4IsMetadata(metadata_ptr)) {
+  if (nvcompLZ4IsMetadata(metadata_ptr)) {
     return nvcompLZ4DecompressAsync(
         in_ptr,
         in_bytes,

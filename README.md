@@ -2,24 +2,33 @@
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
 
-nvCOMP 2.1.0-dev includes Cascaded, LZ4, and Snappy compression methods.
-Support for Bitcomp and GDeflate will come with the official release of 2.1.0,
-and are not supported for 2.1.0-dev.
+## nvCOMP Compression algorithms
 
-Cascaded compression methods demonstrate high performance with up to 500 GB/s
-throughput and a high compression ratio of up to 80x on numerical data from
-analytical workloads.
-Snappy and LZ4 methods can achieve up to 100 GB/s compression and decompression
-throughput depending on the dataset, and show good compression ratios for
-arbitrary byte streams.
+- Cascaded: Novel high-throughput compressor ideal for analytical or structured/tabular data.
+- LZ4: General-purpose no-entropy byte-level compressor well-suited for a wide range of datasets.
+- Snappy: Similar to LZ4, this byte-level compressor is a popular existing format used for tabular data.
+- GDeflate: Proprietary compressor with entropy encoding and LZ77, high compression ratios on arbitrary data.
+- Bitcomp: Proprietary compressor designed for floating point data in Scientific Computing applications.
 
-Below are compression ratio and performance plots for three methods available in nvCOMP (Cascaded, Snappy and LZ4). Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The numbers were collected on a NVIDIA A100 80GB GPU (with ECC on). 
+## Compression algorithm sample results
 
-![compression ratio](/doc/compression_ratio.svg)
+Compression ratio and performance plots for each of the compression methods available in nvCOMP are now provided. Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The numbers were collected on a NVIDIA A100 80GB GPU (with ECC on). 
 
-![compression performance](/doc/compression_performance_a100.svg)
+<center><strong>CompressionRatios</strong></center>
 
-![decompression performance](/doc/decompression_performance_a100.svg)
+![compression ratio](/doc/CompressionRatios.svg)
+
+<center><strong>CompressionThroughput</strong></center>
+
+![compression performance](/doc/CompressionThroughput.svg)
+
+<center><strong>DecompressionThroughput</strong></center>
+
+![decompression performance](/doc/DecompressionThroughput.svg)
+
+## Version 2.1 Release
+
+This minor release of nvCOMP enhances the low-level interface by adding configuration options, a new error reporting mechanism and functions that calculate the size of the decompressed output.
 
 nvCOMP 2.1 features new flexible APIs:
 * [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
@@ -32,26 +41,23 @@ nvCOMP 2.1 features new flexible APIs:
   APIs are synchronous and for best performance/flexibility it’s recommended to
   use the low-level APIs.
 
-Please note, that in nvCOMP 2.1 some compressors are only available either through the Low-level API or through the High-level API.
-
-Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
-
-# Version 2.1 Release
-
-This minor release of nvCOMP enhances the low-level interface by adding configuration options, new error reporting mechanism and function to calculate the size of the decompressed output
+In nvCOMP 2.1 all compressors are available through the low-level API. A high-level API is provided for LZ4, Bitcomp and Cascaded.
 
 ## Known issues
+* Cascaded and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. However, there are no implicit checksums implemented for any of the compressors. For full verification of the stream, it's recommended to run checksum separately.  
+* The Cascaded high-level compression API requires a large amount of temporary workspace to
+operate. The current workaround is to compress/decompress large datasets in pieces,
+re-using temporary workspaces for each piece. Alternatively, the low-level Cascaded API may be used and uses shared memory for its temp space.
+* Cascaded and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values.
+* The Bitcomp low-level batched decompression function is not fully asynchronous.
 
-* Bitcomp and GDeflate are not supported in the preview version of 2.1.0. They
-will be supported in the full release of 2.1.0.
-* Cascaded compression requires a large amount of temporary workspace to
-operate. Current workaround is to compress/decompress large datasets in pieces,
-re-using temporary workspace for each piece.
-
-# Requirements
+## Requirements
 Pascal (sm60) or higher GPU architecture is required. Volta+ GPU architecture is recommended for best results.
 
-# Building the library, with nvCOMP extensions
+# Getting Started
+Below you can find instructions on how to build the library, reproduce our benchmarking results, a guide on how to integrate into your application and a detailed description of the compression methods. Enjoy!
+
+## Building the library, with nvCOMP extensions
 To configure nvCOMP extensions, simply define the `NVCOMP_EXTS_ROOT` variable
 to allow CMake to find the library
 
@@ -65,10 +71,10 @@ cd nvcomp
 mkdir build
 cd build
 cmake -DNVCOMP_EXTS_ROOT=/path/to/nvcomp_exts/${CUDA_VERSION} ..
-make -j4
+make -j
 ```
 
-# Building the library, without nvCOMP extensions
+## Building the library, without nvCOMP extensions
 nvCOMP uses CMake for building. Generally, it is best to do an out of source build:
 ```
 git clone https://github.com/NVIDIA/nvcomp.git
@@ -79,14 +85,13 @@ make -j
 ```
 
 If you're building using CUDA 10 or less, you will need to specify a path to
-[CUB](https://github.com/thrust/cub) on your system, of at least version
-1.9.10.
+[CUB](https://github.com/thrust/cub) on your system. Install version 1.8 (https://github.com/thrust/cub/tree/1.8.0) to ensure interoperability with thrust.
 
 ```
 cmake -DCUB_DIR=<path to cub repository>
 ```
 
-# Install the library
+## Install the library
 
 The library can then be installed via:
 ```
@@ -104,17 +109,18 @@ make install
 Will install the `libnvcomp.so` into `/foo/bar/lib/libnvcomp.so` and the
 headers into `/foo/bar/include/`.
 
-# How to use the library in your code
+## How to use the library in your code
 
 * [High-level Quick Start Guide](doc/highlevel_cpp_quickstart.md)
 * [Low-level Quick Start Guide](doc/lowlevel_c_quickstart.md)
 * [Cascaded Format Selector Guide](doc/selector-quickstart.md)
 
-# Further information about our compression algorithms
+
+## Further information about some of our compression algorithms
 
 * [Algorithms overview](doc/algorithms_overview.md)
 
-# Running benchmarks
+## Running benchmarks
 
 By default the benchmarks are not built. To build them, pass
 `-DBUILD_BENCHMARKS=ON` to cmake.
@@ -130,7 +136,7 @@ To obtain TPC-H data:
 - Run `./dbgen -s <scale factor>`, then grab `lineitem.tbl`
 
 To obtain Mortgage data:
-- Download any of the archives from https://rapidsai.github.io/demos/datasets/mortgage-data
+- Download any of the archives from https://docs.rapids.ai/datasets/mortgage-data
 - Unpack and grab `perf/Perforamnce_<year><quarter>.txt`, e.g. `Perforamnce_2000Q4.txt`
 
 Convert CSV files to binary files:
@@ -161,7 +167,7 @@ compression throughput (GB/s): 36.64
 decompression throughput (GB/s): 118.47
 ```
 
-# Running examples
+## Running examples
 
 By default the examples are not built. To build the CPU compression examples, pass `-DBUILD_EXAMPLES=ON` to cmake.
 

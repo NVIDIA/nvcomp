@@ -1,5 +1,5 @@
 # Algorithms Overview
-The nvcomp library currently supports two compression schemes: Cascaded and LZ4. These schemes differ significantly in their algorithmic approach and use cases. Overall, the nvcomp library aims to achieve high compression/decompression throughput on GPUs, requiring a high degree of parallelism. The parallel algorithms that we use for each of these compression schemes are outlined below.
+Here we'll discuss two of the compression schemes supported by nvcomp: Cascaded and LZ4. These schemes differ significantly in their algorithmic approach and use cases. Overall, the nvcomp library aims to achieve high compression/decompression throughput on GPUs, requiring a high degree of parallelism. The parallel algorithms that we use for each of these compression schemes are outlined below.
 
 ## Cascaded Compression
 Cascaded compression is a general compression scheme that is ideally suited for analytical workloads. It uses a series of low-level compression building blocks that can be used in combination. Since there are many possible combinations of these building blocks, Cascaded compression can be configured in several different ways. Below is a brief overview of each low-level building block compression scheme.
