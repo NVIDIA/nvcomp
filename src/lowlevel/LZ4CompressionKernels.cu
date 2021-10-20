@@ -89,7 +89,7 @@ constexpr const position_type DECOMP_BUFFER_PREFETCH_DIST
  * @brief The number of elements in the hash table to use while performing
  * compression.
  */
-constexpr const position_type HASH_TABLE_SIZE = 1U << 14;
+constexpr const position_type MAX_HASH_TABLE_SIZE = 1U << 14;
 
 /**
  * @brief The value used to explicitly represent and invalid offset. This
@@ -101,17 +101,6 @@ constexpr const offset_type NULL_OFFSET = static_cast<offset_type>(-1);
  * @brief The maximum size of a valid offset.
  */
 constexpr const position_type MAX_OFFSET = (1U << 16) - 1;
-
-/**
- * @brief The minimum chunk size that can be used in single buffer compression.
- * This is so that we can re-use the output buffer to work as a hashtable, since
- * the compressed chunks are written to independent locations in the temporary
- * space. Later they are copied to by contiguous in the output buffer.
- * NOTE: the "batched" interface does not make use of this since it writes it's
- * output directly to the specififed locations, and stores it's hashtables in
- * the temporary space.
- */
-constexpr const size_t MIN_CHUNK_SIZE = sizeof(offset_type) * HASH_TABLE_SIZE;
 
 /**
  * @brief The last 5 bytes of input are always literals.
@@ -505,10 +494,10 @@ inline __device__ void coopCopyOverlap(
   }
 }
 
-inline __device__ position_type hash(const word_type key)
+inline __device__ position_type hash(const word_type key, position_type hash_table_size)
 {
   // needs to be 12 bits
-  return (__brev(key) + (key ^ 0xc375)) & (HASH_TABLE_SIZE - 1);
+  return (__brev(key) + (key ^ 0xc375)) & (hash_table_size - 1);
 }
 
 inline __device__ uint8_t encodePair(const uint8_t t1, const uint8_t t2)
@@ -667,11 +656,12 @@ inline __device__ int numValidThreadsToMask(const int numValidThreads)
 
 inline __device__ void insertHashTableWarp(
     offset_type* hashTable,
+    const position_type hashTableSize,
     const offset_type pos,
     const word_type next,
     const int numValidThreads)
 {
-  position_type hashPos = hash(next);
+  position_type hashPos = hash(next, hashTableSize);
 
   if (threadIdx.x < numValidThreads) {
     const int match
@@ -738,6 +728,7 @@ __device__ void compressStream(
     uint8_t* compData,
     const T* decompData,
     offset_type* const hashTable,
+    const position_type hash_table_size,
     const position_type length,
     size_t* comp_length)
 {
@@ -752,7 +743,7 @@ __device__ void compressStream(
   position_type comp_idx = 0;
   const position_type typed_length = divRoundUp(length, sizeof(T));
 
-  for (position_type i = threadIdx.x; i < HASH_TABLE_SIZE;
+  for (position_type i = threadIdx.x; i < hash_table_size;
        i += COMP_THREADS_PER_CHUNK) {
     hashTable[i] = NULL_OFFSET;
   }
@@ -832,7 +823,7 @@ __device__ void compressStream(
 
       {
         // go to hash table for an earlier match
-        position_type hashPos = hash(next);
+        position_type hashPos = hash(next, hash_table_size);
         word_type offset = decomp_idx;
         const int match_found = threadIdx.x < first_match_thread
                                     ? isValidHash<T>(
@@ -862,7 +853,7 @@ __device__ void compressStream(
       if (match_location != typed_length) {
         // insert up to the match into the hash table
         insertHashTableWarp(
-            hashTable, decomp_idx + threadIdx.x, next, first_match_thread);
+            hashTable, hash_table_size, decomp_idx + threadIdx.x, next, first_match_thread);
 
         const position_type pos = decomp_idx + first_match_thread;
         assert(match_location < pos);
@@ -894,7 +885,7 @@ __device__ void compressStream(
 
       // insert everything into hash table
       insertHashTableWarp(
-          hashTable, decomp_idx + threadIdx.x, next, numValidThreads);
+          hashTable, hash_table_size, decomp_idx + threadIdx.x, next, numValidThreads);
 
       decomp_idx += numValidThreads;
     }
@@ -1039,7 +1030,8 @@ __global__ void lz4CompressBatchKernel(
     const size_t* const device_in_bytes,
     uint8_t* const* const device_out_ptr,
     size_t* const device_out_bytes,
-    offset_type* const temp_space)
+    offset_type* const temp_space,
+    const position_type hash_table_size)
 {
   static_assert(sizeof(T) <= sizeof(uint32_t) && "Max alignment support is 4 bytes");
 
@@ -1052,9 +1044,9 @@ __global__ void lz4CompressBatchKernel(
   uint8_t* const comp_ptr = device_out_ptr[bidx];
   size_t* const comp_length = device_out_bytes + bidx;
 
-  offset_type* const hash_table = temp_space + bidx * HASH_TABLE_SIZE;
+  offset_type* const hash_table = temp_space + bidx * hash_table_size;
 
-  compressStream(comp_ptr, reinterpret_cast<const T*>(decomp_ptr), hash_table, decomp_length, comp_length);
+  compressStream(comp_ptr, reinterpret_cast<const T*>(decomp_ptr), hash_table, hash_table_size, decomp_length, comp_length);
 }
 
 __global__ void lz4DecompressBatchKernel(
@@ -1101,9 +1093,26 @@ __global__ void lz4DecompressBatchKernel(
  * PUBLIC FUNCTIONS ***********************************************************
  *****************************************************************************/
 
+static size_t lz4GetHashTableSize(size_t max_chunk_size)
+{
+  auto roundUpPow2 = [](size_t x) {
+    size_t ans = 1;
+    while(ans < x)
+      ans *= 2;
+    return ans;
+  };
+  // when chunk size is smaller than the max hashtable size round the
+  // hashtable size up to the nearest power of 2 of the chunk size.
+  // The lower load factor from a significantly larger hashtable size compared
+  // to the chunk size doesn't increase performance, however having a smaller
+  // hashtable which yields much high cache utilization does.
+  return min(roundUpPow2(max_chunk_size), (size_t)MAX_HASH_TABLE_SIZE);
+}
+
 void lz4BatchCompress(
     const uint8_t* const* decomp_data_device,
     const size_t* const decomp_sizes_device,
+    const size_t max_chunk_size,
     const size_t batch_size,
     void* const temp_data,
     const size_t temp_bytes,
@@ -1112,8 +1121,11 @@ void lz4BatchCompress(
     nvcompType_t data_type,
     cudaStream_t stream)
 {
+
+  position_type HT_size = lz4GetHashTableSize(max_chunk_size);
+
   const size_t total_required_temp
-      = batch_size * HASH_TABLE_SIZE * sizeof(offset_type);
+      = batch_size * HT_size * sizeof(offset_type);
   if (temp_bytes < total_required_temp) {
     throw std::runtime_error(
         "Insufficient temp space: got " + std::to_string(temp_bytes)
@@ -1133,7 +1145,8 @@ void lz4BatchCompress(
           decomp_sizes_device,
           comp_data_device,
           comp_sizes_device,
-          static_cast<offset_type*>(temp_data));
+          static_cast<offset_type*>(temp_data),
+          HT_size);
       break;
     case NVCOMP_TYPE_SHORT:
     case NVCOMP_TYPE_USHORT:
@@ -1142,7 +1155,8 @@ void lz4BatchCompress(
           decomp_sizes_device,
           comp_data_device,
           comp_sizes_device,
-          static_cast<offset_type*>(temp_data));
+          static_cast<offset_type*>(temp_data),
+          HT_size);
       break;
     case NVCOMP_TYPE_INT:
     case NVCOMP_TYPE_UINT:
@@ -1151,7 +1165,8 @@ void lz4BatchCompress(
           decomp_sizes_device,
           comp_data_device,
           comp_sizes_device,
-          static_cast<offset_type*>(temp_data));
+          static_cast<offset_type*>(temp_data),
+          HT_size);
       break;
     default:
       throw std::invalid_argument("Unsupported input data type");
@@ -1231,7 +1246,7 @@ size_t lz4BatchCompressComputeTempSize(
         "Maximum chunk size for LZ4 is " + std::to_string(lz4MaxChunkSize()));
   }
 
-  return HASH_TABLE_SIZE * sizeof(offset_type) * batch_size;
+  return lz4GetHashTableSize(max_chunk_size) * sizeof(offset_type) * batch_size;
 }
 
 size_t lz4DecompressComputeTempSize(
@@ -1249,11 +1264,6 @@ size_t lz4ComputeMaxSize(const size_t size)
         "Maximum chunk size for LZ4 is " + std::to_string(lz4MaxChunkSize()));
   }
   return maxSizeOfStream(size);
-}
-
-size_t lz4MinChunkSize()
-{
-  return MIN_CHUNK_SIZE;
 }
 
 size_t lz4MaxChunkSize()

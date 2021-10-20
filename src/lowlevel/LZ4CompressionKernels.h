@@ -49,6 +49,7 @@ namespace lowlevel
 void lz4BatchCompress(
     const uint8_t* const* decomp_data_device,
     const size_t* decomp_sizes_device,
+    const size_t max_chunk_size,
     const size_t batch_size,
     void* temp_data,
     size_t temp_bytes,
@@ -100,8 +101,6 @@ size_t lz4DecompressComputeTempSize(
     const size_t max_chunks_in_batch, const size_t chunk_size);
 
 size_t lz4ComputeMaxSize(const size_t chunk_size);
-
-size_t lz4MinChunkSize();
 
 size_t lz4MaxChunkSize();
 } // namespace lowlevel
