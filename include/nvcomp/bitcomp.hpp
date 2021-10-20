@@ -36,8 +36,6 @@
 
 #ifdef ENABLE_BITCOMP
 
-#include <bitcomp.h>
-
 namespace nvcomp
 {
 
