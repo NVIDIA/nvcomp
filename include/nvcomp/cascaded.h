@@ -282,6 +282,7 @@ typedef struct
    * depending on the datatype of the input and the shared memory size of
    * the GPU being used.
    * Recommended size is 4096.
+   * NOTE: Not currently used and a default of 4096 is just used.
    */
   size_t chunk_size;
 
