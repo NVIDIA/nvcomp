@@ -26,19 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "benchmark_template_chunked.cuh"
 #include "nvcomp/cascaded.h"
+#include "test_batch_c_api.h"
 
-// Template benchmark uses a fixed format Opts, so just defaulting to INT for
-// now.
-// TODO: Update benchmark to accept type as a command-line parameter
-static const nvcompBatchedCascadedOpts_t nvcompBatchedCascadedTestOpts
-    = {4096, NVCOMP_TYPE_UINT, 2, 1, 1};
-
-GENERATE_CHUNKED_BENCHMARK(
-    nvcompBatchedCascadedCompressGetTempSize,
-    nvcompBatchedCascadedCompressGetMaxOutputChunkSize,
-    nvcompBatchedCascadedCompressAsync,
-    nvcompBatchedCascadedDecompressGetTempSize,
-    nvcompBatchedCascadedDecompressAsync,
-    nvcompBatchedCascadedTestOpts);
+GENERATE_TESTS(Cascaded);

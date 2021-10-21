@@ -63,7 +63,7 @@ __device__ inline nvcompType_t d_TypeOf()
     return NVCOMP_TYPE_CHAR;
   }
 
-// TODO - perform error checking and notify user if incorrect type is given
+  // TODO - perform error checking and notify user if incorrect type is given
 }
 
 constexpr int default_chunk_size = 4096;
@@ -1030,11 +1030,26 @@ __global__ void cascaded_compression_kernel(
 }
 
 /**
- * @brief Helper macro to determine the shared memory requirement
- * based on the chunk size.
+ * @brief Helper function to determine the shared memory requirement
+ * based on the chunk size and datatype...
+ * @tparam chunk_size Size of the chunk in bytes
+ * @tparam width Width of the datatype being used (in bytes)
+ * @tparam storage_width Width in bytes of the storage type used
+ * to compute offset.  This should be a minimum of 4 bytes, or 8
+ * bytes if the width is also 8 bytes.
  */
-#define NVCOMP_COMPUTE_SHMEM_SIZE(chunk_size)           \
-  roundUpTo(6 * chunk_size + 112, 8);                   
+template <int chunk_size, int width, int storage_width>
+__device__ constexpr int compute_smem_size() 
+{
+  constexpr int storage_num_elts
+      = roundUpDiv(chunk_size + 4 + width, storage_width);
+  constexpr int tot_elt_storage = 2 * (storage_num_elts * storage_width);
+  constexpr int run_width = 2;
+  constexpr int chunk_num_elements = chunk_size / width;
+  constexpr int tot_count_bytes = 2 * (chunk_num_elements * run_width);
+
+  return 64 + tot_elt_storage + tot_count_bytes + (4 * 8);
+}
 
 /**
  * @brief Device function to perform batched cascaded decompression for
@@ -1088,8 +1103,8 @@ __device__ void cascaded_decompression_fcn(
   // make sure the storage starts at an 8-byte alignment location.
   // Here we assume the metadata is at most 64B.
   uint64_t* chunk_metadata_storage = static_cast<uint64_t*>(shmem);
-  shmem = static_cast<void*>(static_cast<uint8_t*>(shmem) + 64);
   auto chunk_metadata = reinterpret_cast<uint32_t*>(chunk_metadata_storage);
+  shmem = static_cast<void*>((static_cast<uint8_t*>(shmem)) + 64);
 
   // `shared_element_storage_0` and `shared_element_storage_1` are shared memory
   // storage used for the data arrays of the input and the output of the current
@@ -1106,6 +1121,7 @@ __device__ void cascaded_decompression_fcn(
       = static_cast<shared_storage_type*>(shmem);
   shmem = static_cast<void*>(
       static_cast<shared_storage_type*>(shmem) + storage_num_elements);
+
   data_type* shared_element_buffer_0
       = reinterpret_cast<data_type*>(shared_element_storage_0);
 
@@ -1124,6 +1140,7 @@ __device__ void cascaded_decompression_fcn(
   uint32_t* count_array = static_cast<uint32_t*>(shmem);
   shmem = static_cast<void*>(
       static_cast<uint8_t*>(shmem) + (chunk_num_elements * sizeof(run_type)));
+
   uint32_t* temp_count_array = static_cast<uint32_t*>(shmem);
   shmem = static_cast<void*>(
       static_cast<uint8_t*>(shmem) + (chunk_num_elements * sizeof(run_type)));
@@ -1388,10 +1405,13 @@ __device__ void cascaded_decompression_fcn(
 }
 
 /**
- * @brief Kernel to perform batched cascaded decompression. Simply extracts the
- * datatype from the metadata of the compressed buffer and calls a device
- * function based on that.
+ * @brief Kernel to perform batched cascaded decompression. Extracts the
+ * datatype from the metadata of the compressed buffer, then checks of the
+ * templated call type matches.  If it matches, it allocates the correct amount
+ * of shared memory and runs decompression.  Otherwise, it just exits.
  *
+ * @tparam bitwidth_test Data type to use for underlying decompression.  If
+ * datatype found in metadata matches, perform compression, else exit.
  * @tparam size_type Data type used for size measures, typically size_t is used.
  * @tparam threadblock_size Number of threads in a threadblock. This argument
  * must match the configuration specified when launching this kernel.
@@ -1411,10 +1431,11 @@ __device__ void cascaded_decompression_fcn(
  * all partitions.
  */
 template <
+    int bitwidth_test,
     typename size_type,
     int threadblock_size,
     int chunk_size = default_chunk_size>
-__global__ void cascaded_decompression_kernel(
+__global__ void cascaded_decompression_kernel_type_check(
     int batch_size,
     const void* const* compressed_data,
     const size_type* compressed_bytes,
@@ -1430,28 +1451,76 @@ __global__ void cascaded_decompression_kernel(
       = reinterpret_cast<const uint8_t*>(partition_start_ptr);
   const auto type = static_cast<nvcompType_t>(partition_metadata_ptr[3]);
 
-  // Allocate maximum amount of shared memory needed for any supported datatype
-  // Size is calculated by the maximum shared memory that will be needed during
-  // compression for any datatype, since it is selected determined dynamically.
-//  const int shmem_size = compute_shmem_size(chunk_size);
-  const int shmem_size = NVCOMP_COMPUTE_SHMEM_SIZE(chunk_size);
-  __shared__ uint8_t shmem[shmem_size];
+  switch (bitwidth_test) {
+  case 1:
+    if (type == NVCOMP_TYPE_CHAR || type == NVCOMP_TYPE_UCHAR) {
+      // allocate shmem and run fcn for 1-byte type
+      const int shmem_size = compute_smem_size<chunk_size, 1, 4>();
+      __shared__ uint8_t shmem[shmem_size];
 
-  // Call device function based on datatype used, and pass in allocated shared
-  // memory
-  NVCOMP_TYPE_THREE_SWITCH_FIRST_ONLY(
-      type,
-      size_type,
-      threadblock_size,
-      cascaded_decompression_fcn,
-      batch_size,
-      compressed_data,
-      compressed_bytes,
-      decompressed_data,
-      decompressed_buffer_bytes,
-      actual_decompressed_bytes,
-      (void*)shmem,
-      statuses);
+      cascaded_decompression_fcn<uint8_t, size_type, threadblock_size>(
+          batch_size,
+          compressed_data,
+          compressed_bytes,
+          decompressed_data,
+          decompressed_buffer_bytes,
+          actual_decompressed_bytes,
+          (void*)shmem,
+          statuses);
+    }
+    break;
+  case 2:
+    if (type == NVCOMP_TYPE_SHORT || type == NVCOMP_TYPE_USHORT) {
+      // allocate shmem and run fcn for 2-byte type
+      const int shmem_size = compute_smem_size<chunk_size, 2, 4>();
+      __shared__ uint8_t shmem[shmem_size];
+
+      cascaded_decompression_fcn<uint16_t, size_type, threadblock_size>(
+          batch_size,
+          compressed_data,
+          compressed_bytes,
+          decompressed_data,
+          decompressed_buffer_bytes,
+          actual_decompressed_bytes,
+          (void*)shmem,
+          statuses);
+    }
+    break;
+  case 4:
+    if (type == NVCOMP_TYPE_INT || type == NVCOMP_TYPE_UINT) {
+      // allocate shmem and run fcn for 4-byte type
+      const int shmem_size = compute_smem_size<chunk_size, 4, 4>();
+      __shared__ uint8_t shmem[shmem_size];
+
+      cascaded_decompression_fcn<uint32_t, size_type, threadblock_size>(
+          batch_size,
+          compressed_data,
+          compressed_bytes,
+          decompressed_data,
+          decompressed_buffer_bytes,
+          actual_decompressed_bytes,
+          (void*)shmem,
+          statuses);
+    }
+    break;
+  case 8:
+    if (type == NVCOMP_TYPE_LONGLONG || type == NVCOMP_TYPE_ULONGLONG) {
+      // allocate shmem and run fcn for 8-byte type
+      const int shmem_size = compute_smem_size<chunk_size, 8, 8>();
+      __shared__ uint8_t shmem[shmem_size];
+
+      cascaded_decompression_fcn<uint64_t, size_type, threadblock_size>(
+          batch_size,
+          compressed_data,
+          compressed_bytes,
+          decompressed_data,
+          decompressed_buffer_bytes,
+          actual_decompressed_bytes,
+          (void*)shmem,
+          statuses);
+    }
+    break;
+  }
 }
 
 __global__ void get_decompress_size_kernel(
@@ -1570,7 +1639,42 @@ nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
   // Just call kernel to perform compression. Macro for datatype happens within
   // kernel
   constexpr int threadblock_size = 128;
-  cascaded_decompression_kernel<size_t, threadblock_size>
+
+  // call for all 4 possible sizes, all except the correct one will immediately
+  // exit.
+
+  // CHAR or UCHAR
+  cascaded_decompression_kernel_type_check<1, size_t, threadblock_size>
+      <<<batch_size, threadblock_size, 0, stream>>>(
+          batch_size,
+          device_compressed_ptrs,
+          device_compressed_bytes,
+          device_uncompressed_ptrs,
+          device_uncompressed_bytes,
+          device_actual_uncompressed_bytes,
+          device_statuses);
+  // SHORT or USHORT
+  cascaded_decompression_kernel_type_check<2, size_t, threadblock_size>
+      <<<batch_size, threadblock_size, 0, stream>>>(
+          batch_size,
+          device_compressed_ptrs,
+          device_compressed_bytes,
+          device_uncompressed_ptrs,
+          device_uncompressed_bytes,
+          device_actual_uncompressed_bytes,
+          device_statuses);
+  // INT or UINT
+  cascaded_decompression_kernel_type_check<4, size_t, threadblock_size>
+      <<<batch_size, threadblock_size, 0, stream>>>(
+          batch_size,
+          device_compressed_ptrs,
+          device_compressed_bytes,
+          device_uncompressed_ptrs,
+          device_uncompressed_bytes,
+          device_actual_uncompressed_bytes,
+          device_statuses);
+  // LONGLONG or ULONGLONG
+  cascaded_decompression_kernel_type_check<8, size_t, threadblock_size>
       <<<batch_size, threadblock_size, 0, stream>>>(
           batch_size,
           device_compressed_ptrs,
