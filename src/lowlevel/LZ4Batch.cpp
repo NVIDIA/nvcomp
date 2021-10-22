@@ -92,8 +92,8 @@ nvcompStatus_t nvcompBatchedLZ4DecompressAsync(
         temp_bytes,
         CudaUtils::device_pointer(
             reinterpret_cast<uint8_t* const*>(device_uncompressed_ptrs)),
-        CudaUtils::device_pointer(device_actual_uncompressed_bytes),
-        CudaUtils::device_pointer(device_status_ptrs),
+        device_actual_uncompressed_bytes ? CudaUtils::device_pointer(device_actual_uncompressed_bytes) : nullptr,
+        device_status_ptrs ? CudaUtils::device_pointer(device_status_ptrs) : nullptr,
         stream);
 
   } catch (const std::exception& e) {

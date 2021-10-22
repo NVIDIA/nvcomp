@@ -1016,8 +1016,10 @@ inline __device__ void decompressStream(
   }
 
   if (threadIdx.x == 0) {
-    decompSize[0] = corrupted_sequence ? 0 : decomp_idx;
-    if (output_decompressed) {
+    if (decompSize != nullptr) {
+      decompSize[0] = corrupted_sequence ? 0 : decomp_idx;
+    }
+    if (output_decompressed && decompStatus != nullptr) {
       decompStatus[0]
           = corrupted_sequence ? nvcompErrorCannotDecompress : nvcompSuccess;
     }
@@ -1063,8 +1065,10 @@ __global__ void lz4DecompressBatchKernel(
 
   __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
 
-  assert(!output_decompressed || device_status_ptrs != nullptr);
   assert(!output_decompressed || device_out_ptrs != nullptr);
+  // device_uncompressed_bytes needs to be valid if we are precomputing
+  // output size
+  assert(output_decompressed || device_uncompressed_bytes != nullptr);
 
   if (bid < batch_size) {
     uint8_t* const decomp_ptr
@@ -1083,8 +1087,8 @@ __global__ void lz4DecompressBatchKernel(
         comp_ptr,
         chunk_length,
         output_buf_length,
-        device_uncompressed_bytes + bid,
-        device_status_ptrs + bid,
+        device_uncompressed_bytes ? device_uncompressed_bytes + bid : nullptr,
+        device_status_ptrs? device_status_ptrs + bid : nullptr,
         output_decompressed);
   }
 }

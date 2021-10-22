@@ -125,9 +125,7 @@ nvcompStatus_t nvcompBatchedSnappyDecompressAsync(
     CHECK_NOT_NULL(device_compressed_ptrs);
     CHECK_NOT_NULL(device_compressed_bytes);
     CHECK_NOT_NULL(device_uncompressed_bytes);
-    CHECK_NOT_NULL(device_actual_uncompressed_bytes);
     CHECK_NOT_NULL(device_uncompressed_ptr);
-    CHECK_NOT_NULL(device_statuses);
 
     gpu_unsnap(
         device_compressed_ptrs,
