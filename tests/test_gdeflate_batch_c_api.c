@@ -30,6 +30,8 @@
 #include "nvcomp/gdeflate.h"
 #include "test_batch_c_api.h"
 
+#define SUPPORT_NULLPTR_APIS
+
 GENERATE_TESTS(Gdeflate);
 #else
 int main(int argc, char** argv) {
