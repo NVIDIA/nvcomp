@@ -41,3 +41,7 @@ if (LZ4_INCLUDE_DIR AND LZ4_LIBRARY)
 else()
   message(WARNING "Skipping building LZ4 CPU example, as no LZ4 library was found.")
 endif()
+
+# Add quickstart example
+add_executable(low_level_quickstart_example low_level_quickstart_example.cpp)
+target_link_libraries(low_level_quickstart_example PRIVATE CUDA::cudart nvcomp)

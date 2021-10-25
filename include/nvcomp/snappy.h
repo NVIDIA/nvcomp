@@ -64,8 +64,8 @@ nvcompStatus_t nvcompBatchedSnappyDecompressGetTempSize(
  * @param device_compresed_ptrs The pointers on the GPU, to the compressed chunks.
  * @param device_compressed_bytes The size of each compressed chunk on the GPU.
  * @param device_uncompressed_bytes The actual size of each uncompressed chunk.
- * @param batch_size The number of batch items.
- * @param stream The stream to operate on.
+ * @param batch_size The number of chunks in the batch.
+ * @param stream The CUDA stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
@@ -83,12 +83,14 @@ nvcompStatus_t nvcompBatchedSnappyGetDecompressSizeAsync(
  * @param device_compressed_bytes The size of each compressed chunk on the GPU.
  * @param device_uncompressed_bytes The size of each device_uncompressed_ptr[i] buffer.
  * @param device_actual_uncompressed_bytes The actual size of each uncompressed chunk
- * @param batch_size The number of batch items.
+ * Can be nullptr if desired, in which case the actual_uncompressed_bytes is not reported.
+ * @param batch_size The number of chunks in the batch.
  * @param device_temp_ptr The temporary GPU space, could be NULL in case temprorary space is not needed.
  * @param temp_bytes The size of the temporary GPU space.
  * @param device_uncompressed_ptr The pointers on the GPU, to where to uncompress each chunk (output).
  * @param device_statuses The pointers on the GPU, to where to uncompress each chunk (output).
- * @param stream The stream to operate on.
+ * Can be nullptr if desired, in which case error status is not reported.
+ * @param stream The CUDA stream to operate on.
  *
  * @return nvcompSuccess if successful, and an error code otherwise.
  */
@@ -147,13 +149,13 @@ nvcompStatus_t nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
  * @param device_uncompressed_ptr The pointers on the GPU, to uncompressed batched items.
  * @param device_uncompressed_bytes The size of each uncompressed batch item on the GPU.
  * @param max_uncompressed_chunk_bytes The size of the largest uncompressed chunk.
- * @param batch_size The number of batch items.
+ * @param batch_size The number of chunks in the batch.
  * @param device_temp_ptr The temporary GPU workspace, could be NULL in case temprorary space is not needed.
  * @param temp_bytes The size of the temporary GPU workspace.
  * @param device_compressed_ptr The pointers on the GPU, to the output location for each compressed batch item (output).
  * @param device_compressed_bytes The compressed size of each chunk on the GPU (output).
  * @param format_ops Snappy compression options.
- * @param stream The stream to operate on.
+ * @param stream The CUDA stream to operate on.
  *
  * @return nvcompSuccess if successfully launched, and an error code otherwise.
  */

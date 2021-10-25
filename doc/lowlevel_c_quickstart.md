@@ -4,8 +4,7 @@ Some applications require compressing or decompressing multiple small inputs,
 so we provide an additional API to do this efficiently. These API calls combine
 all compression/decompression
 into a single execution, greatly improving performance compared with running
-each input individually.  Note that currently, this is only available with the
-C API and using the LZ4 and Snappy compressors. This API relies on the user to
+each input individually.  This API relies on the user to
 split the data into chunks, as well as manage metadata information such as
 compressed and uncompressed chunk sizes. When splitting data, for best
 performance, chunks should be relatively equal size to achieve good
@@ -13,163 +12,132 @@ load-balancing as well as extract sufficient parallelism. So in the case that
 there are multiple inputs to compress, it may still be best to break each one
 up into smaller chunks.
 
-In this guide, we walk through how to use this API with the LZ4 compressor,
-making use of the functions declared in `include/nvcomp/lz4.h`.
+The low level batched C API provides a set of functions to do batched decompression
+and compression. 
 
-## Batched Compression
+In the following API description, replace * with the desired compression algorithm. For example, for LZ4,  nvCompBatched\*CompressAsync becomes nvCompBatchedLZ4CompressAsync and nvcompBatched*DecompressAsync becomes nvcompBatchedLZ4DecompressAsync.
 
-The batched LZ4 compression C API call takes, as input, a array of input
-pointers on the GPU (`d_comp_input`), their uncompressed sizes
-(`d_uncomp_sizes`), and as output writes to a set of output locations on the
-GPU (`d_comp_output`), and compressed sizes (`d_comp_sizes`).
+## Compression API  
 
-So first, we need to split the data into chunks.
-The below code snippet, assumes we have a single array of data to compress
-on the GPU (`d_in_data`, of size `in_bytes`).
-
+To do batched compression, a temporary workspace is required to be allocated in device memory. The size of this space is computed using:
 ```c++
-// compute chunk sizes 
-const size_t chunk_size = 65536;
-const size_t num_chunks = (in_bytes + chunk_size - 1) / chunk_size;
-size_t * chunk_sizes;
-uncomp_sizes = cudaMallocHost((void**)&uncomp_sizes,
-    sizeof(*uncomp_sizes)*num_chunks);
-for (size_t i = 0; i < num_chunks; ++i) {
-  if (i + 1 < num_chunks) {
-    uncomp_sizes[i] = chunk_size;
-  } else {
-    // last chunk may be smaller
-    uncomp_sizes[i] = in_bytes - (chunk_size*i);
-  }
-}
-
-// setup input pointers
-void ** comp_input;
-cudaMallocHost((void**)&comp_input, sizeof(*comp_input)*num_chunks);
-for (size_t i = 0; i < num_chunks; ++i) {
-  comp_input[i] = ((char*)d_in_data) + (chunk_size*i);
-}
+/*
+ batch_size: Number of chunks to compress
+ max_chunk_bytes: Size in bytes of the largest chunk
+ format_opts: The compression options to use
+ temp_bytes: The output temporary size required by the compression algorithm
+*/
+nvcompStatus_t nvcompBatched*CompressGetTempSize(
+    size_t batch_size,
+    size_t max_chunk_bytes,
+    nvcompBatched*FormatOpts format_opts,
+    size_t * temp_bytes);
 ```
 
-Next, we need to copy this input information to the GPU.
+Then compression is done using:
 ```c++
-// copy chunk sizes to the GPU
-size_t * d_uncomp_sizes;
-cudaMalloc((void**)&d_uncomp_sizes, sizeof(*d_uncomp_sizes));
-cudaMemcpyAsync(d_uncmop_sizes, uncomp_sizes,
-    sizeof(*d_uncomp_sizes)*num_chunks, cudaMemcpyHostToDevice, stream);
-
-// copy input pointers to the GPU
-void ** d_comp_input;
-cudaMalloc((void**)&d_comp_input, sizeof(*d_comp_input)*num_chunks);
-cudaMemcpyAsync(d_comp_input, comp_input, sizeof(*d_comp_input)*num_chunks,
-    cudaMemcpyHostToDevice, stream);
+/*
+ device_uncompressed_ptrs: The pointers on the GPU to uncompressed batched items.
+ device_uncompressed_bytes: The size of each uncompressed batch item on the GPU.
+ max_uncompressed_chunk_bytes: The maximum size in bytes of the largest chunk in the batch.
+ batch_size: The number of chunks in the batch.
+ device_temp_ptr: The temporary GPU workspace.
+ temp_bytes: The size of the temporary GPU workspace.
+ device_compressed_ptrs: The pointers on the GPU, to the output location for each compressed batch item (output). 
+ device_compressed_bytes: The compressed size of each chunk on the GPU(output). 
+ format_opts: The compression options to use.
+ stream: The CUDA stream to operate on.
+*/
+nvcompStatus_t nvcompBatched*CompressAsync(  
+  const void* const* device_uncompressed_ptrs,    
+  const size_t* device_uncompressed_bytes,  
+  size_t max_uncompressed_chunk_bytes,  
+  size_t batch_size,  
+  void* device_temp_ptr,  
+  size_t temp_bytes,  
+  void* const* device_compressed_ptrs,  
+  size_t* device_compressed_bytes,  
+  nvcompBatched*Opts_t format_opts,  
+  cudaStream_t stream);
 ```
 
-We also need to allocate the temporary workspace and output space needed by the
-compressor.
+## Decompression API
 
+Decompression also requires a temporary workspace. This is computed using:
 ```c++
-// setup temporary space
-size_t temp_bytes;
-nvcompBatchedLZ4CompressGetTempSize(num_chunks, chunk_size, &temp_bytes);
-void* d_comp_temp;
-cudaMalloc(&d_comp_temp, temp_bytes);
-
-// get the maxmimum output size for each chunk
-size_t max_out_bytes;
-nvcompBatchedLZ4CompressGetMaxOutputChunkSize(chunk_size, &max_out_bytes);
-
-// allocate output space on the device
-void** comp_output;
-cudaMallocHost((void**)&comp_output, sizeof(*comp_output)*num_chunks);
-for(size_t i=0; i<num_chunks; ++i) {
-    cudaMalloc(&comp_output[i], max_out_bytes);
-}
-
-// setup pointers to the output space on the device
-void** d_comp_output;
-cudaMalloc((void**)&d_comp_output, sizeof(*d_comp_output)*num_chunks);
-cudaMemcpyAsync(d_comp_output, comp_output, sizeof(*d_comp_output)*num_chunks,
-    cudaMemcpyHostToDevice, stream);
-
-// allocate space for compressed chunk sizes to be written to
-size_t * d_comp_sizes;
-cudaMalloc((void**)&d_comp_sizes, sizeof(*d_comp_sizes)*num_chunks);
+/*
+ batch_size: Number of chunks to decompress
+ max_chunk_bytes: Size in bytes of the largest chunk
+ temp_bytes: The output temporary size required by the compression algorithm
+*/
+nvcompStatus_t nvcompBatched*DecompressGetTempSize(
+    size_t batch_size,
+    size_t max_chunk_bytes,
+    size_t * temp_bytes);
 ```
 
-An alternative to setting up all of this information using the CPU, and then
-copying it to the GPU, would be to use a custom kernel to do this work directly
-on the GPU.
+During decompression, device memory buffers that are large enough to hold the decompression result must be provided. There are three possible workflows that are supported:
 
-Once we have everything setup, we can launch compression asynchronously.
+#### 1) Uncompressed size for each buffer is known exactly (e.g. Apache Parquet https://github.com/apache/parquet-format )
 
-```c++
-nvcompBatchedLZ4CompressAsync(d_comp_input, d_uncomp_sizes, chunk_size,
-    num_chunks, d_comp_temp, temp_bytes, d_comp_output, d_comp_sizes,
-    nvcompBatchedLZ4DefaultOpts, stream);
-```
+#### 2) Only maximum uncompressed size across all buffers is known (e.g. Apache ORC)
 
-This call compresses each input `d_comp_input[i]`,
-placing the compressed output in the corresponding output list,
-`d_comp_output[i]`, and its compressed size in `d_comp_sizes`.
+#### 3) No information about the uncompressed sizes is provided (e.g. Apache Avro)
 
-## Batched Decompression
-
-Decompression can be similarly performed on a batch of multiple compressed
-input lists. As no metadata is stored with the compressed data, chunks can be
-re-arranged as well decompressed with other originally not compressed in the
-same batch.
-
-In addition to providing an array on the GPU of pointers on the compressed chunks
-(`d_comp_output`),
-the number of inputs (`num_chunks`), and their sizes in
-bytes (`d_comp_sizes`) to the decompressor, we also need the maximum
-uncompressed chunk size (`chunk_size`).
-
-Similarly, to compression, we first need to allocate temporary workspace.
+For case 3), nvCOMP provides an API for pre-processing the compressed file 
+  to determine the proper sizes for the decompressed output buffers. This API is as follows:
 
 ```c++
-size_t temp_bytes;
-nvcompBatchedLZ4DecompressGetTempSize(num_chunks, chunk_size, &temp_bytes);
-void * d_decomp_temp;
-cudaMalloc(&d_decomp_temp, temp_bytes);
+/**
+ * @brief Calculates the decompressed size of each chunk asynchronously. This is
+ * needed when we do not know the expected output size. All pointers must be GPU
+ * accessible. Note, if the stream is corrupt, the sizes will be garbage.
+ *
+ * device_compress_ptrs: The compressed chunks of data. 
+ * device_compressed_bytes: The size of each compressed chunk
+ * device_uncompressed_bytes: The calculated decompressed size of each chunk. 
+ * batch_size: The number of chunks in the batch
+ * stream: The CUDA stream to operate on.
+ */
+nvcompStatus_t nvcompBatched*GetDecompressSizeAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    size_t* device_uncompressed_bytes,
+    size_t batch_size,
+    cudaStream_t stream);
 ```
 
-Next, output space must be allocated, using information about the uncompressed
-chunk sizes. Rather than recompute the uncompressed chunk sizes, we will just
-re-use the ones we calculated during compression.
+With the decompressed sizes known, we can now use the decompression API:
 
 ```c++
-// allocate the output space using the original data size
-void * d_out_data;
-cudaMalloc(&d_out_data, in_bytes);
-
-// setup output pointers
-void ** decomp_output;
-cudaMallocHost((void**)&decomp_output, sizeof(*decomp_output)*num_chunks);
-for (size_t i = 0; i < num_chunks; ++i) {
-  decomp_output[i] = ((char*)d_out_data) + (chunk_size*i);
-}
-
-// copy output pointers to the GPU
-void ** d_decomp_output;
-cudaMalloc(&d_decomp_output, sizeof(*d_decomp_output)*num_chunks);
-cudaMemcpyAsync(d_decomp_output, decomp_output,
-    sizeof(*d_decomp_output)*num_chunks, cudaMemcpyHostToDevice, stream);
+/*
+  device_compressed_ptrs: The pointers on the GPU, to the compressed chunks. 
+  device_compressed_bytes: The size of each compressed chunk on the GPU.
+  device_uncompressed_bytes: The decompressed buffer size. This is needed to prevent OOB accesses.
+  device_actual_uncompressed_bytes: The actual calculated decompressed size of each chunk.
+  batch_size: The number of chunks in the batch.
+  device_temp_ptr: The temporary GPU space.
+  temp_bytes: The size of the temporary GPU space.
+  device_uncompressed_ptrs: The pointers on the GPU, to where to uncompress each chunk (output). 
+  device_statuses: The status for each chunk of whether it was decompressed or not. 
+  stream: The CUDA stream to operate on.
+*/
+nvcompStatus_t nvcompBatched*DecompressAsync(
+    const void* const* device_compressed_ptrs,
+    const size_t* device_compressed_bytes,
+    const size_t* device_uncompressed_bytes,
+    size_t* device_actual_uncompressed_bytes,
+    size_t batch_size,
+    void* const device_temp_ptr,
+    size_t temp_bytes,
+    void* const* device_uncompressed_ptrs,
+    nvcompStatus_t* device_statuses,
+    cudaStream_t stream);
 ```
 
-Asynchronous decompression can then be launched. After the compressed data
-location and the compressed data size, the next two parameters are the size of the
-allocated output buffers for writing the uncompressed data and the actual size
-of each chunk that was decompressed.
+Note that the *device_actual_uncompressed_bytes* and *device_statuses* can both be specified as nullptr for LZ4, Snappy, and GDeflate. If these are nullptr, these methods will not compute these values.
 
-```c++
-nvcompBatchedLZ4DecompressAsync(
-    d_comp_output, d_comp_sizes, d_uncomp_sizes, d_decomp_sizes, chunk_size,
-    num_chunks, d_decomp_temp, temp_bytes, d_decomp_output, stream);
-```
+## Batched Compression / Decompression Example - LZ4
 
-This decompresses each input, `d_comp_output[i]`, and places the decompressed
-result in the corresponding output list, `d_decomp_output[i]`. It also writes
-the size of the uncompressed data to `d_decomp_sizes[i]`.
+For an example of batched compression and decompression using LZ4, please see the examples/low_level_quickstart_example.cpp.
+
