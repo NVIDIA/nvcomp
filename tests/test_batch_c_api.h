@@ -200,7 +200,8 @@ static const int PASS_TEST = 1;
 static const int FAIL_TEST = 0;
 
 int test_generic_batch_compression_and_decompression(
-    const size_t batch_size, const size_t min_size, const size_t max_size)
+    const size_t batch_size, const size_t min_size, 
+    const size_t max_size, const int support_nullptr)
 {
   typedef int T;
 
@@ -373,28 +374,31 @@ int test_generic_batch_compression_and_decompression(
       cudaMemcpyHostToDevice));
 
   // Test functionality with null device_statuses and device_decomp_out_bytes
-  // TODO: gdeflate might not support this functionality yet
-  status = decompressAsync(
-      (const void* const*)device_comp_out,
-      device_comp_out_bytes,
-      device_batch_bytes,
-      NULL,
-      batch_size,
-      device_temp_ptr,
-      temp_bytes,
-      (void* const*)device_decomp_out,
-      NULL,
-      stream);
-  REQUIRE(status == nvcompSuccess);
-  // Verify correctness
-  for (size_t i = 0; i < batch_size; i++) {
-    CUDA_CHECK(cudaMemcpy(
-        host_output[i],
-        host_decomp_out[i],
-        host_batch_bytes[i],
-        cudaMemcpyDeviceToHost));
-    for (size_t j = 0; j < host_batch_bytes[i] / sizeof(T); ++j) {
-      REQUIRE(host_output[i][j] == host_input[i][j]);
+  if (support_nullptr)
+  {
+    status = decompressAsync(
+        (const void* const*)device_comp_out,
+        device_comp_out_bytes,
+        device_batch_bytes,
+        NULL,
+        batch_size,
+        device_temp_ptr,
+        temp_bytes,
+        (void* const*)device_decomp_out,
+        NULL,
+        stream);
+    REQUIRE(status == nvcompSuccess);
+    
+    // Verify correctness
+    for (size_t i = 0; i < batch_size; i++) {
+      CUDA_CHECK(cudaMemcpy(
+          host_output[i],
+          host_decomp_out[i],
+          host_batch_bytes[i],
+          cudaMemcpyDeviceToHost));
+      for (size_t j = 0; j < host_batch_bytes[i] / sizeof(T); ++j) {
+        REQUIRE(host_output[i][j] == host_input[i][j]);
+      }
     }
   }
 
@@ -696,10 +700,10 @@ int test_generic_batch_decompression_errors(
   return PASS_TEST;
 }
 
-#define TEST(bs, min, max, num_tests, rv, crash_safe)                          \
+#define TEST(bs, min, max, num_tests, rv, crash_safe, support_nullptr)         \
   do {                                                                         \
     ++(num_tests);                                                             \
-    if (!test_generic_batch_compression_and_decompression(bs, min, max)) {     \
+    if (!test_generic_batch_compression_and_decompression(bs, min, max, support_nullptr)) {     \
       printf(                                                                  \
           "compression and decompression test failed %dx[%d:%d]\n",            \
           (int)(bs),                                                           \
@@ -735,13 +739,19 @@ int main(int argc, char** argv)
   const int crash_safe = 0;
 #endif
 
+#ifdef SUPPORT_NULLPTR_APIS
+  const int support_nullptr = 1;
+#else 
+  const int support_nullptr = 0;
+#endif
+
   // these macros count the number of failed tests
-  TEST(1, 100, 100, num_tests, num_failed_tests, crash_safe);
-  TEST(1, (1<<16) / sizeof(int), (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe);
-  TEST(11, 1000, 10000, num_tests, num_failed_tests, crash_safe);
-  TEST(127, 10000, (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe);
-  TEST(1025, 100, (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe);
-  TEST(10025, 100, 1000, num_tests, num_failed_tests, crash_safe);
+  TEST(1, 100, 100, num_tests, num_failed_tests, crash_safe, support_nullptr);
+  TEST(1, (1<<16) / sizeof(int), (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe, support_nullptr);
+  TEST(11, 1000, 10000, num_tests, num_failed_tests, crash_safe, support_nullptr);
+  TEST(127, 10000, (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe, support_nullptr);
+  TEST(1025, 100, (1<<16) / sizeof(int), num_tests, num_failed_tests, crash_safe, support_nullptr);
+  TEST(10025, 100, 1000, num_tests, num_failed_tests, crash_safe, support_nullptr);
 
   if (num_failed_tests == 0) {
     printf(
