@@ -123,7 +123,7 @@ nvcompStatus_t nvcompBatchedGdeflateDecompressAsync(
         device_uncompressed_ptrs, device_statuses, stream);
 
     // Launch a kernel to convert the output statuses
-    convertGdeflateOutputStatuses(device_status_ptrs, batch_size, stream);
+    if(device_status_ptrs) convertGdeflateOutputStatuses(device_status_ptrs, batch_size, stream);
 
   } catch (const std::exception& e) {
     return Check::exception_to_error(e, "nvcompBatchedGdeflateDecompressAsync()");
