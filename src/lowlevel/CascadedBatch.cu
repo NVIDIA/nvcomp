@@ -568,7 +568,7 @@ __device__ void block_bitunpack(
       // Shifting by width of the type is UB
       const unsigned_type mask
           = bitwidth < sizeof(unsigned_type) * num_bits_per_byte
-                ? (1 << bitwidth) - 1
+                ? (static_cast<unsigned_type>(1) << bitwidth) - 1
                 : static_cast<unsigned_type>(-1);
 
       // The current output element needs bits from at most two `data_type`
@@ -1039,7 +1039,7 @@ __global__ void cascaded_compression_kernel(
  * bytes if the width is also 8 bytes.
  */
 template <int chunk_size, int width, int storage_width>
-__device__ constexpr int compute_smem_size() 
+__device__ constexpr int compute_smem_size()
 {
   constexpr int storage_num_elts
       = roundUpDiv(chunk_size + 4 + width, storage_width);
