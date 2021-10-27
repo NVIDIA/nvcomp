@@ -42,6 +42,7 @@
 #include <cub/cub.cuh>
 #undef CUB_NS_PREFIX
 #undef CUB_NS_POSTFIX
+#undef CUB_NS_QUALIFIER
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
