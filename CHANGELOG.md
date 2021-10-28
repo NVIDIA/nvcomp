@@ -1,4 +1,8 @@
-# nvcomp 2.1.0 (2021-10-27)
+# nvcomp 2.1.0 (2021-10-28)
+
+## New Features
+ - New release of low-level batched API for Cascaded and Bitcomp methods.
+ - New high-throughput and high-compression-ratio GPU compressors in GDeflate
 
 ## Interface Changes
  - Update batched/low-level compression interfaces to take an options parameter,
@@ -9,14 +13,19 @@
  if an invalid compressed data stream is provided, 0 will be written for the
  output size, rather than generating an illegal memory access.
  - Fix LZ4 to support chunk sizes < 32 KB. 
+
 ## Performance Optimizations
  - Improve performance of Snappy compression by ~10% in some configurations.
  - Add an optimization to the LZ4 compressor based on specification of input data as
  char, short, or int, rather than just treating the input as raw bytes. 
  - Optimization to reduce the LZ hash table size when compressing smaller chunks.
+ - Improved compression performance in GDeflate with the high-throughput option
+ - Improved decompression performance in GDeflate (10-75% depending on the dataset)
+
 ## Bug Fixes
  - Fix LZ4 CPU compression example.
  - Fix temp allocation size bug in `benchmark_template_chunked`.
+
 ## Infrastructure
  - Update CMakeLists to compile nvcomp with -fPIC enabled.
  - Add a new script for benchmarking compression algorithms.

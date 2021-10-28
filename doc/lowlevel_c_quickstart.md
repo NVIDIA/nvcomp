@@ -135,7 +135,7 @@ nvcompStatus_t nvcompBatched*DecompressAsync(
     cudaStream_t stream);
 ```
 
-Note that the *device_actual_uncompressed_bytes* and *device_statuses* can both be specified as nullptr for LZ4, Snappy, and GDeflate. If these are nullptr, these methods will not compute these values.
+Note that the *device_actual_uncompressed_bytes* and *device_statuses* can both be specified as nullptr for LZ4, Snappy, and GDeflate. If these are nullptr, these methods will not compute these values. In particular, if device_statuses is nullptr then out of bounds (OOB) error checking is disabled. This can lead to significant increases in decompression throughput.
 
 ## Batched Compression / Decompression Example - LZ4
 
