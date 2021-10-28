@@ -88,8 +88,8 @@ void verify_compression_output(
   // bitpacking, and the input datatype
   REQUIRE(
       compressed_data_host[0]
-      == (2 + (1 << 8) + (0 << 16)
-          + (((uint32_t)nvcomp::TypeOf<data_type>()) << 24)));
+      == 2 + (1 << 8) + (0 << 16)
+             + (static_cast<uint32_t>(nvcomp::TypeOf<data_type>()) << 24));
 
   // Calculate the location of the first chunk and test array offsets
   uint32_t* chunk_start_ptr = reinterpret_cast<uint32_t*>(
@@ -578,7 +578,8 @@ void test_fallback_path()
         compressed_ptrs_host[partition_idx],
         sizeof(uint32_t),
         cudaMemcpyDeviceToHost));
-    REQUIRE(metadata == 0);
+    REQUIRE(
+        metadata == (static_cast<uint32_t>(nvcomp::TypeOf<data_type>()) << 24));
   }
 
   // Check uncompressed bytes stored in the compressed buffer
