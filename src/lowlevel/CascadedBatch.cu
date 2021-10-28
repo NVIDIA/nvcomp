@@ -1009,16 +1009,21 @@ __global__ void cascaded_compression_kernel(
     if (threadIdx.x == 0) {
       auto partition_metadata_ptr = reinterpret_cast<uint8_t*>(output_buffer);
 
+      partition_metadata_ptr[3] = (d_TypeOf<data_type>());
+
       if (use_compression) {
         partition_metadata_ptr[0] = comp_opts.num_RLEs;
         partition_metadata_ptr[1] = comp_opts.num_deltas;
         partition_metadata_ptr[2] = comp_opts.use_bp;
-        partition_metadata_ptr[3] = (d_TypeOf<data_type>());
         compressed_bytes[partition_idx]
             = reinterpret_cast<uintptr_t>(current_output_ptr)
               - reinterpret_cast<uintptr_t>(output_buffer);
       } else {
-        *output_buffer = 0;
+        // If compression is not used, we set all of num_RLEs, num_deltas and
+        // bit-packing fields to 0
+        partition_metadata_ptr[0] = 0;
+        partition_metadata_ptr[1] = 0;
+        partition_metadata_ptr[2] = 0;
         compressed_bytes[partition_idx]
             = roundUpTo(partition_metadata_size, sizeof(data_type))
               + roundUpTo(num_input_elements * sizeof(data_type), 4);
@@ -1445,10 +1450,8 @@ __global__ void cascaded_decompression_kernel_type_check(
     nvcompStatus_t* statuses)
 {
   // Extract datatype from compressed data
-  const uint32_t* partition_start_ptr
-      = static_cast<const uint32_t*>(((uint32_t* const*)(compressed_data))[0]);
-  const uint8_t* partition_metadata_ptr
-      = reinterpret_cast<const uint8_t*>(partition_start_ptr);
+  const auto partition_metadata_ptr
+      = reinterpret_cast<const uint8_t*>(compressed_data[0]);
   const auto type = static_cast<nvcompType_t>(partition_metadata_ptr[3]);
 
   switch (bitwidth_test) {
