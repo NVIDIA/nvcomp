@@ -9,6 +9,7 @@ option(BUILD_STATIC "Build a static library." OFF)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(GNUInstallDirs)
 
@@ -144,6 +145,11 @@ if (BUILD_TESTS)
   enable_testing()
 endif()
 
+if (UNIX)
+  include(GNUInstallDirs)
+endif()
+
+
 add_subdirectory(src)
 
 if (BUILD_TESTS)
@@ -154,11 +160,6 @@ if (BUILD_BENCHMARKS)
 endif()
 if (BUILD_EXAMPLES)
   add_subdirectory(examples)
-endif()
-
-
-if (UNIX)
-  include(GNUInstallDirs)
 endif()
 
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/nvcomp)
