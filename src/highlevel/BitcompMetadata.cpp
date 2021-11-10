@@ -54,7 +54,7 @@ BitcompMetadata::BitcompMetadata(
 {
   size_t uncompressedBytes = 0;
   bitcompDataType_t t;
-  if (bitcompCreatePlanFromCompressedData(&plan, memPtr) != BITCOMP_SUCCESS
+  if (bitcompCreatePlanFromCompressedData(&plan, (const char*)memPtr) != BITCOMP_SUCCESS
       || bitcompGetUncompressedSizeFromHandle(plan, &uncompressedBytes) != BITCOMP_SUCCESS
       || bitcompGetDataTypeFromHandle(plan, &t) != BITCOMP_SUCCESS) {
     throw NVCompException(
