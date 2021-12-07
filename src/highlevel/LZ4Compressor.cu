@@ -216,7 +216,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
 
   TempSpaceBroker temp(m_workspace, m_workspace_size);
 
-  nvcompBatchedLZ4Opts_t opts = { .data_type = m_data_type };
+  nvcompBatchedLZ4Opts_t opts = { m_data_type };
 
   uint8_t* workspace;
   size_t workspace_size;
