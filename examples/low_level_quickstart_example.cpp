@@ -166,9 +166,9 @@ int main()
   cudaMallocHost((void**)&uncompressed_data, in_bytes);
   
   std::mt19937 random_gen(42);
-  std::uniform_int_distribution<uint8_t> uniform_dist(0, 255);
+  std::uniform_int_distribution<short> uniform_dist(0, 255);
   for (size_t ix = 0; ix < in_bytes; ++ix) {
-    uncompressed_data[ix] = uniform_dist(random_gen);
+    uncompressed_data[ix] = char(uniform_dist(random_gen));
   }
   
   execute_example(uncompressed_data, in_bytes);
