@@ -477,7 +477,10 @@ void test_fallback_path()
 
   std::random_device rd;
   std::mt19937 random_generator(rd());
-  std::uniform_int_distribution<data_type> dist;
+  using safe_type =
+      typename std::conditional<sizeof(data_type) == 1, short, data_type>::type;
+  std::uniform_int_distribution<safe_type> dist(
+      0, std::numeric_limits<data_type>::max());
 
   std::vector<std::vector<data_type>> inputs_data(batch_size);
   for (size_t input_idx = 0; input_idx < batch_size; input_idx++) {
@@ -485,7 +488,7 @@ void test_fallback_path()
     for (int element_idx = 0;
          element_idx < uncompressed_num_elements[input_idx];
          element_idx++) {
-      inputs_data[input_idx][element_idx] = dist(random_generator);
+      inputs_data[input_idx][element_idx] = data_type(dist(random_generator));
     }
   }
 
