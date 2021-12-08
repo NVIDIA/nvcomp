@@ -48,11 +48,11 @@
 void run_benchmark( \
     const std::vector<std::vector<char>>& data, \
     const bool warmup, \
-    const int count, \
+    const size_t count, \
     const bool csv_output, \
     const bool tab_separator, \
-    const int duplicate_count, \
-    const int num_files) \
+    const size_t duplicate_count, \
+    const size_t num_files) \
 { \
   run_benchmark_template( \
       comp_get_temp, \
@@ -248,7 +248,7 @@ std::vector<std::vector<char>> readFileWithPageSizes(const std::string& filename
 
 std::vector<std::vector<char>>
 multi_file(const std::vector<std::string>& filenames, const size_t chunk_size,
-    const bool has_page_sizes, const int num_duplicates)
+    const bool has_page_sizes, const size_t num_duplicates)
 {
   std::vector<std::vector<char>> split_data;
 
@@ -274,7 +274,7 @@ multi_file(const std::vector<std::string>& filenames, const size_t chunk_size,
   }
 
   const size_t num_chunks = split_data.size();
-  for (int d = 0; d < num_duplicates; ++d) {
+  for (size_t d = 0; d < num_duplicates; ++d) {
     split_data.insert(split_data.end(), split_data.begin(),
         split_data.begin()+num_chunks);
   }
@@ -300,11 +300,11 @@ run_benchmark_template(
     const FormatOptsT format_opts,
     const std::vector<std::vector<char>>& data,
     const bool warmup,
-    const int count,
+    const size_t count,
     const bool csv_output,
     const bool use_tabs,
-    const int duplicates,
-    const int num_files)
+    const size_t duplicates,
+    const size_t num_files)
 {
   const std::string separator = use_tabs ? "\t" : ",";
 
@@ -332,7 +332,7 @@ run_benchmark_template(
   size_t compressed_size = 0;
   double comp_time = 0.0;
   double decomp_time = 0.0;
-  for (int iter = 0; iter < count; ++iter) {
+  for (size_t iter = 0; iter < count; ++iter) {
     // compression
     nvcompStatus_t status;
 
@@ -558,22 +558,22 @@ run_benchmark_template(
 void run_benchmark(
     const std::vector<std::vector<char>>& data,
     const bool warmup,
-    const int count, 
-    const bool csv_output, 
-    const bool tab_separator, 
-    const int duplicate_count,
-    const int num_files);
+    const size_t count,
+    const bool csv_output,
+    const bool tab_separator,
+    const size_t duplicate_count,
+    const size_t num_files);
 
 struct args_type {
   int gpu;
   std::vector<std::string> filenames;
-  int warmup_count;
-  int iteration_count;
-  int duplicate_count;
+  size_t warmup_count;
+  size_t iteration_count;
+  size_t duplicate_count;
   bool csv_output;
   bool use_tabs;
   bool has_page_sizes;
-  int chunk_size;
+  size_t chunk_size;
 };
 
 struct parameter_type {
@@ -688,13 +688,13 @@ args_type parse_args(int argc, char ** argv) {
           }
           break;
         } else if (param.long_flag == "warmup_count") {
-          args.warmup_count = std::stol(*(argv++));
+          args.warmup_count = size_t(std::stoull(*(argv++)));
           break;
         } else if (param.long_flag == "iteration_count") {
-          args.iteration_count = std::stol(*(argv++));
+          args.iteration_count = size_t(std::stoull(*(argv++)));
           break;
         } else if (param.long_flag == "duplicate_data") {
-          args.duplicate_count = std::stol(*(argv++));
+          args.duplicate_count = size_t(std::stoull(*(argv++)));
           break;
         } else if (param.long_flag == "csv_output") {
           std::string on(*(argv++));
@@ -709,7 +709,7 @@ args_type parse_args(int argc, char ** argv) {
           args.has_page_sizes = parse_bool(on);
           break;
         } else if (param.long_flag == "chunk_size") {
-          args.chunk_size = std::stol(*(argv++));
+          args.chunk_size = size_t(std::stoull(*(argv++)));
           break;
         } else {
           std::cerr << "INTERNAL ERROR: Unhandled paramter '" << arg << "'." << std::endl;
