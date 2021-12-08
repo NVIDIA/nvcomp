@@ -160,7 +160,7 @@ void execute_example(char* input_data, const size_t in_bytes)
 int main()
 {
   // Initialize a random array of chars
-  const size_t in_bytes = 1e6;
+  const size_t in_bytes = size_t(1e6);
   char* uncompressed_data;
   
   cudaMallocHost((void**)&uncompressed_data, in_bytes);

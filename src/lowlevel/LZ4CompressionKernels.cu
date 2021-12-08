@@ -1055,7 +1055,7 @@ __global__ void lz4DecompressBatchKernel(
     const uint8_t* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t* const device_out_bytes,
-    const int batch_size,
+    const size_t batch_size,
     uint8_t* const* const device_out_ptrs,
     size_t* device_uncompressed_bytes,
     nvcompStatus_t* device_status_ptrs,

@@ -204,8 +204,6 @@ void test(
 
     auto start = std::chrono::steady_clock::now();
 
-    nvcompStatus_t status;
-
     // execute decompression (asynchronous)
     err = nvcompCascadedDecompressAsync(
         d_comp_out,

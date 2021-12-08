@@ -130,7 +130,7 @@ nvcompStatus_t nvcompLZ4CompressConfigure(
 
     *metadata_bytes = sizeof(LZ4Metadata);
 
-    const int total_chunks = roundUpDiv(in_bytes, chunk_bytes);
+    const size_t total_chunks = roundUpDiv(in_bytes, chunk_bytes);
 
     *temp_bytes
         = LZ4Compressor::calculate_workspace_size(in_bytes, chunk_bytes);
@@ -281,7 +281,7 @@ nvcompStatus_t nvcompLZ4DecompressAsync(
     LZ4MetadataOnGPU metadataGPU(device_in_ptr, in_bytes);
 
     const size_t* const comp_prefix = metadataGPU.compressed_prefix_ptr();
-    const int num_chunks = metadata->getNumChunks();
+    const size_t num_chunks = metadata->getNumChunks();
     const size_t chunk_size = metadata->getUncompChunkSize();
 
     LZ4Decompressor decomp(

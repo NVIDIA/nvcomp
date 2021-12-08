@@ -54,7 +54,7 @@ using USE_BITPACKING_TYPE = uint8_t;
 using COMP_BYTES_TYPE = uint64_t;
 using DECOMP_BYTES_TYPE = uint64_t;
 using IN_TYPE_TYPE = int32_t;
-using NUM_INPUTS_TYPE = int32_t;
+using NUM_INPUTS_TYPE = uint32_t;
 using OFFSET_TYPE = uint64_t;
 using HEADER_TYPE = CascadedMetadata::Header;
 } // namespace
@@ -101,8 +101,8 @@ enum OffsetType : unsigned int
 namespace
 {
 
-inline constexpr __device__ __host__ unsigned int
-serializedMetadataSize(const int numInputs)
+inline constexpr __device__ __host__ size_t
+serializedMetadataSize(const size_t numInputs)
 {
   return OFFSET_HEADERS + sizeof(OFFSET_TYPE) * numInputs
          + sizeof(HEADER_TYPE) * numInputs;
@@ -203,7 +203,7 @@ __global__ void setOffset(
 
   uint8_t* const serializedBytes = static_cast<uint8_t*>(serializedMetadata);
 
-  const int numInputs
+  const size_t numInputs
       = getField<NUM_INPUTS_TYPE, OFFSET_NUM_INPUTS>(serializedBytes);
 
   // dataOffsets
