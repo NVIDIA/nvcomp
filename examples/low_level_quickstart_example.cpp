@@ -166,6 +166,10 @@ int main()
   cudaMallocHost((void**)&uncompressed_data, in_bytes);
   
   std::mt19937 random_gen(42);
+
+  // char specialization of std::uniform_int_distribution is
+  // non-standard, and isn't available on MSVC, so use short instead,
+  // but with the range limited, and then cast below.
   std::uniform_int_distribution<short> uniform_dist(0, 255);
   for (size_t ix = 0; ix < in_bytes; ++ix) {
     uncompressed_data[ix] = char(uniform_dist(random_gen));

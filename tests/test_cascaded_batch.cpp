@@ -477,6 +477,10 @@ void test_fallback_path()
 
   std::random_device rd;
   std::mt19937 random_generator(rd());
+
+  // int8_t and uint8_t specializations of std::uniform_int_distribution are
+  // non-standard, and aren't available on MSVC, so use short instead,
+  // but with the range limit of the smaller type, and then cast below.
   using safe_type =
       typename std::conditional<sizeof(data_type) == 1, short, data_type>::type;
   std::uniform_int_distribution<safe_type> dist(
