@@ -40,7 +40,7 @@ class Metadata
 {
 public:
   /**
-   * @brief Create a new metadta object.
+   * @brief Create a new metadata object.
    *
    * @param type The type of data element to compress.
    * @param uncompressedBytes The size of the data while uncompressed.
