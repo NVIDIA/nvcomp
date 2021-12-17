@@ -215,7 +215,7 @@ std::vector<char> readFile(const std::string& filename)
   if (!fin) {
     std::cerr << "ERROR: Unable to open \"" << filename << "\" for reading."
               << std::endl;
-    return std::vector<char>();
+    throw std::runtime_error("Error opening file for reading.");
   }
 
   fin.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -230,7 +230,7 @@ std::vector<char> readFile(const std::string& filename)
   if (!fin) {
     std::cerr << "ERROR: Unable to read all of file \"" << filename << "\"."
               << std::endl;
-    return std::vector<char>();
+    throw std::runtime_error("Error reading file.");
   }
 
   return host_data;
