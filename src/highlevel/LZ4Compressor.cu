@@ -132,7 +132,7 @@ size_t LZ4Compressor::calculate_workspace_size(
           prefix_bytes,
           static_cast<const size_t*>(nullptr),
           static_cast<size_t*>(nullptr),
-          int(num_chunks)),
+          static_cast<int>(num_chunks)),
       "cub::DeviceScan::InclusiveSum()");
 
   return staging_bytes + pointer_bytes + size_bytes + prefix_bytes
@@ -297,7 +297,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
           prefix_temp_size,
           out_sizes_device,
           m_output_offsets + 1,
-          int(m_num_chunks),
+          static_cast<int>(m_num_chunks),
           stream),
       "cub::DeviceScan::InclusiveSum()");
   void* prefix_temp;
@@ -309,7 +309,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
           prefix_temp_size,
           out_sizes_device,
           m_output_offsets + 1,
-          int(m_num_chunks),
+          static_cast<int>(m_num_chunks),
           stream),
       "cub::DeviceScan::InclusiveSum()");
 

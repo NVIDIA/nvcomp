@@ -158,7 +158,7 @@ __global__ void serializeV1(
     const size_t comp_bytes,
     const size_t decomp_bytes,
     const nvcompType_t in_type,
-    const int numInputs,
+    const size_t numInputs,
     size_t* const serializedSizeDevice)
 {
   using Chunk = uint32_t;
@@ -307,7 +307,7 @@ CascadedMetadata deserializeMetadataFromGPUVersion1(
       decomp_bytes,
       comp_bytes);
 
-  if (numInputs != static_cast<int>(metadata.getNumInputs())) {
+  if (numInputs != metadata.getNumInputs()) {
     throw std::runtime_error(
         "Mismatch in numInputs while deserializing "
         "metadata: "

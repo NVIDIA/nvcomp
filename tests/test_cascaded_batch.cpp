@@ -492,7 +492,7 @@ void test_fallback_path()
     for (int element_idx = 0;
          element_idx < uncompressed_num_elements[input_idx];
          element_idx++) {
-      inputs_data[input_idx][element_idx] = data_type(dist(random_generator));
+      inputs_data[input_idx][element_idx] = static_cast<data_type>(dist(random_generator));
     }
   }
 

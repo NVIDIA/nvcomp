@@ -171,7 +171,7 @@ void test_random_lz4(
 {
   // generate random data
   std::vector<T> data;
-  int seed = (max_val ^ max_run ^ int(chunk_size));
+  int seed = (max_val ^ max_run ^ static_cast<int>(chunk_size));
   random_runs(data, (T)max_val, (T)max_run, seed);
 
   test_lz4<T>(data, chunk_size);

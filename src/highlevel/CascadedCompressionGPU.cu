@@ -332,7 +332,7 @@ void packToOutput(
   } else {
     constexpr const int BLOCK_SIZE = 512;
 
-    const dim3 grid(std::min(1024, int(roundUpDiv(maxNum, BLOCK_SIZE))));
+    const dim3 grid(std::min(1024, static_cast<int>(roundUpDiv(maxNum, BLOCK_SIZE))));
     const dim3 block(BLOCK_SIZE);
 
     deferredCopy<T, BLOCK_SIZE><<<grid, block, 0, stream>>>(

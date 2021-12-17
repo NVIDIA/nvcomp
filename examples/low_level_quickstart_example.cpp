@@ -160,7 +160,7 @@ void execute_example(char* input_data, const size_t in_bytes)
 int main()
 {
   // Initialize a random array of chars
-  const size_t in_bytes = size_t(1e6);
+  const size_t in_bytes = 1000000;
   char* uncompressed_data;
   
   cudaMallocHost((void**)&uncompressed_data, in_bytes);
@@ -172,7 +172,7 @@ int main()
   // but with the range limited, and then cast below.
   std::uniform_int_distribution<short> uniform_dist(0, 255);
   for (size_t ix = 0; ix < in_bytes; ++ix) {
-    uncompressed_data[ix] = char(uniform_dist(random_gen));
+    uncompressed_data[ix] = static_cast<char>(uniform_dist(random_gen));
   }
   
   execute_example(uncompressed_data, in_bytes);

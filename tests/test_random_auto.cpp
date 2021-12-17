@@ -341,7 +341,7 @@ template <typename T>
 void test_random_auto_c(int max_val, int max_run, size_t chunk_size)
 {
   std::vector<T> data;
-  int seed = (max_val ^ max_run ^ int(chunk_size));
+  int seed = (max_val ^ max_run ^ static_cast<int>(chunk_size));
   random_runs(data, (T)max_val, (T)max_run, seed);
   test_auto_c(data);
 }
@@ -350,7 +350,7 @@ template <typename T>
 void test_random_auto_cpp(int max_val, int max_run, size_t chunk_size)
 {
   std::vector<T> data;
-  int seed = (max_val ^ max_run ^ int(chunk_size));
+  int seed = (max_val ^ max_run ^ static_cast<int>(chunk_size));
   random_runs(data, (T)max_val, (T)max_run, seed);
   test_auto_cpp(data); 
 }
