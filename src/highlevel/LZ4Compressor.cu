@@ -121,6 +121,10 @@ size_t LZ4Compressor::calculate_workspace_size(
       chunk_size, nvcompBatchedLZ4DefaultOpts, &max_out));
   size_t buffer_bytes = max_out * num_chunks;
 
+  // cub::DeviceScan::InclusiveSum's num_items parameter is int,
+  // so the value in num_chunks must fit in an int.
+  assert(num_chunks <= std::numeric_limits<int>::max());
+
   size_t prefix_bytes;
   CudaUtils::check(
       cub::DeviceScan::InclusiveSum(
@@ -128,7 +132,7 @@ size_t LZ4Compressor::calculate_workspace_size(
           prefix_bytes,
           static_cast<const size_t*>(nullptr),
           static_cast<size_t*>(nullptr),
-          num_chunks),
+          static_cast<int>(num_chunks)),
       "cub::DeviceScan::InclusiveSum()");
 
   return staging_bytes + pointer_bytes + size_bytes + prefix_bytes
@@ -216,7 +220,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
 
   TempSpaceBroker temp(m_workspace, m_workspace_size);
 
-  nvcompBatchedLZ4Opts_t opts = { .data_type = m_data_type };
+  nvcompBatchedLZ4Opts_t opts{ m_data_type };
 
   uint8_t* workspace;
   size_t workspace_size;
@@ -281,6 +285,10 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
       opts,
       stream));
 
+  // cub::DeviceScan::InclusiveSum's num_items parameter is int,
+  // so the value in m_num_chunks must fit in an int.
+  assert(m_num_chunks <= std::numeric_limits<int>::max());
+
   // perform prefixsum on sizes
   size_t prefix_temp_size;
   CudaUtils::check(
@@ -289,7 +297,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
           prefix_temp_size,
           out_sizes_device,
           m_output_offsets + 1,
-          m_num_chunks,
+          static_cast<int>(m_num_chunks),
           stream),
       "cub::DeviceScan::InclusiveSum()");
   void* prefix_temp;
@@ -301,7 +309,7 @@ void LZ4Compressor::compress_async(cudaStream_t stream)
           prefix_temp_size,
           out_sizes_device,
           m_output_offsets + 1,
-          m_num_chunks,
+          static_cast<int>(m_num_chunks),
           stream),
       "cub::DeviceScan::InclusiveSum()");
 

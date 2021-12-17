@@ -47,7 +47,7 @@ void test_random(
 {
   // generate random data
   std::vector<T> data;
-  int seed = (max_val ^ max_run ^ chunk_size);
+  int seed = (max_val ^ max_run ^ int(chunk_size));
   random_runs(data, (T)max_val, (T)max_run, seed);
 
   test<T>(data, chunk_size, numRLEs, numDeltas, bitPacking);

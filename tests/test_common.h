@@ -59,7 +59,7 @@ void random_runs(
     std::vector<valT>& res, const valT max_val, const runT max_run, int seed)
 {
   std::mt19937 eng(seed);
-  std::uniform_int_distribution<> distr(0, max_run);
+  std::uniform_int_distribution<runT> distr(0, max_run);
 
   for (valT val = 0; val < max_val; val++) {
     runT run = distr(eng);
@@ -203,8 +203,6 @@ void test(
         &decomp_out_ptr, decomp_out_bytes)); // also can use RMM_ALLOC instead
 
     auto start = std::chrono::steady_clock::now();
-
-    nvcompStatus_t status;
 
     // execute decompression (asynchronous)
     err = nvcompCascadedDecompressAsync(

@@ -115,7 +115,7 @@ static void load_chunks_to_devices(
     exit(1);
   }
 
-  int chunk_size = 1 + ((input_elts - 1) / chunks);
+  size_t chunk_size = 1 + ((input_elts - 1) / chunks);
 
   std::cout << "Loading data - " << input_elts
             << " elements, chunk size:" << chunk_size
@@ -297,8 +297,6 @@ static void run_nvcomp_benchmark(
   const int chunks_per_gpu = chunks / gpus;
   const int STREAMS_PER_GPU = std::min(chunks_per_gpu, MAX_STREAMS);
 
-  int total_comp_bytes = 0;
-
   std::vector<size_t> chunk_bytes(chunks, 0);
   for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
     chunk_bytes[chunkIdx] = chunk_sizes[chunkIdx] * sizeof(T);
@@ -330,7 +328,6 @@ static void run_nvcomp_benchmark(
       // Allocate output buffers for each chunk on the GPU
       comp_out_bytes[idx] = out_size;
       CUDA_CHECK(cudaMalloc(&d_comp_out[idx], comp_out_bytes[idx]));
-      total_comp_bytes += comp_out_bytes[idx];
 
       // biggest temp buffer requirement
       if (temp_size > temp_bytes[gpu]) {
@@ -388,7 +385,7 @@ static void run_nvcomp_benchmark(
 
   sync_all_streams(&streams, gpus, STREAMS_PER_GPU);
 
-  total_comp_bytes = 0;
+  size_t total_comp_bytes = 0;
   for (int i = 0; i < gpus * chunks_per_gpu; ++i) {
     total_comp_bytes += comp_out_bytes[i];
   }

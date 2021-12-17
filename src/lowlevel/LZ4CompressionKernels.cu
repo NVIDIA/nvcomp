@@ -754,8 +754,8 @@ __device__ void compressStream(
   constexpr position_type min_ending_literals = divRoundUp(MIN_ENDING_LITERALS_BYTES, sizeof(T));
 
   // otherwise ceil of typed_length can result in illegal memory access
-  static_assert(last_valid_match > 0);
-  static_assert(min_ending_literals > 0);
+  static_assert(last_valid_match > 0, "Must be rounded up");
+  static_assert(min_ending_literals > 0, "Must be rounded up");
 
   while (decomp_idx < typed_length) {
     const position_type tokenStart = decomp_idx;
@@ -1035,7 +1035,7 @@ __global__ void lz4CompressBatchKernel(
     offset_type* const temp_space,
     const position_type hash_table_size)
 {
-  static_assert(sizeof(T) <= sizeof(uint32_t) && "Max alignment support is 4 bytes");
+  static_assert(sizeof(T) <= sizeof(uint32_t), "Max alignment support is 4 bytes");
 
   const int bidx = blockIdx.x * blockDim.y + threadIdx.y;
 
@@ -1055,7 +1055,7 @@ __global__ void lz4DecompressBatchKernel(
     const uint8_t* const* const device_in_ptrs,
     const size_t* const device_in_bytes,
     const size_t* const device_out_bytes,
-    const int batch_size,
+    const size_t batch_size,
     uint8_t* const* const device_out_ptrs,
     size_t* device_uncompressed_bytes,
     nvcompStatus_t* device_status_ptrs,

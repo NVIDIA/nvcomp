@@ -160,15 +160,19 @@ void execute_example(char* input_data, const size_t in_bytes)
 int main()
 {
   // Initialize a random array of chars
-  const size_t in_bytes = 1e6;
+  const size_t in_bytes = 1000000;
   char* uncompressed_data;
   
   cudaMallocHost((void**)&uncompressed_data, in_bytes);
   
   std::mt19937 random_gen(42);
-  std::uniform_int_distribution<uint8_t> uniform_dist(0, 255);
+
+  // char specialization of std::uniform_int_distribution is
+  // non-standard, and isn't available on MSVC, so use short instead,
+  // but with the range limited, and then cast below.
+  std::uniform_int_distribution<short> uniform_dist(0, 255);
   for (size_t ix = 0; ix < in_bytes; ++ix) {
-    uncompressed_data[ix] = uniform_dist(random_gen);
+    uncompressed_data[ix] = static_cast<char>(uniform_dist(random_gen));
   }
   
   execute_example(uncompressed_data, in_bytes);

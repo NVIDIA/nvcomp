@@ -278,7 +278,7 @@ int test_generic_batch_compression_and_decompression(
   // Compress on the GPU using batched API
   size_t comp_temp_bytes;
   status = compressGetTempSize(batch_size, max_chunk_size, &comp_temp_bytes);
-  if (max_chunk_size > 1<<16) printf("max_chunk_size = %lu\n", max_chunk_size);
+  if (max_chunk_size > 1<<16) printf("max_chunk_size = %zu\n", max_chunk_size);
   REQUIRE(status == nvcompSuccess);
 
   void* d_comp_temp;

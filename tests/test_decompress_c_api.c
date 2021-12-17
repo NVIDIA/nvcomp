@@ -207,7 +207,7 @@ int test_lz4(void)
   T* input = malloc(input_size * sizeof(T));
   for (size_t i = 0; i < input_size; ++i) {
     // semi compressible data
-    input[i] = (i % 23) + (i / 101);
+    input[i] = (T)((i % 23) + (i / 101));
   }
 
   // create GPU only input buffer

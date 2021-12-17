@@ -97,7 +97,7 @@ void compressAsyncTestRandom(const size_t n)
 
   CUDA_RT_CALL(cudaMallocHost((void**)&inputHost, n * sizeof(*inputHost)));
 
-  float const totalGB = numBytes / (1024.0 * 1024.0 * 1024.0);
+  float const totalGB = numBytes / (1024.0f * 1024.0f * 1024.0f);
 
   cudaStream_t stream;
   CUDA_RT_CALL(cudaStreamCreate(&stream));
@@ -249,7 +249,7 @@ TEST_CASE("compress_10Million_Test", "[small]")
 
   CUDA_RT_CALL(cudaMallocHost((void**)&inputHost, n * sizeof(*inputHost)));
 
-  float const totalGB = numBytes / (1024.0 * 1024.0 * 1024.0);
+  float const totalGB = numBytes / (1024.0f * 1024.0f * 1024.0f);
 
   cudaStream_t stream;
   CUDA_RT_CALL(cudaStreamCreate(&stream));
@@ -361,7 +361,7 @@ TEST_CASE("compressDownstream_10kUniform_Test", "[small]")
 
   CUDA_RT_CALL(cudaMallocHost((void**)&inputHost, n * sizeof(*inputHost)));
 
-  float const totalGB = numBytes / (1024.0 * 1024.0 * 1024.0);
+  float const totalGB = numBytes / (1024.0f * 1024.0f * 1024.0f);
 
   cudaStream_t stream;
   CUDA_RT_CALL(cudaStreamCreate(&stream));

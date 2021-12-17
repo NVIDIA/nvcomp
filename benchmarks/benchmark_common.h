@@ -109,10 +109,7 @@ gen_data(const int max_byte, const size_t size, std::mt19937& rng)
 template <typename T>
 std::vector<T> load_dataset_from_binary(char* fname, size_t* input_elts)
 {
-
-  FILE* fileptr;
-
-  fileptr = fopen(fname, "rb");
+  FILE* fileptr = fopen(fname, "rb");
 
   if (fileptr == NULL) {
     printf("Binary input file not found.\n");

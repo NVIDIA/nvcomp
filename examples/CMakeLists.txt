@@ -44,4 +44,4 @@ endif()
 
 # Add quickstart example
 add_executable(low_level_quickstart_example low_level_quickstart_example.cpp)
-target_link_libraries(low_level_quickstart_example PRIVATE CUDA::cudart nvcomp)
+target_link_libraries(low_level_quickstart_example PRIVATE nvcomp CUDA::cudart)
