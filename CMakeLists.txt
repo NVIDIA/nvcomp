@@ -69,7 +69,8 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
 endif()
 
   if (MSVC)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W3>")
+    # Use "/permissive-" in order to be closer to GCC/Clang in what the MSVC compiler accepts.
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W3>" "$<$<COMPILE_LANGUAGE:CXX>:/permissive->")
   endif()
 
 if(NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})

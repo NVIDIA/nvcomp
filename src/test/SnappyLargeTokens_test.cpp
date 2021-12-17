@@ -95,8 +95,8 @@ void encode_copy(
     uint32_t offset, uint8_t match_length, uint8_t* output, size_t& ix_output)
 {
   if (match_length >= SNAPPY_SINGLE_BYTE_MIN_MATCH_LENGTH
-      && match_length <= SNAPPY_SINGLE_BYTE_MAX_MATCH_LENGTH
-      && offset <= SNAPPY_SINGLE_BYTE_MAX_OFFSET) {
+      and match_length <= SNAPPY_SINGLE_BYTE_MAX_MATCH_LENGTH
+      and offset <= SNAPPY_SINGLE_BYTE_MAX_OFFSET) {
     // 1 byte offset encoding. the  tag byte is: 
     // [5..7: upper 3 bits of offset],[2..4: (match_length - 4)],[0..1: 01, indicates 1 byte offset]
     uint8_t lower_bits = offset & 0xff;
