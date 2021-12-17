@@ -211,17 +211,27 @@ private:
 
 std::vector<char> readFile(const std::string& filename)
 {
-  std::vector<char> buffer(4096);
-  std::vector<char> host_data;
-
   std::ifstream fin(filename, std::ifstream::binary);
+  if (!fin) {
+    std::cerr << "ERROR: Unable to open \"" << filename << "\" for reading."
+              << std::endl;
+    return std::vector<char>();
+  }
+
   fin.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-  size_t num;
-  do {
-    num = fin.readsome(buffer.data(), buffer.size());
-    host_data.insert(host_data.end(), buffer.begin(), buffer.begin() + num);
-  } while (num > 0);
+  fin.seekg(0, std::ios_base::end);
+  auto fileSize = static_cast<std::streamoff>(fin.tellg());
+  fin.seekg(0, std::ios_base::beg);
+
+  std::vector<char> host_data(fileSize);
+  fin.read(host_data.data(), fileSize);
+
+  if (!fin) {
+    std::cerr << "ERROR: Unable to read all of file \"" << filename << "\"."
+              << std::endl;
+    return std::vector<char>();
+  }
 
   return host_data;
 }
@@ -577,7 +587,7 @@ struct args_type {
 };
 
 struct parameter_type {
-	std::string short_flag;
+  std::string short_flag;
   std::string long_flag;
   std::string description;
   std::string default_value;
@@ -598,7 +608,7 @@ bool parse_bool(const std::string& val)
 void usage(const std::string& name, const std::vector<parameter_type>& parameters)
 {
   std::cout << "Usage: " << name << " [OPTIONS]" << std::endl;
-	for (const parameter_type& parameter : parameters) {
+  for (const parameter_type& parameter : parameters) {
     std::cout << "  -" << parameter.short_flag << ",--" << parameter.long_flag;
     std::cout << "  : " << parameter.description << std::endl;
     if (parameter.default_value.empty()) {
