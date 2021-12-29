@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,16 +28,40 @@
 
 #pragma once
 
-#include "nvcomp.h"
 #include "common.h"
 
 namespace nvcomp {
 
+using offset_type = uint16_t;
+using word_type = uint32_t;
+
+// This restricts us to 4GB chunk sizes (total buffer can be up to
+// max(size_t)). We actually artificially restrict it to much less, to
+// limit what we have to test, as well as to encourage users to exploit some
+// parallelism.
+using position_type = uint32_t;
+
+// Use anonymous namespace to avoid ODR problems 
+// because we need these values at compile time 
+// in multiple places. Could use extern and a constants file 
+// if we didn't need them for compile time template logic.
+namespace {
+
 /**
- * @brief The result of the compression and decompression routines
- **/
-struct gpu_snappy_status_s {
-  uint32_t status; // Non-zero value indicates an error
-};
+ * @brief The number of threads to use per chunk in compression.
+ */
+const int LZ4_COMP_THREADS_PER_CHUNK = 32;
+
+/**
+ * @brief The number of threads to use per chunk in decompression.
+ */
+const int LZ4_DECOMP_THREADS_PER_CHUNK = 32;
+
+/**
+ * @brief The number of chunks to decompression concurrently per threadblock.
+ */
+const int LZ4_DECOMP_CHUNKS_PER_BLOCK = 2;
+
+} // anonymous namespace
 
 } // namespace nvcomp

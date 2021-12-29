@@ -26,18 +26,38 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-
 #include "nvcomp.h"
-#include "common.h"
+#include "SnappyKernels.h"
 
 namespace nvcomp {
 
-/**
- * @brief The result of the compression and decompression routines
- **/
-struct gpu_snappy_status_s {
-  uint32_t status; // Non-zero value indicates an error
-};
+void snappyHlifBatchCompress(
+    const uint8_t* decomp_buffer, 
+    const size_t decomp_buffer_size, 
+    uint8_t* comp_buffer, 
+    uint8_t* tmp_buffer,
+    const size_t raw_chunk_size,
+    size_t* ix_output,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t max_comp_chunk_size,
+    size_t* comp_chunk_offsets,
+    size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    cudaStream_t stream);
+
+void snappyHlifBatchDecompress(
+    const uint8_t* comp_buffer, 
+    uint8_t* decomp_buffer, 
+    const size_t raw_chunk_size,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t* comp_chunk_offsets,
+    const size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    cudaStream_t stream);
+
+size_t snappyHlifDecompMaxBlockOccupancy(const int device_id); 
+size_t snappyHlifCompMaxBlockOccupancy(const int device_id);
 
 } // namespace nvcomp

@@ -26,12 +26,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
+#include "../common.h"
 
 namespace nvcomp
 {
 namespace lowlevel
 {
+
+using offset_type = uint16_t;
+using word_type = uint32_t;
+
+// This restricts us to 4GB chunk sizes (total buffer can be up to
+// max(size_t)). We actually artificially restrict it to much less, to
+// limit what we have to test, as well as to encourage users to exploit some
+// parallelism.
+using position_type = uint32_t;
+
+extern const int COMP_THREADS_PER_CHUNK;
+extern const int DECOMP_THREADS_PER_CHUNK;
+extern const int DECOMP_CHUNKS_PER_BLOCK;
 
 /**
  * @brief Compress a batch of memory locations.
@@ -58,6 +71,23 @@ void lz4BatchCompress(
     nvcompType_t data_type,
     cudaStream_t stream);
 
+void lz4HlifBatchCompress(
+    const uint8_t* decomp_buffer, 
+    const size_t decomp_buffer_size, 
+    uint8_t* comp_buffer, 
+    uint8_t* tmp_buffer,
+    const size_t raw_chunk_size,
+    uint64_t* ix_output,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t max_comp_chunk_size,
+    const position_type hash_table_size,
+    size_t* comp_chunk_offsets,
+    size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    nvcompType_t data_type,
+    cudaStream_t stream);
+
 void lz4BatchDecompress(
     const uint8_t* const* device_in_ptrs,
     const size_t* device_in_bytes,
@@ -69,6 +99,21 @@ void lz4BatchDecompress(
     size_t* device_actual_uncompressed_bytes,
     nvcompStatus_t* device_status_ptrs,
     cudaStream_t stream);
+
+void lz4HlifBatchDecompress(
+    const uint8_t* comp_buffer, 
+    uint8_t* decomp_buffer, 
+    const size_t raw_chunk_size,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t* comp_chunk_offsets,
+    const size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    cudaStream_t stream);
+
+size_t batchedLZ4DecompMaxBlockOccupancy(nvcompType_t data_type, const int device_id);
+
+size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_id);
 
 /**
  * @brief Calculate the decompressed sizes of each chunk. This is 
@@ -103,5 +148,9 @@ size_t lz4DecompressComputeTempSize(
 size_t lz4ComputeMaxSize(const size_t chunk_size);
 
 size_t lz4MaxChunkSize();
+
+size_t lz4GetHashTableSize(size_t max_chunk_size);
+
 } // namespace lowlevel
+
 } // namespace nvcomp

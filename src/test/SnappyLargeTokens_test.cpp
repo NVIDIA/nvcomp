@@ -35,7 +35,7 @@
 #include "tests/catch.hpp"
 
 #include "CudaUtils.h"
-#include "SnappyKernels.h"
+#include "lowlevel/SnappyBatchKernels.h"
 
 #define CUDA_CHECK(func)                                                       \
   {                                                                            \

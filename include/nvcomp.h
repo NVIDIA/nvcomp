@@ -30,6 +30,7 @@
 #define NVCOMP_H
 
 #include <cuda_runtime.h>
+#include "nvcomp_common_deps/shared_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,16 +43,6 @@ extern "C" {
 #define NVCOMP_MAJOR_VERSION 2
 #define NVCOMP_MINOR_VERSION 1
 #define NVCOMP_PATCH_VERSION 0
-
-typedef enum nvcompStatus_t
-{
-  nvcompSuccess = 0,
-  nvcompErrorInvalidValue = 10,
-  nvcompErrorNotSupported = 11,
-  nvcompErrorCannotDecompress = 12,
-  nvcompErrorCudaError = 1000,
-  nvcompErrorInternal = 10000,
-} nvcompStatus_t;
 
 /* Supported datatypes */
 typedef enum nvcompType_t

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,18 +26,40 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-
-#include "nvcomp.h"
-#include "common.h"
+#include "LZ4Kernels.h"
 
 namespace nvcomp {
 
-/**
- * @brief The result of the compression and decompression routines
- **/
-struct gpu_snappy_status_s {
-  uint32_t status; // Non-zero value indicates an error
-};
+void lz4HlifBatchCompress(
+    const uint8_t* decomp_buffer, 
+    const size_t decomp_buffer_size, 
+    uint8_t* comp_buffer, 
+    uint8_t* tmp_buffer,
+    const size_t raw_chunk_size,
+    uint64_t* ix_output,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t max_comp_chunk_size,
+    const position_type hash_table_size,
+    size_t* comp_chunk_offsets,
+    size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    nvcompType_t data_type,
+    cudaStream_t stream);
+
+void lz4HlifBatchDecompress(
+    const uint8_t* comp_buffer, 
+    uint8_t* decomp_buffer, 
+    const size_t raw_chunk_size,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t* comp_chunk_offsets,
+    const size_t* comp_chunk_sizes,
+    const uint32_t max_ctas,
+    cudaStream_t stream);
+
+size_t batchedLZ4DecompMaxBlockOccupancy(nvcompType_t data_type, const int device_id);
+
+size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_id);
 
 } // namespace nvcomp

@@ -69,7 +69,7 @@ static inline __device__ uint32_t snap_hash(uint32_t v)
  *
  * @return Updated pointer to compressed byte stream
  **/
-static __device__ uint8_t *StoreLiterals(
+static inline __device__ uint8_t *StoreLiterals(
   uint8_t *dst, uint8_t *end, const uint8_t *src, uint32_t len_minus1, uint32_t t)
 {
   if (len_minus1 < 60) {
@@ -122,10 +122,11 @@ static __device__ uint8_t *StoreLiterals(
  *
  * @return Updated pointer to compressed byte stream
  **/
-static __device__ uint8_t *StoreCopy(uint8_t *dst,
-                                     uint8_t *end,
-                                     uint32_t copy_len,
-                                     uint32_t distance)
+static inline __device__ uint8_t *StoreCopy(
+    uint8_t *dst,
+    uint8_t *end,
+    uint32_t copy_len,
+    uint32_t distance)
 {
   if (copy_len < 12 && distance < 2048) {
     // xxxxxx01.oooooooo: copy with 3-bit length, 11-bit offset
@@ -175,10 +176,11 @@ static inline __device__ uint32_t HashMatchAny(uint32_t v, uint32_t t)
  *
  * @return Number of bytes before first match (literal length)
  **/
-static __device__ uint32_t FindFourByteMatch(snap_state_s *s,
-                                             const uint8_t *src,
-                                             uint32_t pos0,
-                                             uint32_t t)
+static __device__ inline uint32_t FindFourByteMatch(
+    snap_state_s *s,
+    const uint8_t *src,
+    uint32_t pos0,
+    uint32_t t)
 {
   uint32_t len    = s->src_len;
   uint32_t pos    = pos0;
@@ -227,7 +229,7 @@ static __device__ uint32_t FindFourByteMatch(snap_state_s *s,
 }
 
 /// @brief Returns the number of matching bytes for two byte sequences up to 63 bytes
-static __device__ uint32_t Match60(const uint8_t *src1,
+static __device__ inline uint32_t Match60(const uint8_t *src1,
                                    const uint8_t *src2,
                                    uint32_t len,
                                    uint32_t t)
@@ -242,22 +244,22 @@ static __device__ uint32_t Match60(const uint8_t *src1,
 }
 
 /**
- * @brief Snappy compression kernel
+ * @brief Snappy compression device function
  * See http://github.com/google/snappy/blob/master/format_description.txt
  *
- * blockDim {128,1,1}
+ * Device helper function that can be used to 
  *
  * @param[in] inputs Source/Destination buffer information per block
  * @param[out] outputs Compression status per block
  * @param[in] count Number of blocks to compress
  **/
-__global__ void __launch_bounds__(64)
-snap_kernel(
-  const void* const* __restrict__ device_in_ptr,
-  const uint64_t* __restrict__ device_in_bytes,
-  void* const* __restrict__ device_out_ptr,
-  const uint64_t* __restrict__ device_out_available_bytes,
-  gpu_snappy_status_s * __restrict__ outputs,
+__device__ inline void
+do_snap(
+  const uint8_t* __restrict__ device_in_ptr,
+  const uint64_t device_in_bytes,
+  uint8_t* const __restrict__ device_out_ptr,
+  const uint64_t device_out_available_bytes,
+  gpu_snappy_status_s* __restrict__ outputs,
 	uint64_t* device_out_bytes)
 {
   __shared__ __align__(16) snap_state_s state_g;
@@ -268,10 +270,10 @@ snap_kernel(
   const uint8_t *src;
 
   if (!t) {
-    const uint8_t *src = reinterpret_cast<const uint8_t *>(device_in_ptr[blockIdx.x]);
-    uint32_t src_len   = static_cast<uint32_t>(device_in_bytes[blockIdx.x]);
-    uint8_t *dst       = reinterpret_cast<uint8_t *>(device_out_ptr[blockIdx.x]);
-    uint32_t dst_len   = device_out_available_bytes ? static_cast<uint32_t>(device_out_available_bytes[blockIdx.x]) : 0;
+    const uint8_t *src = device_in_ptr;
+    uint32_t src_len   = static_cast<uint32_t>(device_in_bytes);
+    uint8_t *dst       = device_out_ptr;
+    uint32_t dst_len   = device_out_available_bytes;
     if (dst_len == 0)
       dst_len = get_max_compressed_length(src_len);
 
@@ -338,9 +340,9 @@ snap_kernel(
   }
   __syncthreads();
   if (!t) {
-    device_out_bytes[blockIdx.x] = s->dst - s->dst_base;
+    *device_out_bytes = s->dst - s->dst_base;
     if (outputs)
-      outputs[blockIdx.x].status = (s->dst > s->end) ? 1 : 0;
+      outputs->status = (s->dst > s->end) ? 1 : 0;
   }
 }
 
@@ -410,7 +412,7 @@ struct unsnap_state_s {
  * @param s decompression state
  * @param t warp lane id
  **/
-__device__ void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
+__device__ inline void snappy_prefetch_bytestream(unsnap_state_s *s, int t)
 {
   const uint8_t *base  = s->base;
   uint32_t end         = (uint32_t)(s->end - base);
@@ -614,7 +616,7 @@ inline __device__ uint32_t get_len5_mask(uint32_t v0, uint32_t v1)
  * @param s decompression state
  * @param t warp lane id
  **/
-__device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
+__device__ inline void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
 {
   uint32_t cur        = 0;
   uint32_t end        = static_cast<uint32_t>(s->end - s->base);
@@ -824,7 +826,7 @@ __device__ void snappy_decode_symbols(unsnap_state_s *s, uint32_t t)
  * NOTE: No error checks at this stage (WARP0 responsible for not sending offsets and lengths that
  *would result in out-of-bounds accesses)
  **/
-__device__ void snappy_process_symbols(unsnap_state_s *s, int t)
+__device__ inline void snappy_process_symbols(unsnap_state_s *s, int t)
 {
   const uint8_t *literal_base = s->base;
   uint8_t *out                = reinterpret_cast<uint8_t *>(s->in.dstDevice);
@@ -956,72 +958,14 @@ __device__ void snappy_process_symbols(unsnap_state_s *s, int t)
   } while (1);
 }
 
-__global__ void __launch_bounds__(32)
-get_uncompressed_sizes_kernel(
-  const void* const* __restrict__ device_in_ptr,
-  const uint64_t* __restrict__ device_in_bytes,
-	uint64_t* __restrict__ device_out_bytes)
-{
-  int t             = threadIdx.x;
-  int strm_id       = blockIdx.x;
-
-  if (t == 0) {
-    uint32_t uncompressed_size = 0;
-    const uint8_t *cur = reinterpret_cast<const uint8_t *>(device_in_ptr[strm_id]);
-    const uint8_t *end = cur + device_in_bytes[strm_id];
-    if (cur < end) {
-      // Read uncompressed size (varint), limited to 31-bit
-      // The size is stored as little-endian varint, from 1 to 5 bytes (as we allow up to 2^31 sizes only)
-      // The upper bit of each byte indicates if there is another byte to read to compute the size
-      // Please see format details at https://github.com/google/snappy/blob/master/format_description.txt 
-      uncompressed_size = *cur++;
-      if (uncompressed_size > 0x7f) {
-        uint32_t c        = (cur < end) ? *cur++ : 0;
-        uncompressed_size = (uncompressed_size & 0x7f) | (c << 7);
-        // Check if the most significant bit is set, this indicates we need to read the next byte
-        // (maybe even more) to compute the uncompressed size
-        // We do it several time stopping if 1) MSB is cleared or 2) we see that the size is >= 2^31
-        // which we cannot handle  
-        if (uncompressed_size >= (0x80 << 7)) {
-          c                 = (cur < end) ? *cur++ : 0;
-          uncompressed_size = (uncompressed_size & ((0x7f << 7) | 0x7f)) | (c << 14);
-          if (uncompressed_size >= (0x80 << 14)) {
-            c = (cur < end) ? *cur++ : 0;
-            uncompressed_size =
-              (uncompressed_size & ((0x7f << 14) | (0x7f << 7) | 0x7f)) | (c << 21);
-            if (uncompressed_size >= (0x80 << 21)) {
-              c = (cur < end) ? *cur++ : 0;
-              // Snappy format alllows uncompressed sizes larger than 2^31
-              // We generate an error in this case
-              if (c < 0x8)
-                uncompressed_size =
-                  (uncompressed_size & ((0x7f << 21) | (0x7f << 14) | (0x7f << 7) | 0x7f)) |
-                  (c << 28);
-              else
-                uncompressed_size = 0;
-            }
-          }
-        }
-      }
-    }
-    device_out_bytes[strm_id] = uncompressed_size;
-  }
-}
-
 /**
- * @brief Snappy decompression kernel
- * See http://github.com/google/snappy/blob/master/format_description.txt
- *
- * blockDim {128,1,1}
- *
- * @param[in] inputs Source & destination information per block
- * @param[out] outputs Decompression status per block
- **/
-__global__ void __launch_bounds__(96) unsnap_kernel(
-    const void* const* __restrict__ device_in_ptr,
-    const uint64_t* __restrict__ device_in_bytes,
-    void* const* __restrict__ device_out_ptr,
-    const uint64_t* __restrict__ device_out_available_bytes,
+ * @brief Snappy decompression device function
+ **/ 
+__device__ inline void do_unsnap(
+    const uint8_t* const __restrict__ device_in_ptr,
+    const uint64_t device_in_bytes,
+    uint8_t* const __restrict__ device_out_ptr,
+    const uint64_t device_out_available_bytes,
     nvcompStatus_t* const __restrict__ outputs,
     uint64_t* __restrict__ device_out_bytes)
 {
@@ -1029,13 +973,12 @@ __global__ void __launch_bounds__(96) unsnap_kernel(
 
   int t             = threadIdx.x;
   unsnap_state_s *s = &state_g;
-  int strm_id       = blockIdx.x;
 
   if (!t) {
-    s->in.srcDevice = device_in_ptr[strm_id];
-    s->in.srcSize = device_in_bytes[strm_id];
-    s->in.dstDevice = device_out_ptr[strm_id];
-    s->in.dstSize = device_out_available_bytes ? device_out_available_bytes[strm_id] : 0;
+    s->in.srcDevice = device_in_ptr;
+    s->in.srcSize = device_in_bytes;
+    s->in.dstDevice = device_out_ptr;
+    s->in.dstSize = device_out_available_bytes;
   }
   if (t < BATCH_COUNT) { s->q.batch_len[t] = 0; }
   __syncthreads();
@@ -1103,63 +1046,10 @@ __global__ void __launch_bounds__(96) unsnap_kernel(
   }
   if (!t) {
     if (device_out_bytes)
-      device_out_bytes[strm_id] = s->uncompressed_size - s->bytes_left;
+      *device_out_bytes = s->uncompressed_size - s->bytes_left;
     if (outputs)
-      outputs[strm_id] = s->error ? nvcompErrorCannotDecompress : nvcompSuccess;
+      *outputs = s->error ? nvcompErrorCannotDecompress : nvcompSuccess;
   }
-}
-
-void gpu_snap(
-  const void* const* device_in_ptr,
-	const size_t* device_in_bytes,
-	void* const* device_out_ptr,
-	const size_t* device_out_available_bytes,
-	gpu_snappy_status_s *outputs,
-	size_t* device_out_bytes,
-  int count,
-  cudaStream_t stream)
-{
-  dim3 dim_block(64, 1);  // 2 warps per stream, 1 stream per block
-  dim3 dim_grid(count, 1);
-  if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
-    device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
-      outputs, device_out_bytes); }
-  CudaUtils::check_last_error("Failed to launch Snappy compression CUDA kernel gpu_snap");
-}
-
-void gpu_unsnap(
-    const void* const* device_in_ptr,
-    const size_t* device_in_bytes,
-    void* const* device_out_ptr,
-    const size_t* device_out_available_bytes,
-    nvcompStatus_t* outputs,
-    size_t* device_out_bytes,
-    int count,
-    cudaStream_t stream)
-{
-  uint32_t count32 = (count > 0) ? count : 0;
-  dim3 dim_block(96, 1);     // 3 warps per stream, 1 stream per block
-  dim3 dim_grid(count32, 1);  // TODO: Check max grid dimensions vs max expected count
-
-  unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(
-    device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
-      outputs, device_out_bytes);
-  CudaUtils::check_last_error("Failed to launch Snappy decompression CUDA kernel gpu_unsnap");
-}
-
-void gpu_get_uncompressed_sizes(
-  const void* const* device_in_ptr,
-  const size_t* device_in_bytes,
-  size_t* device_out_bytes,
-  int count,
-  cudaStream_t stream)
-{
-  dim3 dim_block(32, 1);
-  dim3 dim_grid(count, 1);
-
-  get_uncompressed_sizes_kernel<<<dim_grid, dim_block, 0, stream>>>(
-    device_in_ptr, device_in_bytes, device_out_bytes);
-  CudaUtils::check_last_error("Failed to run Snappy kernel gpu_get_uncompressed_sizes");
 }
 
 } // nvcomp namespace
