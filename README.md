@@ -212,7 +212,7 @@ comp_size: 2018066, compressed ratio: 81.53
 decompression validated :)
 decompression throughput (GB/s): 160.35
 ```
-### Docker container
+### Running the examples using the docker image
 For building the image container:
 ```
 docker build -t nvcomp:latest .
