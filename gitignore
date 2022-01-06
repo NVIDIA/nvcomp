@@ -1,6 +1,6 @@
 *.swp
 *.o
 build/
-.env/
+.env
 .vscode/
 .idea/
