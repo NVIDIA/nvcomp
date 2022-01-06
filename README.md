@@ -212,3 +212,25 @@ comp_size: 2018066, compressed ratio: 81.53
 decompression validated :)
 decompression throughput (GB/s): 160.35
 ```
+### Docker container
+For building the image container:
+```
+docker build -t nvcomp:latest .
+```
+For running the image container:
+```
+docker run -p 8085:3000  -it --gpus all nvcomp:latest 
+```
+
+The benchmarks and examples have been built in `/usr/nvcomp/build/bin`
+```
+# ls /usr/nvcomp/build/bin
+benchmark_allgather         benchmark_lz4_chunked
+benchmark_bitcomp           benchmark_lz4_synth
+benchmark_bitcomp_chunked   benchmark_snappy_chunked
+benchmark_cascaded          benchmark_snappy_synth
+benchmark_cascaded_auto     gdeflate_cpu_compression
+benchmark_cascaded_chunked  low_level_quickstart_example
+benchmark_gdeflate_chunked  lz4_cpu_compression
+benchmark_lz4               lz4_cpu_decompression
+```
