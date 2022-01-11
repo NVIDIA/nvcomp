@@ -58,8 +58,30 @@ struct DecompressionConfig {
   }
 };
 
+struct BatchManagerBase {
+  virtual std::shared_ptr<CompressionConfig> compress(
+      const uint8_t* decomp_buffer, 
+      const size_t decomp_buffer_size, 
+      uint8_t* comp_buffer) = 0;
+
+  virtual std::shared_ptr<DecompressionConfig> configure_decompression(uint8_t* comp_buffer) = 0;
+
+  virtual void decompress(
+      uint8_t* decomp_buffer, 
+      const uint8_t* comp_buffer,
+      const DecompressionConfig& config) = 0;
+  
+  virtual void set_tmp_buffer(uint8_t* new_tmp_buffer) = 0;
+
+  virtual size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) = 0;
+  
+  virtual size_t get_tmp_buffer_size() = 0;
+  
+  virtual size_t get_compressed_output_size(uint8_t* comp_buffer) = 0;
+};
+
 template<typename FormatSpecHeader>
-struct BatchManager {
+struct BatchManager : BatchManagerBase {
 
 private: // typedefs
 
@@ -139,7 +161,7 @@ public: // Method definitions - ToDo: Split into public / private
   std::shared_ptr<CompressionConfig> compress(
       const uint8_t* decomp_buffer, 
       const size_t decomp_buffer_size, 
-      uint8_t* comp_buffer) 
+      uint8_t* comp_buffer) final override
   {
     if (not filled_tmp_buffer) {
       gpuErrchk(cudaMallocAsync(&tmp_buffer, tmp_buffer_size, user_stream));
@@ -205,7 +227,8 @@ public: // Method definitions - ToDo: Split into public / private
     return comp_config;
   }
 
-  std::shared_ptr<DecompressionConfig> configure_decompression(uint8_t* comp_buffer) 
+  std::shared_ptr<DecompressionConfig> 
+  configure_decompression(uint8_t* comp_buffer) final override
   {
     // To do this, need synchronous memcpy because 
     // the user will need to allocate an output buffer based on the result
@@ -230,7 +253,7 @@ public: // Method definitions - ToDo: Split into public / private
     return decomp_config;
   }
 
-  size_t get_compressed_output_size(uint8_t* comp_buffer) 
+  size_t get_compressed_output_size(uint8_t* comp_buffer) final override
   {
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
     
@@ -243,14 +266,14 @@ public: // Method definitions - ToDo: Split into public / private
     return common_header_cpu->comp_data_size + common_header_cpu->comp_data_offset;
   }
 
-  size_t get_tmp_buffer_size() {
+  size_t get_tmp_buffer_size() final override {
     return tmp_buffer_size;
   }
 
   void decompress(
       uint8_t* decomp_buffer, 
       const uint8_t* comp_buffer,
-      const DecompressionConfig& config) 
+      const DecompressionConfig& config) final override
   {
     const CommonHeader* common_header = reinterpret_cast<const CommonHeader*>(comp_buffer);
     const FormatSpecHeader* comp_format_header = reinterpret_cast<const FormatSpecHeader*>(common_header + 1);
@@ -273,7 +296,7 @@ public: // Method definitions - ToDo: Split into public / private
         comp_chunk_sizes);
   }
 
-  size_t calculate_max_compressed_output_size(size_t decomp_buffer_size)
+  size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) final override
   {
     const size_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
 
@@ -288,7 +311,7 @@ public: // Method definitions - ToDo: Split into public / private
         chunk_offsets_size + chunk_sizes_size + checksum_size + comp_buffer_size;
   }
 
-  void set_tmp_buffer(uint8_t* new_tmp_buffer) 
+  void set_tmp_buffer(uint8_t* new_tmp_buffer) final override
   {
     // TODO: What if the temp buffer is already set? Part of reconfiguration idea
     if (filled_tmp_buffer) return;
