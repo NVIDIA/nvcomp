@@ -47,15 +47,9 @@ target_include_directories(nvcomp PUBLIC
 endif()
 
 target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/src>")
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>")
 target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}>")
-
-if(UNIX)
-target_include_directories(nvcomp PUBLIC
-  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-endif()
-
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
 if(DEFINED CUB_DIR)
   target_include_directories(nvcomp PRIVATE "${CUB_DIR}")
 endif()
