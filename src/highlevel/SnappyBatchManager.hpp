@@ -100,7 +100,8 @@ public:
       uint8_t* comp_data_buffer,
       const uint32_t num_chunks,
       size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes) final override
+      size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) final override
   {
     snappyHlifBatchCompress(
         decomp_buffer,
@@ -115,7 +116,8 @@ public:
         comp_chunk_offsets,
         comp_chunk_sizes,
         max_comp_ctas,
-        user_stream);
+        user_stream,
+        output_status);
   }
 
   void do_decompress(
@@ -123,7 +125,8 @@ public:
       uint8_t* decomp_buffer,
       const uint32_t num_chunks,
       const size_t* comp_chunk_offsets,
-      const size_t* comp_chunk_sizes) final override
+      const size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) final override
   {        
     snappyHlifBatchDecompress(
         comp_data_buffer,
@@ -134,7 +137,8 @@ public:
         comp_chunk_offsets,
         comp_chunk_sizes,
         max_decomp_ctas,
-        user_stream);
+        user_stream,
+        output_status);
   }
 };
 

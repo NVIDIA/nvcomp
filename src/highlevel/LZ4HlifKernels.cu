@@ -54,14 +54,19 @@ struct CompressArgStruct {
 
 template<typename T>
 struct lz4_compress_wrapper : hlif_compress_wrapper {
+private: 
   const position_type hash_table_size;
   offset_type* hash_table;
+  nvcompStatus_t* status;
 
+public:
   __device__ lz4_compress_wrapper(
       const CompressArgStruct input,
       uint8_t* tmp_buffer,
-      uint8_t* /*share_buffer*/)
-    : hash_table_size(input.hash_table_size)
+      uint8_t*, /*share_buffer*/
+      nvcompStatus_t* status)
+    : hash_table_size(input.hash_table_size),
+      status(status)
   {
     static_assert(sizeof(T) <= 4, "Max alignment support is 4 bytes");
     hash_table = reinterpret_cast<offset_type*>(tmp_buffer) + blockIdx.x * hash_table_size;
@@ -84,21 +89,29 @@ struct lz4_compress_wrapper : hlif_compress_wrapper {
         decomp_size,
         comp_chunk_size);
   }
+
+  __device__ nvcompStatus_t& get_output_status() final override {
+    return *status;
+  }
 };
 
 struct lz4_decompress_wrapper : hlif_decompress_wrapper {
-  uint8_t* this_shared_buffer;
 
-  __device__ lz4_decompress_wrapper(uint8_t* shared_buffer)
-    : this_shared_buffer(reinterpret_cast<uint8_t*>(shared_buffer) + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE)
+private:
+  uint8_t* this_shared_buffer;
+  nvcompStatus_t* status;
+
+public:
+  __device__ lz4_decompress_wrapper(uint8_t* shared_buffer, nvcompStatus_t* status)
+    : this_shared_buffer(reinterpret_cast<uint8_t*>(shared_buffer) + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE),
+      status(status)
   {}
       
   __device__ void decompress_chunk(
       uint8_t* decomp_buffer,
       const uint8_t* comp_buffer,
       const size_t comp_chunk_size,
-      const size_t decomp_buffer_size,
-      nvcompStatus_t* output_status) 
+      const size_t decomp_buffer_size) final override
   {
     decompressStream(
         this_shared_buffer,
@@ -107,8 +120,12 @@ struct lz4_decompress_wrapper : hlif_decompress_wrapper {
         comp_chunk_size,
         decomp_buffer_size,
         nullptr, // device_uncompressed_bytes -- unnecessary for HLIF
-        output_status,
+        status,
         true /* output decompressed */);
+  }
+
+  __device__ nvcompStatus_t& get_output_status() final override {
+    return *status;
   }
 };
 
@@ -127,7 +144,8 @@ void lz4HlifBatchCompress(
     size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
     nvcompType_t data_type,
-    cudaStream_t stream) 
+    cudaStream_t stream,
+    nvcompStatus_t* output_status) 
 {
   const dim3 grid(max_ctas);
   const dim3 block(LZ4_COMP_THREADS_PER_CHUNK);
@@ -148,6 +166,7 @@ void lz4HlifBatchCompress(
           max_comp_chunk_size,
           comp_chunk_offsets,
           comp_chunk_sizes,
+          output_status,
           CompressArgStruct{hash_table_size});
       break;
     case NVCOMP_TYPE_SHORT:
@@ -164,6 +183,7 @@ void lz4HlifBatchCompress(
           max_comp_chunk_size,
           comp_chunk_offsets,
           comp_chunk_sizes,
+          output_status,
           CompressArgStruct{hash_table_size});
       break;
     case NVCOMP_TYPE_INT:
@@ -180,6 +200,7 @@ void lz4HlifBatchCompress(
           max_comp_chunk_size,
           comp_chunk_offsets,
           comp_chunk_sizes,
+          output_status,
           CompressArgStruct{hash_table_size});
       break;
     default:
@@ -198,7 +219,8 @@ void lz4HlifBatchDecompress(
     const size_t* comp_chunk_offsets,
     const size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
-    cudaStream_t stream) 
+    cudaStream_t stream,
+    nvcompStatus_t* output_status) 
 {
   const dim3 grid(max_ctas);
   const dim3 block(LZ4_DECOMP_THREADS_PER_CHUNK, LZ4_DECOMP_CHUNKS_PER_BLOCK);
@@ -210,7 +232,8 @@ void lz4HlifBatchDecompress(
       ix_chunk,
       num_chunks,
       comp_chunk_offsets,
-      comp_chunk_sizes);
+      comp_chunk_sizes,
+      output_status);
 
   CudaUtils::check_last_error();
 }

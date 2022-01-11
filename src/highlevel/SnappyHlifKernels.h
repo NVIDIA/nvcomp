@@ -44,7 +44,8 @@ void snappyHlifBatchCompress(
     size_t* comp_chunk_offsets,
     size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    nvcompStatus_t* output_status);
 
 void snappyHlifBatchDecompress(
     const uint8_t* comp_buffer, 
@@ -55,7 +56,8 @@ void snappyHlifBatchDecompress(
     const size_t* comp_chunk_offsets,
     const size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    nvcompStatus_t* output_status);
 
 size_t snappyHlifDecompMaxBlockOccupancy(const int device_id); 
 size_t snappyHlifCompMaxBlockOccupancy(const int device_id);

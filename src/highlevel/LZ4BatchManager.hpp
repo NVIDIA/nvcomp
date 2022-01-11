@@ -108,7 +108,8 @@ public:
       uint8_t* comp_data_buffer,
       const uint32_t num_chunks,
       size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes) final override
+      size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) final override
   {
     lz4HlifBatchCompress(
         decomp_buffer,
@@ -125,7 +126,8 @@ public:
         comp_chunk_sizes,
         max_comp_ctas,
         format_spec->data_type,
-        user_stream);
+        user_stream,
+        output_status);
   }
 
   void do_decompress(
@@ -133,7 +135,8 @@ public:
       uint8_t* decomp_buffer,
       const uint32_t num_chunks,
       const size_t* comp_chunk_offsets,
-      const size_t* comp_chunk_sizes) final override
+      const size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) final override
   {        
     lz4HlifBatchDecompress(
         comp_data_buffer,
@@ -144,7 +147,8 @@ public:
         comp_chunk_offsets,
         comp_chunk_sizes,
         max_decomp_ctas,
-        user_stream);
+        user_stream,
+        output_status);
   }
 };
 

@@ -41,10 +41,12 @@ namespace nvcomp {
 struct CompressionConfig {
   uint64_t* ix_output;
   uint32_t* ix_chunk;
+  nvcompStatus_t* output_status;
     
   ~CompressionConfig() {
     cudaFreeHost(ix_output);
     cudaFreeHost(ix_chunk);
+    cudaFreeHost(output_status);
   }
 };
 
@@ -52,9 +54,11 @@ struct DecompressionConfig {
   size_t decomp_data_size;
   uint32_t num_chunks;
   uint32_t* ix_chunk;
+  nvcompStatus_t* output_status;
   
   ~DecompressionConfig() {
     cudaFreeHost(ix_chunk);
+    cudaFreeHost(output_status);
   }
 };
 
@@ -144,14 +148,16 @@ public: // Method definitions - ToDo: Split into public / private
       uint8_t* comp_data_buffer,
       const uint32_t num_chunks,
       size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes) = 0;
+      size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) = 0;
 
   virtual void do_decompress(
       const uint8_t* comp_data_buffer,
       uint8_t* decomp_buffer,
       const uint32_t num_chunks,
       const size_t* comp_chunk_offsets,
-      const size_t* comp_chunk_sizes) = 0;
+      const size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) = 0;
 
   virtual uint8_t get_decomp_chunks_per_block()
   {
@@ -188,9 +194,12 @@ public: // Method definitions - ToDo: Split into public / private
     auto comp_config = std::make_shared<CompressionConfig>();
     gpuErrchk(cudaHostAlloc(&comp_config->ix_output, sizeof(uint64_t), cudaHostAllocDefault));
     gpuErrchk(cudaHostAlloc(&comp_config->ix_chunk, sizeof(uint32_t), cudaHostAllocDefault));
+    gpuErrchk(cudaHostAlloc(&comp_config->output_status, sizeof(nvcompStatus_t), cudaHostAllocDefault));
     
+    *comp_config->output_status = nvcompSuccess;
     *comp_config->ix_output = 0;
     *comp_config->ix_chunk = std::min(max_comp_ctas, num_chunks);
+
     gpuErrchk(cudaMemcpyAsync(ix_output, comp_config->ix_output, sizeof(uint64_t), cudaMemcpyHostToDevice, user_stream));
     gpuErrchk(cudaMemcpyAsync(ix_chunk, comp_config->ix_chunk, sizeof(uint32_t), cudaMemcpyHostToDevice, user_stream));
     
@@ -220,7 +229,8 @@ public: // Method definitions - ToDo: Split into public / private
         comp_data_buffer,
         num_chunks,
         comp_chunk_offsets,
-        comp_chunk_sizes);
+        comp_chunk_sizes,
+        comp_config->output_status);
 
     gpuErrchk(cudaMemcpyAsync(&(common_header->comp_data_size), ix_output, sizeof(uint64_t), cudaMemcpyDeviceToHost, user_stream));
     gpuErrchk(cudaStreamSynchronize(internal_stream));
@@ -247,6 +257,9 @@ public: // Method definitions - ToDo: Split into public / private
         internal_stream));
 
     gpuErrchk(cudaHostAlloc(&decomp_config->ix_chunk, sizeof(uint32_t), cudaHostAllocDefault));
+    gpuErrchk(cudaHostAlloc(&decomp_config->output_status, sizeof(nvcompStatus_t), cudaHostAllocDefault));
+    
+    *decomp_config->output_status = nvcompSuccess;
 
     gpuErrchk(cudaStreamSynchronize(internal_stream));
 
@@ -293,7 +306,8 @@ public: // Method definitions - ToDo: Split into public / private
         decomp_buffer,
         config.num_chunks,
         comp_chunk_offsets,
-        comp_chunk_sizes);
+        comp_chunk_sizes,
+        config.output_status);
   }
 
   size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) final override

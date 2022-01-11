@@ -45,7 +45,8 @@ void lz4HlifBatchCompress(
     size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
     nvcompType_t data_type,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    nvcompStatus_t* output_status);
 
 void lz4HlifBatchDecompress(
     const uint8_t* comp_buffer, 
@@ -56,7 +57,8 @@ void lz4HlifBatchDecompress(
     const size_t* comp_chunk_offsets,
     const size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    nvcompStatus_t* output_status);
 
 size_t batchedLZ4DecompMaxBlockOccupancy(nvcompType_t data_type, const int device_id);
 
