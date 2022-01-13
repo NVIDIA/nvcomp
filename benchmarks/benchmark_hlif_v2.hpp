@@ -32,13 +32,13 @@
 #include <vector>
 
 #include "benchmark_common.h"
-#include "src/highlevel/BatchManager.hpp"
+#include "src/highlevel/nvcompManager.hpp"
 
 using namespace nvcomp;
 
 const int chunk_size = 1 << 16;
 
-void run_benchmark(char* fname, BatchManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
+void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
 {
   using T = uint8_t;
 
@@ -64,39 +64,42 @@ void run_benchmark(char* fname, BatchManagerBase& batch_manager, int verbose_mem
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-  size_t comp_out_bytes = batch_manager.calculate_max_compressed_output_size(in_bytes);
+  auto compress_config = batch_manager.configure_compression(in_bytes);
+  
+  size_t comp_out_bytes = compress_config.max_compressed_buffer_size;
   benchmark_assert(
       comp_out_bytes > 0, "Output size must be greater than zero.");
 
   // Allocate temp workspace
-  size_t comp_temp_bytes = batch_manager.get_tmp_buffer_size();
-  uint8_t* d_comp_temp;
-  CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
-  batch_manager.set_tmp_buffer(d_comp_temp);
+  size_t comp_scratch_bytes = batch_manager.get_scratch_buffer_size();
+  uint8_t* d_comp_scratch;
+  CUDA_CHECK(cudaMalloc(&d_comp_scratch, comp_scratch_bytes));
+  batch_manager.set_scratch_buffer(d_comp_scratch);
 
   // Allocate compressed output buffer
   uint8_t* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
 
   if (verbose_memory) {
-    std::cout << "compression memory (input+output+temp) (B): "
-              << (in_bytes + comp_out_bytes + comp_temp_bytes) << std::endl;
-    std::cout << "compression temp space (B): " << comp_temp_bytes << std::endl;
+    std::cout << "compression memory (input+output+scratch) (B): "
+              << (in_bytes + comp_out_bytes + comp_scratch_bytes) << std::endl;
+    std::cout << "compression scratch space (B): " << comp_scratch_bytes << std::endl;
     std::cout << "compression output space (B): " << comp_out_bytes
               << std::endl;
   }
 
   // Launch compression
   auto start = std::chrono::steady_clock::now();
-  auto compress_config = batch_manager.compress(
+  batch_manager.compress(
       d_in_data,
       in_bytes,
-      d_comp_out);
+      d_comp_out,
+      compress_config);
   CUDA_CHECK(cudaStreamSynchronize(stream));
   auto end = std::chrono::steady_clock::now();
   comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
 
-  cudaFree(d_comp_temp);
+  cudaFree(d_comp_scratch);
   cudaFree(d_in_data);
 
   std::cout << "comp_size: " << comp_out_bytes
@@ -107,7 +110,7 @@ void run_benchmark(char* fname, BatchManagerBase& batch_manager, int verbose_mem
 
   // allocate output buffer
   auto decomp_config = batch_manager.configure_decompression(d_comp_out);
-  const size_t decomp_bytes = decomp_config->decomp_data_size;
+  const size_t decomp_bytes = decomp_config.decomp_data_size;
   uint8_t* decomp_out_ptr;
   CUDA_CHECK(cudaMalloc(&decomp_out_ptr, decomp_bytes));
   const size_t decomp_temp_bytes = 0;
@@ -124,7 +127,7 @@ void run_benchmark(char* fname, BatchManagerBase& batch_manager, int verbose_mem
   start = std::chrono::steady_clock::now();
 
   // execute decompression (asynchronous)
-  batch_manager.decompress(decomp_out_ptr, d_comp_out, *decomp_config);
+  batch_manager.decompress(decomp_out_ptr, d_comp_out, decomp_config);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
   end = std::chrono::steady_clock::now();

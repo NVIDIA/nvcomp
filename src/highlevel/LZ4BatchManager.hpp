@@ -34,7 +34,7 @@
 #include "src/CudaUtils.h"
 #include "src/lowlevel/LZ4CompressionKernels.h"
 #include "src/highlevel/LZ4HlifKernels.h"
-#include "lz4.h"
+#include "nvcomp/lz4.h"
 #include "src/common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
 #include "BatchManager.hpp"
@@ -51,7 +51,7 @@ private:
   LZ4FormatSpecHeader* format_spec;
 
 public:
-  LZ4BatchManager(size_t uncomp_chunk_size, nvcompType_t data_type, cudaStream_t user_stream = 0, int device_id = 0)
+  LZ4BatchManager(size_t uncomp_chunk_size, nvcompType_t data_type, cudaStream_t user_stream = 0, const int device_id = 0)
     : BatchManager(uncomp_chunk_size, user_stream, device_id),      
       format_spec()
   {
@@ -65,7 +65,7 @@ public:
 
   virtual ~LZ4BatchManager() 
   {
-    cudaFreeHost(format_spec);
+    gpuErrchk(cudaFreeHost(format_spec));
   }
 
   size_t compute_max_compressed_chunk_size() final override 
@@ -86,23 +86,12 @@ public:
     return batchedLZ4DecompMaxBlockOccupancy(format_spec->data_type, device_id); 
   }
 
-  uint8_t get_decomp_chunks_per_block() final override 
-  {
-    return LZ4_DECOMP_CHUNKS_PER_BLOCK;
-  }
-
-  size_t compute_tmp_buffer_size() final override
-  {
-    return max_comp_ctas * (hash_table_size * sizeof(offset_type) 
-         + max_comp_chunk_size);
-  }
-
   LZ4FormatSpecHeader* get_format_header() final override 
   {
     return format_spec;
   }
 
-  void do_compress(
+  void do_batch_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer,
       const size_t decomp_buffer_size,
@@ -117,7 +106,7 @@ public:
         decomp_buffer,
         decomp_buffer_size,
         comp_data_buffer,
-        tmp_buffer,
+        scratch_buffer,
         uncomp_chunk_size,
         &common_header->comp_data_size,
         ix_chunk,
@@ -132,7 +121,7 @@ public:
         output_status);
   }
 
-  void do_decompress(
+  void do_batch_decompress(
       const uint8_t* comp_data_buffer,
       uint8_t* decomp_buffer,
       const uint32_t num_chunks,
@@ -152,6 +141,13 @@ public:
         user_stream,
         output_status);
   }
+
+private: // helper overrides
+  size_t compute_scratch_buffer_size() final override
+  {
+    return max_comp_ctas * (hash_table_size * sizeof(offset_type) 
+         + max_comp_chunk_size);
+  }  
 };
 
 } // namespace nvcomp

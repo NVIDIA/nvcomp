@@ -30,7 +30,7 @@
 
 #include "Check.h"
 #include "CudaUtils.h"
-#include "lowlevel/SnappyBatchKernels.h"
+#include "SnappyBatchKernels.h"
 #include "common.h"
 #include "nvcomp.h"
 #include "nvcomp.hpp"

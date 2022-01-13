@@ -63,7 +63,7 @@ public:
 
   virtual ~SnappyBatchManager() 
   {
-    cudaFreeHost(format_spec);
+    gpuErrchk(cudaFreeHost(format_spec));
   }
 
   size_t compute_max_compressed_chunk_size() final override 
@@ -82,19 +82,14 @@ public:
   uint32_t compute_decompression_max_block_occupancy() final override 
   {
     return snappyHlifDecompMaxBlockOccupancy(device_id); 
-  }
-
-  size_t compute_tmp_buffer_size() final override
-  {
-    return max_comp_ctas * max_comp_chunk_size;
-  }
+  }  
 
   SnappyFormatSpecHeader* get_format_header() final override 
   {
     return format_spec;
   }
 
-  void do_compress(
+  void do_batch_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer,
       const size_t decomp_buffer_size,
@@ -109,7 +104,7 @@ public:
         decomp_buffer,
         decomp_buffer_size,
         comp_data_buffer,
-        tmp_buffer,
+        scratch_buffer,
         uncomp_chunk_size,
         &common_header->comp_data_size,
         ix_chunk,
@@ -122,7 +117,7 @@ public:
         output_status);
   }
 
-  void do_decompress(
+  void do_batch_decompress(
       const uint8_t* comp_data_buffer,
       uint8_t* decomp_buffer,
       const uint32_t num_chunks,

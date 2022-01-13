@@ -93,6 +93,11 @@ public:
   __device__ nvcompStatus_t& get_output_status() final override {
     return *status;
   }
+
+  __device__ FormatType get_format_type() final override {
+    return FormatType::LZ4;
+  }
+
 };
 
 struct lz4_decompress_wrapper : hlif_decompress_wrapper {
@@ -244,8 +249,6 @@ void lz4HlifBatchDecompress(
 
 size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_id)
 {
-  static_assert(sizeof(data_type) <= 4);
-
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, device_id);
   int numBlocksPerSM;
@@ -284,8 +287,6 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
 
 size_t batchedLZ4DecompMaxBlockOccupancy(nvcompType_t data_type, const int device_id)
 {
-  static_assert(sizeof(data_type) <= 4);
-
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, device_id);
   int numBlocksPerSM;

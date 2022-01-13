@@ -50,6 +50,10 @@ public:
   __device__ nvcompStatus_t& get_output_status() final override {
     return *status;
   }
+
+  __device__ FormatType get_format_type() final override {
+    return FormatType::Snappy;
+  }
 };
 
 struct snappy_decompress_wrapper : hlif_decompress_wrapper {
