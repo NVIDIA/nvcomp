@@ -130,6 +130,7 @@ public:
 };
 
 void lz4HlifBatchCompress(
+    CommonHeader* common_header,
     const uint8_t* decomp_buffer, 
     const size_t decomp_buffer_size, 
     uint8_t* comp_buffer, 
@@ -155,6 +156,7 @@ void lz4HlifBatchCompress(
     case NVCOMP_TYPE_CHAR:
     case NVCOMP_TYPE_UCHAR:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint8_t>><<<grid, block, 0, stream>>>(
+          common_header,
           decomp_buffer, 
           decomp_buffer_size, 
           comp_buffer, 
@@ -172,6 +174,7 @@ void lz4HlifBatchCompress(
     case NVCOMP_TYPE_SHORT:
     case NVCOMP_TYPE_USHORT:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint16_t>><<<grid, block, 0, stream>>>(
+          common_header,
           decomp_buffer, 
           decomp_buffer_size, 
           comp_buffer, 
@@ -189,6 +192,7 @@ void lz4HlifBatchCompress(
     case NVCOMP_TYPE_INT:
     case NVCOMP_TYPE_UINT:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint32_t>><<<grid, block, 0, stream>>>(
+          common_header,
           decomp_buffer, 
           decomp_buffer_size, 
           comp_buffer, 

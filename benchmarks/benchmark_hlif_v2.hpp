@@ -94,7 +94,6 @@ void run_benchmark(char* fname, BatchManagerBase& batch_manager, int verbose_mem
       d_comp_out);
   CUDA_CHECK(cudaStreamSynchronize(stream));
   auto end = std::chrono::steady_clock::now();
-
   comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
 
   cudaFree(d_comp_temp);

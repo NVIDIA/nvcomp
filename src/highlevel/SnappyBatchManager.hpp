@@ -34,7 +34,7 @@
 #include "src/CudaUtils.h"
 #include "src/common.h"
 #include "nvcomp/snappy.h"
-#include "src/highlevel/hlif_internal.hpp"
+#include "nvcomp_common_deps/hlif_shared_types.h"
 #include "src/highlevel/SnappyHlifKernels.h"
 #include "BatchManager.hpp"
 
@@ -95,6 +95,7 @@ public:
   }
 
   void do_compress(
+      CommonHeader* common_header,
       const uint8_t* decomp_buffer,
       const size_t decomp_buffer_size,
       uint8_t* comp_data_buffer,
@@ -104,12 +105,13 @@ public:
       nvcompStatus_t* output_status) final override
   {
     snappyHlifBatchCompress(
+        common_header,
         decomp_buffer,
         decomp_buffer_size,
         comp_data_buffer,
         tmp_buffer,
         uncomp_chunk_size,
-        ix_output,
+        &common_header->comp_data_size,
         ix_chunk,
         num_chunks,
         max_comp_chunk_size,

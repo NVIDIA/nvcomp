@@ -27,10 +27,12 @@
  */
 
 #include "LZ4Kernels.h"
+#include "nvcomp_common_deps/hlif_shared_types.h"
 
 namespace nvcomp {
 
 void lz4HlifBatchCompress(
+    CommonHeader* common_header,
     const uint8_t* decomp_buffer, 
     const size_t decomp_buffer_size, 
     uint8_t* comp_buffer, 

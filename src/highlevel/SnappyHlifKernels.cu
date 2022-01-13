@@ -83,6 +83,7 @@ public:
 };
 
 void snappyHlifBatchCompress(
+    CommonHeader* common_header,
     const uint8_t* decomp_buffer, 
     const size_t decomp_buffer_size, 
     uint8_t* comp_buffer, 
@@ -102,6 +103,7 @@ void snappyHlifBatchCompress(
   const dim3 block(64);
 
   HlifCompressBatchKernel<snappy_compress_wrapper><<<grid, block, 0, stream>>>(
+      common_header,
       decomp_buffer, 
       decomp_buffer_size, 
       comp_buffer, 

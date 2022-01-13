@@ -29,36 +29,94 @@
  */
 
 #include <memory>
+#include <vector>
 
 #include "src/Check.h"
 #include "src/CudaUtils.h"
 #include "src/common.h"
-#include "src/highlevel/hlif_internal.hpp"
+#include "nvcomp_common_deps/hlif_shared_types.h"
 
 namespace nvcomp {
 
+template<typename T>
+struct PinnedPtrPool {
+  const static int POOL_PREALLOC_SIZE = 10;
+  const static int POOL_REALLOC_SIZE = 5;
+  std::vector<T*> pool;
+  std::vector<T*> alloced_buffers; 
+
+  PinnedPtrPool() 
+    : alloced_buffers(1)
+  {
+    T*& first_alloc = alloced_buffers[0];
+
+    pool.reserve(POOL_PREALLOC_SIZE);
+
+    gpuErrchk(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+
+    for (size_t ix; ix < POOL_PREALLOC_SIZE; ++ix) {
+      pool.push_back(first_alloc + ix);
+    }
+  }
+
+  void push_ptr(T* status) 
+  {
+    pool.push_back(status);
+  }
+
+  T* pop_status() 
+  {
+    if (pool.empty()) {
+      // realloc
+      alloced_buffers.push_back(nullptr);
+      T*& new_alloc = alloced_buffers.back();
+
+      gpuErrchk(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+      for (size_t ix; ix < POOL_REALLOC_SIZE; ++ix) {
+        pool.push_back(new_alloc + ix);
+      }
+    } 
+
+    T* res = pool.back();
+    pool.pop_back();
+    return res;
+  }
+
+  ~PinnedPtrPool() {
+    for (auto alloced_buffer : alloced_buffers) {
+      gpuErrchk(cudaFreeHost(alloced_buffer));
+    }
+  }
+};
+
 // In the below, need the ix_output / ix_chunk to be 
 struct CompressionConfig {
-  uint64_t* ix_output;
-  uint32_t* ix_chunk;
   nvcompStatus_t* output_status;
-    
+  PinnedPtrPool<nvcompStatus_t>& status_pool;
+
+  CompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
+    : output_status(pool.pop_status()),
+      status_pool(pool)
+  {}
+
   ~CompressionConfig() {
-    cudaFreeHost(ix_output);
-    cudaFreeHost(ix_chunk);
-    cudaFreeHost(output_status);
+    status_pool.push_ptr(output_status);
   }
 };
 
 struct DecompressionConfig {
   size_t decomp_data_size;
   uint32_t num_chunks;
-  uint32_t* ix_chunk;
   nvcompStatus_t* output_status;
-  
+  PinnedPtrPool<nvcompStatus_t>& status_pool;
+
+  DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
+    : output_status(pool.pop_status()),
+      status_pool(pool)
+  {}
+
   ~DecompressionConfig() {
-    cudaFreeHost(ix_chunk);
-    cudaFreeHost(output_status);
+    status_pool.push_ptr(output_status);
   }
 };
 
@@ -90,12 +148,9 @@ struct BatchManager : BatchManagerBase {
 private: // typedefs
 
 private: // members
-  cudaStream_t internal_stream;
   bool filled_tmp_buffer;
-  CommonHeader* common_header_cpu;
 
 protected:
-  uint64_t* ix_output;
   uint32_t* ix_chunk;
   uint32_t max_comp_ctas;
   uint32_t max_decomp_ctas;
@@ -105,7 +160,9 @@ protected:
   size_t tmp_buffer_size;
   size_t uncomp_chunk_size;
   FormatSpecHeader format_spec;
+  CommonHeader* common_header_cpu;
   int device_id;
+  PinnedPtrPool<nvcompStatus_t> status_pool;
 
 public: // Method definitions - ToDo: Split into public / private
   BatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
@@ -114,18 +171,14 @@ public: // Method definitions - ToDo: Split into public / private
       tmp_buffer(nullptr),
       tmp_buffer_size(0),
       device_id(device_id),
-      uncomp_chunk_size(uncomp_chunk_size)
+      uncomp_chunk_size(uncomp_chunk_size),
+      status_pool()
   {
-    cudaStreamCreate(&internal_stream);    
-    
-    gpuErrchk(cudaMalloc(&ix_output, sizeof(uint64_t)));
     gpuErrchk(cudaMalloc(&ix_chunk, sizeof(uint32_t)));
-    
     gpuErrchk(cudaHostAlloc(&common_header_cpu, sizeof(CommonHeader), cudaHostAllocDefault));
   }
 
   virtual ~BatchManager() {
-    gpuErrchk(cudaFree(ix_output));
     gpuErrchk(cudaFree(ix_chunk));
     gpuErrchk(cudaFreeHost(common_header_cpu));
   }
@@ -143,6 +196,7 @@ public: // Method definitions - ToDo: Split into public / private
   virtual FormatSpecHeader* get_format_header() = 0;
 
   virtual void do_compress(
+      CommonHeader* common_header,
       const uint8_t* decomp_buffer,
       const size_t decomp_buffer_size,
       uint8_t* comp_data_buffer,
@@ -179,7 +233,7 @@ public: // Method definitions - ToDo: Split into public / private
     // Set up the raw pointers
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
     FormatSpecHeader* comp_format_header = reinterpret_cast<FormatSpecHeader*>(common_header + 1);
-    // Need to pad 
+    // Pad so that the comp chunk offsets are properly aligned
     void* offset_input = sizeof(FormatSpecHeader) > 0 ? reinterpret_cast<void*>(comp_format_header + 1)
                                                       : reinterpret_cast<void*>(comp_format_header);
     size_t* comp_chunk_offsets = roundUpToAlignment<size_t>(offset_input);
@@ -190,40 +244,16 @@ public: // Method definitions - ToDo: Split into public / private
     uint32_t comp_data_offset = (uintptr_t)(comp_data_buffer - comp_buffer);
 
     // Initialize necessary values.
+    auto comp_config = std::make_shared<CompressionConfig>(status_pool);
 
-    auto comp_config = std::make_shared<CompressionConfig>();
-    gpuErrchk(cudaHostAlloc(&comp_config->ix_output, sizeof(uint64_t), cudaHostAllocDefault));
-    gpuErrchk(cudaHostAlloc(&comp_config->ix_chunk, sizeof(uint32_t), cudaHostAllocDefault));
-    gpuErrchk(cudaHostAlloc(&comp_config->output_status, sizeof(nvcompStatus_t), cudaHostAllocDefault));
-    
-    *comp_config->output_status = nvcompSuccess;
-    *comp_config->ix_output = 0;
-    *comp_config->ix_chunk = std::min(max_comp_ctas, num_chunks);
-
-    gpuErrchk(cudaMemcpyAsync(ix_output, comp_config->ix_output, sizeof(uint64_t), cudaMemcpyHostToDevice, user_stream));
-    gpuErrchk(cudaMemcpyAsync(ix_chunk, comp_config->ix_chunk, sizeof(uint32_t), cudaMemcpyHostToDevice, user_stream));
+    gpuErrchk(cudaMemsetAsync(&common_header->comp_data_size, 0, sizeof(uint64_t), user_stream));
+    gpuErrchk(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));
     
     FormatSpecHeader* cpu_format_header = get_format_header();
-
-    *common_header_cpu = CommonHeader{
-        0, // magic number
-        2, // major version
-        2, // minor version
-        0, // compressed_data_size -- fill in later
-        decomp_buffer_size, // decompressed_data_size 
-        num_chunks,
-        true, // include chunk starts
-        0, // full comp buffer checksum
-        0, // full decomp buffer checksum
-        true, // include_per_chunk_comp_buffer_checksums 
-        true, // include_per_chunk_decomp_buffer_checksums
-        uncomp_chunk_size, 
-        comp_data_offset};
-
-    gpuErrchk(cudaMemcpyAsync(common_header, common_header_cpu, sizeof(CommonHeader), cudaMemcpyHostToDevice, internal_stream));
-    gpuErrchk(cudaMemcpyAsync(comp_format_header, cpu_format_header, sizeof(FormatSpecHeader), cudaMemcpyHostToDevice, internal_stream));
+    gpuErrchk(cudaMemcpyAsync(comp_format_header, cpu_format_header, sizeof(FormatSpecHeader), cudaMemcpyHostToDevice, user_stream));
     
     do_compress(
+        common_header,
         decomp_buffer,
         decomp_buffer_size,
         comp_data_buffer,
@@ -231,9 +261,7 @@ public: // Method definitions - ToDo: Split into public / private
         comp_chunk_offsets,
         comp_chunk_sizes,
         comp_config->output_status);
-
-    gpuErrchk(cudaMemcpyAsync(&(common_header->comp_data_size), ix_output, sizeof(uint64_t), cudaMemcpyDeviceToHost, user_stream));
-    gpuErrchk(cudaStreamSynchronize(internal_stream));
+    
     return comp_config;
   }
 
@@ -243,25 +271,20 @@ public: // Method definitions - ToDo: Split into public / private
     // To do this, need synchronous memcpy because 
     // the user will need to allocate an output buffer based on the result
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
-    auto decomp_config = std::make_shared<DecompressionConfig>();
+    auto decomp_config = std::make_shared<DecompressionConfig>(status_pool);
     gpuErrchk(cudaMemcpyAsync(&decomp_config->decomp_data_size, 
         &common_header->decomp_data_size, 
         sizeof(size_t),
-        cudaMemcpyDeviceToHost,
-        internal_stream));
+        cudaMemcpyDefault,
+        user_stream));
 
     gpuErrchk(cudaMemcpyAsync(&decomp_config->num_chunks, 
         &common_header->num_chunks, 
         sizeof(size_t),
-        cudaMemcpyDeviceToHost,
-        internal_stream));
+        cudaMemcpyDefault,
+        user_stream));
 
-    gpuErrchk(cudaHostAlloc(&decomp_config->ix_chunk, sizeof(uint32_t), cudaHostAllocDefault));
-    gpuErrchk(cudaHostAlloc(&decomp_config->output_status, sizeof(nvcompStatus_t), cudaHostAllocDefault));
-    
     *decomp_config->output_status = nvcompSuccess;
-
-    gpuErrchk(cudaStreamSynchronize(internal_stream));
 
     return decomp_config;
   }
@@ -274,8 +297,8 @@ public: // Method definitions - ToDo: Split into public / private
         common_header, 
         sizeof(CommonHeader),
         cudaMemcpyDeviceToHost,
-        internal_stream));
-    gpuErrchk(cudaStreamSynchronize(internal_stream));
+        user_stream));
+    gpuErrchk(cudaStreamSynchronize(user_stream));
     return common_header_cpu->comp_data_size + common_header_cpu->comp_data_offset;
   }
 
@@ -298,9 +321,7 @@ public: // Method definitions - ToDo: Split into public / private
     const uint32_t* decomp_chunk_checksums = comp_chunk_checksums + config.num_chunks;
     const uint8_t* comp_data_buffer = reinterpret_cast<const uint8_t*>(decomp_chunk_checksums + config.num_chunks);
 
-    *config.ix_chunk = std::min(max_decomp_ctas * get_decomp_chunks_per_block(), config.num_chunks);
-    gpuErrchk(cudaMemcpyAsync(ix_chunk, config.ix_chunk, sizeof(uint32_t), cudaMemcpyHostToDevice, user_stream));
-    
+    gpuErrchk(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));
     do_decompress(
         comp_data_buffer,
         decomp_buffer,
