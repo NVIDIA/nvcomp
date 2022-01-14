@@ -121,7 +121,9 @@ nvcompStatus_t nvcompBatchedBitcompCompressAsync(
 // Need to convert them to nvcompStatus_t.
 __global__ void convertOutputStatuses (nvcompStatus_t *statuses, size_t batch_size)
 {
-  static_assert (sizeof (nvcompStatus_t) == sizeof (bitcompResult_t));
+  static_assert(
+      sizeof(nvcompStatus_t) == sizeof(bitcompResult_t),
+      "bitcomp and nvcomp statuses must be the same size");
   size_t index = (size_t)blockIdx.x * (size_t)blockDim.x + (size_t)threadIdx.x;
   if (index >= batch_size)
       return;
