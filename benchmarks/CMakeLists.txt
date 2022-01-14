@@ -6,5 +6,12 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   string(REPLACE ".cu" "" EXAMPLE_NAME ${EXAMPLE_NAME})
   get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
-  target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::nvml)
+  if (NOT MSVC)
+    target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::cudart CUDA::nvml)
+  else()
+    # Including CUDA::cudart on Windows resulted in multiple definition
+    # linker errors for gdeflate and bitcomp benchmarks, since
+    # cudart_static.lib is already included.
+    target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::nvml)
+  endif()
 endforeach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
