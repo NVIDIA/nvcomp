@@ -157,7 +157,11 @@ public: // API
   virtual ~ManagerBase() {
     gpuErrchk(cudaFreeHost(common_header_cpu));
     if (manager_filled_scratch_buffer) {
-      gpuErrchk(cudaFree(scratch_buffer));
+      #if CUDART_VERSION >= 11020
+        gpuErrchk(cudaFreeAsync(scratch_buffer, user_stream));
+      #else 
+        gpuErrchk(cudaFree(scratch_buffer));
+      #endif
     }
   }
 
@@ -202,7 +206,11 @@ public: // API
       const CompressionConfig& comp_config) 
   {
     if (not scratch_buffer_filled) {
-      gpuErrchk(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
+      #if CUDART_VERSION >= 11020
+        gpuErrchk(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
+      #else
+        gpuErrchk(cudaMalloc(&scratch_buffer, scratch_buffer_size));
+      #endif
       scratch_buffer_filled = true;
       manager_filled_scratch_buffer = true;
     }    
