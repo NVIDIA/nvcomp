@@ -35,79 +35,9 @@
 #include "src/CudaUtils.h"
 #include "src/common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
+#include "PinnedPtrs.hpp"
 
 namespace nvcomp {
-
-template<typename T>
-struct PinnedPtrPool {
-  const static int POOL_PREALLOC_SIZE = 10;
-  const static int POOL_REALLOC_SIZE = 5;
-  std::vector<T*> alloced_buffers; 
-  std::vector<T*> pool;
-
-  PinnedPtrPool() 
-    : alloced_buffers(1),
-      pool()
-  {
-    T*& first_alloc = alloced_buffers[0];
-
-    pool.reserve(POOL_PREALLOC_SIZE);
-
-    gpuErrchk(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
-
-    for (size_t ix = 0; ix < POOL_PREALLOC_SIZE; ++ix) {
-      pool.push_back(first_alloc + ix);
-    }
-  }
-
-  void push_ptr(T* status) 
-  {
-    pool.push_back(status);
-  }
-
-  T* pop_ptr() 
-  {
-    if (pool.empty()) {
-      // realloc
-      alloced_buffers.push_back(nullptr);
-      T*& new_alloc = alloced_buffers.back();
-
-      gpuErrchk(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
-      for (size_t ix; ix < POOL_REALLOC_SIZE; ++ix) {
-        pool.push_back(new_alloc + ix);
-      }
-    } 
-
-    T* res = pool.back();
-    pool.pop_back();
-    return res;
-  }
-
-  ~PinnedPtrPool() {
-    for (auto alloced_buffer : alloced_buffers) {
-      gpuErrchk(cudaFreeHost(alloced_buffer));
-    }
-  }
-};
-
-template<typename T>
-struct PinnedPtrWrapper {
-  PinnedPtrPool<T>& memory_pool;
-  T* ptr;
-
-  PinnedPtrWrapper(PinnedPtrPool<T>& memory_pool) 
-    : memory_pool(memory_pool),
-      ptr(memory_pool.pop_ptr())
-  {}
-
-  PinnedPtrWrapper& operator=(const PinnedPtrWrapper&) = delete;
-
-  PinnedPtrWrapper(const nvcomp::PinnedPtrWrapper<nvcompStatus_t>&) = delete;
-
-  ~PinnedPtrWrapper() {
-    memory_pool.push_ptr(ptr);
-  }
-};
 
 struct CompressionConfig {
 private: 

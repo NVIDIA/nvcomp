@@ -33,11 +33,11 @@
 #include "nvcomp/cascaded.h"
 #include "nvcomp/cascaded.hpp"
 
-#include "../../tests/catch.hpp"
-#include "../CascadedCompressionGPU.h"
-#include "../common.h"
-#include "../type_macros.h"
-#include "CascadedCommon.h"
+#include "tests/catch.hpp"
+#include "highlevel/CascadedCompressionGPU.h"
+#include "common.h"
+#include "type_macros.h"
+#include "highlevel/CascadedCommon.h"
 #include "common.h"
 
 #include <algorithm>
