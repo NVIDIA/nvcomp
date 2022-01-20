@@ -15,6 +15,8 @@ struct hlif_compress_wrapper {
   virtual __device__ nvcompStatus_t& get_output_status() = 0;
 
   virtual __device__ FormatType get_format_type() = 0;
+
+  virtual __device__ ~hlif_compress_wrapper() {};
 };
 
 // Decompress wrapper must meet this requirement
@@ -26,6 +28,8 @@ struct hlif_decompress_wrapper {
       const size_t decomp_buffer_size) = 0;
       
   virtual __device__ nvcompStatus_t& get_output_status() = 0;
+  
+  virtual __device__ ~hlif_decompress_wrapper() {};
 };
 
 __device__ inline void fill_common_header(
