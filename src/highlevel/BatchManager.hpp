@@ -46,6 +46,10 @@ protected: // members
 public: // API
   BatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
     : ManagerBase<FormatSpecHeader>(user_stream, device_id),
+      ix_chunk(),
+      max_comp_ctas(),
+      max_decomp_ctas(),
+      max_comp_chunk_size(),
       uncomp_chunk_size(uncomp_chunk_size)
   {
     gpuErrchk(cudaMalloc(&ix_chunk, sizeof(uint32_t)));
@@ -53,7 +57,10 @@ public: // API
 
   virtual ~BatchManager() {
     gpuErrchk(cudaFree(ix_chunk));
-  }      
+  }
+
+  BatchManager& operator=(const BatchManager&) = delete;     
+  BatchManager(const BatchManager&) = delete;     
 
   void do_decompress(
       uint8_t* decomp_buffer, 
@@ -138,7 +145,6 @@ private: // helper API overrides
     uint32_t* comp_chunk_checksums = reinterpret_cast<uint32_t*>(comp_chunk_sizes + num_chunks);
     uint32_t* decomp_chunk_checksums = comp_chunk_checksums + num_chunks;
     uint8_t* comp_data_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + num_chunks);
-    uint32_t comp_data_offset = (uintptr_t)(comp_data_buffer - comp_buffer);
 
     gpuErrchk(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));    
     

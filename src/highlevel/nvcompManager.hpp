@@ -42,11 +42,12 @@ template<typename T>
 struct PinnedPtrPool {
   const static int POOL_PREALLOC_SIZE = 10;
   const static int POOL_REALLOC_SIZE = 5;
-  std::vector<T*> pool;
   std::vector<T*> alloced_buffers; 
+  std::vector<T*> pool;
 
   PinnedPtrPool() 
-    : alloced_buffers(1)
+    : alloced_buffers(1),
+      pool()
   {
     T*& first_alloc = alloced_buffers[0];
 
@@ -91,13 +92,17 @@ struct PinnedPtrPool {
 
 template<typename T>
 struct PinnedPtrWrapper {
-  T* ptr;
   PinnedPtrPool<T>& memory_pool;
+  T* ptr;
 
   PinnedPtrWrapper(PinnedPtrPool<T>& memory_pool) 
     : memory_pool(memory_pool),
       ptr(memory_pool.pop_ptr())
   {}
+
+  PinnedPtrWrapper& operator=(const PinnedPtrWrapper&) = delete;
+
+  PinnedPtrWrapper(const nvcomp::PinnedPtrWrapper<nvcompStatus_t>&) = delete;
 
   ~PinnedPtrWrapper() {
     memory_pool.push_ptr(ptr);
@@ -134,7 +139,9 @@ public:
   uint32_t num_chunks;
 
   DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(std::make_shared<PinnedPtrWrapper<nvcompStatus_t>>(pool))
+    : status(std::make_shared<PinnedPtrWrapper<nvcompStatus_t>>(pool)),
+      decomp_data_size(),
+      num_chunks()
   {
     *get_status() = nvcompSuccess;
   }
@@ -186,7 +193,8 @@ private: // members
 
 public: // API
   ManagerBase(cudaStream_t user_stream = 0, int device_id = 0) 
-    : user_stream(user_stream),
+    : common_header_cpu(),
+      user_stream(user_stream),
       scratch_buffer(nullptr),
       scratch_buffer_size(0),
       device_id(device_id),
@@ -200,6 +208,9 @@ public: // API
   size_t get_scratch_buffer_size() final override {
     return scratch_buffer_size;
   }
+
+  ManagerBase(const ManagerBase&) = delete;
+  ManagerBase& operator=(const ManagerBase&) = delete;
 
   size_t get_compressed_output_size(uint8_t* comp_buffer) final override {
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);

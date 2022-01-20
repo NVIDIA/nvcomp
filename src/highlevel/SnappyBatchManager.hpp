@@ -46,7 +46,6 @@ struct SnappyFormatSpecHeader {
 
 struct SnappyBatchManager : BatchManager<SnappyFormatSpecHeader> {
 private:
-  size_t hash_table_size;
   SnappyFormatSpecHeader* format_spec;
 
 public:
@@ -65,6 +64,9 @@ public:
   {
     gpuErrchk(cudaFreeHost(format_spec));
   }
+
+  SnappyBatchManager& operator=(const SnappyBatchManager&) = delete;     
+  SnappyBatchManager(const SnappyBatchManager&) = delete;     
 
   size_t compute_max_compressed_chunk_size() final override 
   {

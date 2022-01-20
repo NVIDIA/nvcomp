@@ -53,6 +53,7 @@ private:
 public:
   LZ4BatchManager(size_t uncomp_chunk_size, nvcompType_t data_type, cudaStream_t user_stream = 0, const int device_id = 0)
     : BatchManager(uncomp_chunk_size, user_stream, device_id),      
+      hash_table_size(),
       format_spec()
   {
     gpuErrchk(cudaHostAlloc(&format_spec, sizeof(LZ4FormatSpecHeader), cudaHostAllocDefault));
@@ -67,6 +68,9 @@ public:
   {
     gpuErrchk(cudaFreeHost(format_spec));
   }
+
+  LZ4BatchManager(const LZ4BatchManager&) = delete;
+  LZ4BatchManager& operator=(const LZ4BatchManager&) = delete;
 
   size_t compute_max_compressed_chunk_size() final override 
   {
