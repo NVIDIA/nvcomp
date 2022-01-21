@@ -46,12 +46,12 @@ namespace nvcomp {
 /**
  * @brief Config used to aggregate information about a particular compression.
  * 
- * Contains a "PinnedPtrWrapper" to an nvcompStatus. After the compression is complete,
+ * Contains a "PinnedPtrHandle" to an nvcompStatus. After the compression is complete,
  * the user can check the result status which resides in pinned host memory.
  */
 struct CompressionConfig {
 private: 
-  std::shared_ptr<PinnedPtrWrapper<nvcompStatus_t>> status;
+  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
 
 public:
   size_t max_compressed_buffer_size;
@@ -62,7 +62,7 @@ public:
   CompressionConfig(
       PinnedPtrPool<nvcompStatus_t>& pool, 
       size_t max_compressed_buffer_size)
-    : status(std::make_shared<PinnedPtrWrapper<nvcompStatus_t>>(pool)),
+    : status(pool.allocate()),
       max_compressed_buffer_size(max_compressed_buffer_size)
   {
     *get_status() = nvcompSuccess;
@@ -72,19 +72,19 @@ public:
    * @brief Get the raw nvcompStatus_t*
    */
   nvcompStatus_t* get_status() const {
-    return status->ptr;
+    return status->get_ptr();
   }
 };
 
 /**
  * @brief Config used to aggregate information about a particular decompression.
  * 
- * Contains a "PinnedPtrWrapper" to an nvcompStatus. After the decompression is complete,
+ * Contains a "PinnedPtrHandle" to an nvcompStatus. After the decompression is complete,
  * the user can check the result status which resides in pinned host memory.
  */
 struct DecompressionConfig {
 private: 
-  std::shared_ptr<PinnedPtrWrapper<nvcompStatus_t>> status;
+  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
 
 public:
   size_t decomp_data_size;
@@ -94,7 +94,7 @@ public:
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
   DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(std::make_shared<PinnedPtrWrapper<nvcompStatus_t>>(pool)),
+    : status(pool.allocate()),
       decomp_data_size(),
       num_chunks()
   {
@@ -105,7 +105,7 @@ public:
    * @brief Get the raw nvcompStatus_t*
    */
   nvcompStatus_t* get_status() const {
-    return status->ptr;
+    return status->get_ptr();
   }
 };
 

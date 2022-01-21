@@ -36,8 +36,8 @@ namespace nvcomp {
 // Static values that should be exposed.
 // These could be static members of the PinnedPtrPool 
 // but it's complicated by PinnedPtrPool being a template class
-static const int PINNED_POOL_PREALLOC_SIZE = 10;
-static const int PINNED_POOL_REALLOC_SIZE = 5;
+static constexpr size_t PINNED_POOL_PREALLOC_SIZE_BYTES = 4096; // Allocate a page
+static constexpr size_t PINNED_POOL_REALLOC_SIZE_BYTES = 4096; // Reallocate a page
 
 /** 
  * @brief A memory pool that can allocate pinned host memory in batches 
@@ -47,14 +47,20 @@ static const int PINNED_POOL_REALLOC_SIZE = 5;
  * the pointer to the value is pushed back into the pool.
  * 
  */ 
+
+template<typename T>
+struct PoolTestWrapper;
+
 template<typename T>
 struct PinnedPtrPool {
 
 private: // data
   std::vector<T*> alloced_buffers; 
   std::vector<T*> pool;
+  static const size_t POOL_PREALLOC_SIZE = PINNED_POOL_PREALLOC_SIZE_BYTES / sizeof(T);
+  static const size_t POOL_REALLOC_SIZE = PINNED_POOL_REALLOC_SIZE_BYTES / sizeof(T);
 
-public: // members
+public: // API
 
   PinnedPtrPool() 
     : alloced_buffers(1),
@@ -62,23 +68,110 @@ public: // members
   {
     T*& first_alloc = alloced_buffers[0];
 
-    pool.reserve(PINNED_POOL_PREALLOC_SIZE);
+    pool.reserve(POOL_PREALLOC_SIZE);
 
-    gpuErrchk(cudaHostAlloc(&first_alloc, PINNED_POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+    gpuErrchk(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
 
-    for (int ix = 0; ix < PINNED_POOL_PREALLOC_SIZE; ++ix) {
+    for (size_t ix = 0; ix < POOL_PREALLOC_SIZE; ++ix) {
       pool.push_back(first_alloc + ix);
     }
   }
 
+  /** 
+   * @brief A wrapper for pinned ptrs, interacts with PinnedPtrPool.
+   * 
+   * This class is intended to be held in a std::shared_ptr. Then, when the 
+   * user is finished, the destructor automatically returns the underlying memory
+   * to the PinnedPtrPool.
+   * 
+   */ 
+  class PinnedPtrHandle {
+    PinnedPtrPool& memory_pool;
+    T* ptr;
+
+    /**
+     * @brief The constructor gets a wrapped ptr from the memory pool
+     */ 
+    PinnedPtrHandle(PinnedPtrPool& memory_pool, T* ptr) 
+      : memory_pool(memory_pool),
+        ptr(ptr)
+    {}
+
+    // Disallow copies
+    PinnedPtrHandle& operator=(const PinnedPtrHandle&) = delete;
+    PinnedPtrHandle(const PinnedPtrHandle&) = delete;
+
+  public: // Public API
+    /**
+     * @brief Move constructor that steals the pointer from the expiring `other`
+     */ 
+    PinnedPtrHandle(PinnedPtrHandle&& other) 
+      : memory_pool(other.memory_pool),
+        ptr(other.ptr)
+    {
+      other.ptr = nullptr;
+    }
+
+    /**
+     * @brief The destructor will automatically return the ptr to the memory pool
+     */ 
+    ~PinnedPtrHandle() {
+      if (ptr != nullptr) {
+        memory_pool.deallocate(ptr);
+      }
+    }
+    
+    /**
+     * @brief Gets a reference to the underlying value
+     */
+  public: // accessor 
+    T& operator*() {
+      return *ptr;
+    }
+
+    T* get_ptr() {
+      return ptr;
+    }
+
+    friend struct PinnedPtrPool;
+  };
+
   /**
    * @brief Push the pointer back into the pool
    */ 
-  void push_ptr(T* status) 
+  void deallocate(T* status) 
   {
     pool.push_back(status);
   }
 
+  /**
+   * @brief Get a pointer to a T instance in pinned host memory from the pool
+   */ 
+  std::shared_ptr<PinnedPtrHandle> allocate() 
+  {
+    if (pool.empty()) {
+      // realloc
+      alloced_buffers.push_back(nullptr);
+      T*& new_alloc = alloced_buffers.back();
+
+      gpuErrchk(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+      for (size_t ix = 0; ix < POOL_REALLOC_SIZE; ++ix) {
+        pool.push_back(new_alloc + ix);
+      }
+    } 
+    T* res = pool.back();
+    pool.pop_back();
+
+    return std::make_shared<PinnedPtrHandle>(PinnedPtrHandle{*this, res});
+  }
+
+  ~PinnedPtrPool() {
+    for (auto alloced_buffer : alloced_buffers) {
+      gpuErrchk(cudaFreeHost(alloced_buffer));
+    }
+  }
+
+private: // helpers that PoolTestWrapper will use
   /**
    * @brief Get the number of available pointers without additional allocations
    */ 
@@ -90,89 +183,10 @@ public: // members
    * @brief Get the total number of T instances that have been allocated
    */ 
   size_t get_alloced_size() {
-    return (alloced_buffers.size() - 1) * PINNED_POOL_REALLOC_SIZE + PINNED_POOL_PREALLOC_SIZE;
-  }
+    return (alloced_buffers.size() - 1) * POOL_REALLOC_SIZE + POOL_PREALLOC_SIZE;
+  }  
 
-  /**
-   * @brief Get a pointer to a T instance in pinned host memory from the pool
-   */ 
-  T* pop_ptr() 
-  {
-    if (pool.empty()) {
-      // realloc
-      alloced_buffers.push_back(nullptr);
-      T*& new_alloc = alloced_buffers.back();
-
-      gpuErrchk(cudaHostAlloc(&new_alloc, PINNED_POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
-      for (int ix = 0; ix < PINNED_POOL_REALLOC_SIZE; ++ix) {
-        get_current_pool_size();
-        pool.push_back(new_alloc + ix);
-      }
-    } 
-    T* res = pool.back();
-    get_current_pool_size();
-    pool.pop_back();
-    get_current_pool_size();
-    return res;
-  }
-
-  ~PinnedPtrPool() {
-    for (auto alloced_buffer : alloced_buffers) {
-      gpuErrchk(cudaFreeHost(alloced_buffer));
-    }
-  }
-};
-
-/** 
- * @brief A wrapper for pinned ptrs, interacts with PinnedPtrPool.
- * 
- * This class is intended to be held in a std::shared_ptr. Then, when the 
- * user is finished, the destructor automatically returns the underlying memory
- * to the PinnedPtrPool.
- * 
- */ 
-template<typename T>
-struct PinnedPtrWrapper {
-  PinnedPtrPool<T>& memory_pool;
-  T* ptr;
-
-  /**
-   * @brief The constructor gets a wrapped ptr from the memory pool
-   */ 
-  PinnedPtrWrapper(PinnedPtrPool<T>& memory_pool) 
-    : memory_pool(memory_pool),
-      ptr(memory_pool.pop_ptr())
-  {}
-
-  // Disallow copies
-  PinnedPtrWrapper& operator=(const PinnedPtrWrapper&) = delete;
-  PinnedPtrWrapper(const PinnedPtrWrapper&) = delete;
-
-  /**
-   * @brief Move constructor that steals the pointer from the expiring `other`
-   */ 
-  PinnedPtrWrapper(PinnedPtrWrapper&& other) 
-    : memory_pool(other.memory_pool),
-      ptr(other.ptr)
-  {
-    other.ptr = nullptr;
-  }
-
-  /**
-   * @brief The destructor will automatically return the ptr to the memory pool
-   */ 
-  ~PinnedPtrWrapper() {
-    if (ptr != nullptr) {
-      memory_pool.push_ptr(ptr);
-    }
-  }
-  
-  /**
-   * @brief Gets a reference to the underlying value
-   */ 
-  T& operator*() {
-    return *ptr;
-  }
+  friend struct PoolTestWrapper<T>;
 };
 
 } // namespace nvcomp
