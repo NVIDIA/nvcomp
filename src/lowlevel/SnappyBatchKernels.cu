@@ -37,7 +37,7 @@ snap_kernel(
   void* const* __restrict__ device_out_ptr,
   const uint64_t* __restrict__ device_out_available_bytes,
   gpu_snappy_status_s * __restrict__ outputs,
-	uint64_t* device_out_bytes)
+  uint64_t* device_out_bytes)
 {
   const int ix_chunk = blockIdx.x;
   do_snap(reinterpret_cast<const uint8_t*>(device_in_ptr[ix_chunk]),
@@ -52,7 +52,7 @@ __global__ void __launch_bounds__(32)
 get_uncompressed_sizes_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
-	uint64_t* __restrict__ device_out_bytes)
+  uint64_t* __restrict__ device_out_bytes)
 {
   int t             = threadIdx.x;
   int strm_id       = blockIdx.x;
@@ -128,11 +128,11 @@ __global__ void __launch_bounds__(96) unsnap_kernel(
 
 void gpu_snap(
   const void* const* device_in_ptr,
-	const size_t* device_in_bytes,
-	void* const* device_out_ptr,
-	const size_t* device_out_available_bytes,
-	gpu_snappy_status_s *outputs,
-	size_t* device_out_bytes,
+  const size_t* device_in_bytes,
+  void* const* device_out_ptr,
+  const size_t* device_out_available_bytes,
+  gpu_snappy_status_s *outputs,
+  size_t* device_out_bytes,
   int count,
   cudaStream_t stream)
 {
