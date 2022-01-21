@@ -32,6 +32,20 @@
 
 namespace nvcomp {
 
+/**
+ * Base class for compression formats that are able to use the 
+ * nvcomp shared HLIF logic code. 
+ * 
+ * This class does compression by splitting the uncompressed buffer into chunks. 
+ * It compresses each chunk independently and outputs the chunks into a gapless 
+ * result buffer in arbitrary chunk ordering. The header then includes the information
+ * needed to decompress the chunks back into the original ordering.
+ * 
+ * Generally, the code in hlif_shared.cuh can be used to implement 
+ * do_batch_(compress/decompress). In this case, device code for compression / decompression 
+ * can be shared between the low level batch API and the BatchManager extension.
+ * 
+ */
 template<typename FormatSpecHeader>
 struct BatchManager : ManagerBase<FormatSpecHeader> {
 
@@ -82,12 +96,37 @@ public: // API
         comp_chunk_sizes,
         config.get_status());
   }
+  
+  virtual void do_configure_decompression(
+      DecompressionConfig& decomp_config,
+      CommonHeader* common_header) final override 
+  {
+    gpuErrchk(cudaMemcpy(&decomp_config.num_chunks, 
+        &common_header->num_chunks, 
+        sizeof(size_t),
+        cudaMemcpyDefault));
+  }
 
 private: // pure virtual functions
+  /**
+   * @brief Computes the maximum compressed chunk size given the member variable
+   * uncomp_chunk_size
+   */ 
   virtual size_t compute_max_compressed_chunk_size() = 0;
+
+  /**
+   * @brief Computes the maximum CTA occupancy for compression
+   */ 
   virtual uint32_t compute_compression_max_block_occupancy() = 0;
+
+  /**
+   * @brief Computes the maximum CTA occupancy for decompression
+   */ 
   virtual uint32_t compute_decompression_max_block_occupancy() = 0;
 
+  /**
+   * @brief Does the batch level compression
+   */ 
   virtual void do_batch_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer,
@@ -98,6 +137,9 @@ private: // pure virtual functions
       size_t* comp_chunk_sizes,
       nvcompStatus_t* output_status) = 0;
 
+  /**
+   * @brief Does the batch level decompression
+   */ 
   virtual void do_batch_decompress(
       const uint8_t* comp_data_buffer,
       uint8_t* decomp_buffer,
@@ -159,8 +201,13 @@ private: // helper API overrides
         comp_config.get_status());
   }
 
-  // Can be overridden if the format needs additional scratch space, see LZ4 for an example
-  size_t compute_scratch_buffer_size() override
+  /**
+   * @brief Computes the required scratch space size
+   * 
+   * Note: This can be overridden if the format needs additional scratch space 
+   * beyond that used for compressing blocks. See LZ4BatchManager for an example.
+   */
+  virtual size_t compute_scratch_buffer_size() override
   {
     return max_comp_ctas * max_comp_chunk_size;
   }

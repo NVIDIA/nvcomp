@@ -71,7 +71,7 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
       comp_out_bytes > 0, "Output size must be greater than zero.");
 
   // Allocate temp workspace
-  size_t comp_scratch_bytes = batch_manager.get_scratch_buffer_size();
+  size_t comp_scratch_bytes = batch_manager.get_required_scratch_buffer_size();
   uint8_t* d_comp_scratch;
   CUDA_CHECK(cudaMalloc(&d_comp_scratch, comp_scratch_bytes));
   batch_manager.set_scratch_buffer(d_comp_scratch);
