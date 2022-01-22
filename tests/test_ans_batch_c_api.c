@@ -26,6 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #define SUPPORT_NULLPTR_APIS
+#define CRASH_SAFE
 
 #include "nvcomp/ans.h"
 #include "test_batch_c_api.h"
