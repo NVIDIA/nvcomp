@@ -1,5 +1,9 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.cu)
 
+if(NOT ans_FOUND)
+  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_ans.cpp")
+endif()
+
 foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   # cut off suffixes
   string(REPLACE ".cpp" "" EXAMPLE_NAME ${EXAMPLE_SOURCE})

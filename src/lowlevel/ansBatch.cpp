@@ -81,8 +81,6 @@ nvcompStatus_t nvcompBatchedANSDecompressAsync(
     cudaStream_t stream)
 {
 #ifdef ENABLE_ANS
-  // TODO: remove - update ans to use nvcompStatus_t when updating to new API
-  auto ans_statuses = reinterpret_cast<ans::ansError_t*>(device_statuses);
   try {
     ans::decompressAsync(
       CudaUtils::device_pointer(device_compressed_ptrs),
@@ -91,7 +89,7 @@ nvcompStatus_t nvcompBatchedANSDecompressAsync(
       device_actual_uncompressed_bytes ? CudaUtils::device_pointer(device_actual_uncompressed_bytes) : nullptr,
       0, batch_size, device_temp_ptr, temp_bytes,
       CudaUtils::device_pointer(device_uncompressed_ptr),
-      ans_statuses ? CudaUtils::device_pointer(ans_statuses) : nullptr,
+      device_statuses ? CudaUtils::device_pointer(device_statuses) : nullptr,
       stream);
   } catch (const std::exception& e) {
      return Check::exception_to_error(e, "nvcompBatchedANSDecompressAsync()");
