@@ -54,6 +54,11 @@ if (gdeflate_FOUND)
   target_link_libraries(nvcomp PRIVATE gdeflate)
 endif()
 
+if (ans_FOUND)
+  target_include_directories(nvcomp PRIVATE ${ANS_INCLUDE_DIRS})
+  target_link_libraries(nvcomp PRIVATE ans)
+endif()
+
 if (BUILD_TESTS)
   add_subdirectory("test")
   add_subdirectory("highlevel/test")

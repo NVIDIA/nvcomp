@@ -1,5 +1,10 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.c)
 
+if(NOT ans_FOUND)
+list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "test_ans_batch_c_api.c")
+endif()
+
+
 function(add_test_file EXAMPLE_SOURCE)
   get_filename_component(BARE_NAME "${EXAMPLE_SOURCE}" NAME_WE)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
