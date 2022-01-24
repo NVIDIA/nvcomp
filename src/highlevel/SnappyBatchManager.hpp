@@ -53,7 +53,7 @@ public:
     : BatchManager(uncomp_chunk_size, user_stream, device_id),      
       format_spec()
   {
-    gpuErrchk(cudaHostAlloc(&format_spec, sizeof(SnappyFormatSpecHeader), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(SnappyFormatSpecHeader), cudaHostAllocDefault));
 
     max_comp_chunk_size = compute_max_compressed_chunk_size();    
     
@@ -62,7 +62,7 @@ public:
 
   virtual ~SnappyBatchManager() 
   {
-    gpuErrchk(cudaFreeHost(format_spec));
+    CudaUtils::check(cudaFreeHost(format_spec));
   }
 
   SnappyBatchManager& operator=(const SnappyBatchManager&) = delete;     

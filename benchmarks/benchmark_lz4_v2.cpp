@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
   LZ4BatchManager batch_manager{chunk_size, data_type, stream};
 
   run_benchmark(fname, batch_manager, verbose_memory, stream);
-  gpuErrchk(cudaStreamDestroy(stream));
+  CudaUtils::check(cudaStreamDestroy(stream));
 
   return 0;
 }

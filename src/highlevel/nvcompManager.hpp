@@ -228,6 +228,9 @@ protected: // members
 private: // members
   bool scratch_buffer_filled;
 
+protected: // members
+  bool finished_init;
+
 public: // API
   /**
    * @brief Construct a ManagerBase
@@ -243,9 +246,10 @@ public: // API
       device_id(device_id),
       status_pool(),
       manager_filled_scratch_buffer(false),
-      scratch_buffer_filled(false)
+      scratch_buffer_filled(false),
+      finished_init(false)
   {
-    gpuErrchk(cudaHostAlloc(&common_header_cpu, sizeof(CommonHeader), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(&common_header_cpu, sizeof(CommonHeader), cudaHostAllocDefault));
   }
 
   size_t get_required_scratch_buffer_size() final override {
@@ -255,11 +259,12 @@ public: // API
   // Disable copying
   ManagerBase(const ManagerBase&) = delete;
   ManagerBase& operator=(const ManagerBase&) = delete;
+  ManagerBase() = delete;     
 
   size_t get_compressed_output_size(uint8_t* comp_buffer) final override {
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
     
-    gpuErrchk(cudaMemcpy(common_header_cpu, 
+    CudaUtils::check(cudaMemcpy(common_header_cpu, 
         common_header, 
         sizeof(CommonHeader),
         cudaMemcpyDefault));
@@ -268,12 +273,12 @@ public: // API
   };
   
   virtual ~ManagerBase() {
-    gpuErrchk(cudaFreeHost(common_header_cpu));
+    CudaUtils::check(cudaFreeHost(common_header_cpu));
     if (manager_filled_scratch_buffer) {
       #if CUDART_VERSION >= 11020
-        gpuErrchk(cudaFreeAsync(scratch_buffer, user_stream));
+        CudaUtils::check(cudaFreeAsync(scratch_buffer, user_stream));
       #else 
-        gpuErrchk(cudaFree(scratch_buffer));
+        CudaUtils::check(cudaFree(scratch_buffer));
       #endif
     }
   }
@@ -289,7 +294,7 @@ public: // API
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
     DecompressionConfig decomp_config{status_pool};
     
-    gpuErrchk(cudaMemcpy(&decomp_config.decomp_data_size, 
+    CudaUtils::check(cudaMemcpy(&decomp_config.decomp_data_size, 
         &common_header->decomp_data_size, 
         sizeof(size_t),
         cudaMemcpyDefault));
@@ -304,9 +309,9 @@ public: // API
     if (scratch_buffer_filled) {
       if (manager_filled_scratch_buffer) {
         #if CUDART_VERSION >= 11020
-          gpuErrchk(cudaFreeAsync(scratch_buffer, user_stream));
+          CudaUtils::check(cudaFreeAsync(scratch_buffer, user_stream));
         #else
-          gpuErrchk(cudaFree(scratch_buffer));
+          CudaUtils::check(cudaFree(scratch_buffer));
         #endif
         manager_filled_scratch_buffer = false;
       }
@@ -322,11 +327,13 @@ public: // API
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) 
   {
+    assert(finished_init);
+
     if (not scratch_buffer_filled) {
       #if CUDART_VERSION >= 11020
-        gpuErrchk(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
+        CudaUtils::check(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
       #else
-        gpuErrchk(cudaMalloc(&scratch_buffer, scratch_buffer_size));
+        CudaUtils::check(cudaMalloc(&scratch_buffer, scratch_buffer_size));
       #endif
       scratch_buffer_filled = true;
       manager_filled_scratch_buffer = true;
@@ -334,9 +341,9 @@ public: // API
 
     CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
     FormatSpecHeader* comp_format_header = reinterpret_cast<FormatSpecHeader*>(common_header + 1);
-    gpuErrchk(cudaMemcpyAsync(comp_format_header, get_format_header(), sizeof(FormatSpecHeader), cudaMemcpyDefault, user_stream));
+    CudaUtils::check(cudaMemcpyAsync(comp_format_header, get_format_header(), sizeof(FormatSpecHeader), cudaMemcpyDefault, user_stream));
 
-    gpuErrchk(cudaMemsetAsync(&common_header->comp_data_size, 0, sizeof(uint64_t), user_stream));
+    CudaUtils::check(cudaMemsetAsync(&common_header->comp_data_size, 0, sizeof(uint64_t), user_stream));
 
     uint8_t* new_comp_buffer = comp_buffer + sizeof(CommonHeader) + sizeof(FormatSpecHeader);
     do_compress(common_header, decomp_buffer, decomp_buffer_size, new_comp_buffer, comp_config);
@@ -347,14 +354,17 @@ public: // API
       const uint8_t* comp_buffer,
       const DecompressionConfig& config)
   {
+    assert(finished_init);
+
     const uint8_t* new_comp_buffer = comp_buffer + sizeof(CommonHeader) + sizeof(FormatSpecHeader);
 
     do_decompress(decomp_buffer, new_comp_buffer, config);
   }
   
 protected: // helpers 
-  void finish_init() {
+  virtual void finish_init() {
     scratch_buffer_size = compute_scratch_buffer_size();
+    finished_init = true;
   }
 
 private: // helpers

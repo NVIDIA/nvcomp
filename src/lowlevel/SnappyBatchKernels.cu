@@ -24,13 +24,11 @@ namespace nvcomp {
  * @brief Snappy compression kernel
  * See http://github.com/google/snappy/blob/master/format_description.txt
  *
- * blockDim {64,1,1}
- *
  * @param[in] inputs Source/Destination buffer information per block
  * @param[out] outputs Compression status per block
  * @param[in] count Number of blocks to compress
  **/
-__global__ void __launch_bounds__(64)
+__global__ void __launch_bounds__(COMP_THREADS_PER_BLOCK)
 snap_kernel(
   const void* const* __restrict__ device_in_ptr,
   const uint64_t* __restrict__ device_in_bytes,
@@ -104,12 +102,12 @@ get_uncompressed_sizes_kernel(
  * @brief Snappy decompression kernel
  * See http://github.com/google/snappy/blob/master/format_description.txt
  *
- * blockDim {96,1,1}
+ * blockDim {DECOMP_THREADS_PER_BLOCK,1,1}
  *
  * @param[in] inputs Source & destination information per block
  * @param[out] outputs Decompression status per block
  **/
-__global__ void __launch_bounds__(96) unsnap_kernel(
+__global__ void __launch_bounds__(DECOMP_THREADS_PER_BLOCK) unsnap_kernel(
     const void* const* __restrict__ device_in_ptr,
     const uint64_t* __restrict__ device_in_bytes,
     void* const* __restrict__ device_out_ptr,
@@ -136,7 +134,7 @@ void gpu_snap(
   int count,
   cudaStream_t stream)
 {
-  dim3 dim_block(64, 1);  // 2 warps per stream, 1 stream per block
+  dim3 dim_block(COMP_THREADS_PER_BLOCK, 1);  
   dim3 dim_grid(count, 1);
   if (count > 0) { snap_kernel<<<dim_grid, dim_block, 0, stream>>>(
     device_in_ptr, device_in_bytes, device_out_ptr, device_out_available_bytes,
@@ -155,7 +153,7 @@ void gpu_unsnap(
     cudaStream_t stream)
 {
   uint32_t count32 = (count > 0) ? count : 0;
-  dim3 dim_block(96, 1);     // 3 warps per stream, 1 stream per block
+  dim3 dim_block(DECOMP_THREADS_PER_BLOCK, 1);     
   dim3 dim_grid(count32, 1);  // TODO: Check max grid dimensions vs max expected count
 
   unsnap_kernel<<<dim_grid, dim_block, 0, stream>>>(

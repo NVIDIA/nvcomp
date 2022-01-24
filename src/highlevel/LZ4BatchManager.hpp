@@ -56,17 +56,15 @@ public:
       hash_table_size(),
       format_spec()
   {
-    gpuErrchk(cudaHostAlloc(&format_spec, sizeof(LZ4FormatSpecHeader), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(LZ4FormatSpecHeader), cudaHostAllocDefault));
     format_spec->data_type = data_type;
 
-    max_comp_chunk_size = compute_max_compressed_chunk_size();    
-    hash_table_size = lowlevel::lz4GetHashTableSize(max_comp_chunk_size);
     finish_init();
   }
 
   virtual ~LZ4BatchManager() 
   {
-    gpuErrchk(cudaFreeHost(format_spec));
+    CudaUtils::check(cudaFreeHost(format_spec));
   }
 
   LZ4BatchManager(const LZ4BatchManager&) = delete;
@@ -152,6 +150,11 @@ private: // helper overrides
     return max_comp_ctas * (hash_table_size * sizeof(offset_type) 
          + max_comp_chunk_size);
   }  
+
+  void format_specific_init() final override 
+  {
+    hash_table_size = lowlevel::lz4GetHashTableSize(max_comp_chunk_size);
+  }
 };
 
 } // namespace nvcomp

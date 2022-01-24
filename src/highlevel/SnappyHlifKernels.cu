@@ -104,7 +104,7 @@ void snappyHlifBatchCompress(
     nvcompStatus_t* output_status) 
 {
   const dim3 grid(max_ctas);
-  const dim3 block(64);
+  const dim3 block(COMP_THREADS_PER_BLOCK);
 
   HlifCompressBatchKernel<snappy_compress_wrapper><<<grid, block, 0, stream>>>(
       common_header,
@@ -135,7 +135,7 @@ void snappyHlifBatchDecompress(
     nvcompStatus_t* output_status) 
 {
   const dim3 grid(max_ctas);
-  const dim3 block(96, 1);
+  const dim3 block(DECOMP_THREADS_PER_BLOCK);
   HlifDecompressBatchKernel<snappy_decompress_wrapper><<<grid, block, 0, stream>>>(
       comp_buffer,
       decomp_buffer,
@@ -156,7 +156,7 @@ size_t snappyHlifCompMaxBlockOccupancy(const int device_id)
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &numBlocksPerSM, 
       HlifCompressBatchKernel<snappy_compress_wrapper>, 
-      64, // threads per block 
+      COMP_THREADS_PER_BLOCK,
       shmem_size);
   
   return deviceProp.multiProcessorCount * numBlocksPerSM;
@@ -171,7 +171,7 @@ size_t snappyHlifDecompMaxBlockOccupancy(const int device_id)
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &numBlocksPerSM, 
       HlifDecompressBatchKernel<snappy_decompress_wrapper, 1>, 
-      96, // threads per block 
+      DECOMP_THREADS_PER_BLOCK, 
       shmem_size);
   
   return deviceProp.multiProcessorCount * numBlocksPerSM;

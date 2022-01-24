@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <vector>
+#include "CudaUtils.h"
 
 namespace nvcomp {
 
@@ -47,7 +48,6 @@ static constexpr size_t PINNED_POOL_REALLOC_SIZE_BYTES = 4096; // Reallocate a p
  * the pointer to the value is pushed back into the pool.
  * 
  */ 
-
 template<typename T>
 struct PoolTestWrapper;
 
@@ -70,7 +70,7 @@ public: // API
 
     pool.reserve(POOL_PREALLOC_SIZE);
 
-    gpuErrchk(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
 
     for (size_t ix = 0; ix < POOL_PREALLOC_SIZE; ++ix) {
       pool.push_back(first_alloc + ix);
@@ -134,15 +134,8 @@ public: // API
     }
 
     friend struct PinnedPtrPool;
-  };
-
-  /**
-   * @brief Push the pointer back into the pool
-   */ 
-  void deallocate(T* status) 
-  {
-    pool.push_back(status);
-  }
+  
+  }; // End PinnedPtrHandle definition
 
   /**
    * @brief Get a pointer to a T instance in pinned host memory from the pool
@@ -154,7 +147,7 @@ public: // API
       alloced_buffers.push_back(nullptr);
       T*& new_alloc = alloced_buffers.back();
 
-      gpuErrchk(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+      CudaUtils::check(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
       for (size_t ix = 0; ix < POOL_REALLOC_SIZE; ++ix) {
         pool.push_back(new_alloc + ix);
       }
@@ -167,9 +160,19 @@ public: // API
 
   ~PinnedPtrPool() {
     for (auto alloced_buffer : alloced_buffers) {
-      gpuErrchk(cudaFreeHost(alloced_buffer));
+      CudaUtils::check(cudaFreeHost(alloced_buffer));
     }
   }
+
+private: // Only used by PinnedPtrHandle
+  /**
+   * @brief Push the pointer back into the pool
+   */ 
+  void deallocate(T* ptr) 
+  {
+    pool.push_back(ptr);
+  }
+
 
 private: // helpers that PoolTestWrapper will use
   /**

@@ -29,6 +29,9 @@ namespace nvcomp {
 #define MAX_COPY_LENGTH 64       // Syntax limit
 #define MAX_COPY_DISTANCE 32768  // Matches encoder limit as described in snappy format description
 
+const int COMP_THREADS_PER_BLOCK = 64; // 2 warps per stream, 1 stream per block
+const int DECOMP_THREADS_PER_BLOCK = 96; // 3 warps per stream, 1 stream per block
+
 /**
  * @brief snappy compressor state
  **/

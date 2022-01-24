@@ -60,21 +60,21 @@ protected: // members
 public: // API
   BatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
     : ManagerBase<FormatSpecHeader>(user_stream, device_id),
-      ix_chunk(),
-      max_comp_ctas(),
-      max_decomp_ctas(),
-      max_comp_chunk_size(),
+      ix_chunk(0),
+      max_comp_ctas(0),
+      max_decomp_ctas(0),
+      max_comp_chunk_size(0),
       uncomp_chunk_size(uncomp_chunk_size)
   {
-    gpuErrchk(cudaMalloc(&ix_chunk, sizeof(uint32_t)));
+    CudaUtils::check(cudaMalloc(&ix_chunk, sizeof(uint32_t)));
   }
 
   virtual ~BatchManager() {
-    gpuErrchk(cudaFree(ix_chunk));
+    CudaUtils::check(cudaFree(ix_chunk));
   }
 
   BatchManager& operator=(const BatchManager&) = delete;     
-  BatchManager(const BatchManager&) = delete;     
+  BatchManager(const BatchManager&) = delete;
 
   void do_decompress(
       uint8_t* decomp_buffer, 
@@ -87,7 +87,7 @@ public: // API
     const uint32_t* decomp_chunk_checksums = comp_chunk_checksums + config.num_chunks;
     const uint8_t* comp_data_buffer = reinterpret_cast<const uint8_t*>(decomp_chunk_checksums + config.num_chunks);
 
-    gpuErrchk(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));
+    CudaUtils::check(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));
     do_batch_decompress(
         comp_data_buffer,
         decomp_buffer,
@@ -101,7 +101,7 @@ public: // API
       DecompressionConfig& decomp_config,
       CommonHeader* common_header) final override 
   {
-    gpuErrchk(cudaMemcpy(&decomp_config.num_chunks, 
+    CudaUtils::check(cudaMemcpy(&decomp_config.num_chunks, 
         &common_header->num_chunks, 
         sizeof(size_t),
         cudaMemcpyDefault));
@@ -151,9 +151,13 @@ private: // pure virtual functions
 
 protected: // derived helpers
   void finish_init() {
+    max_comp_chunk_size = compute_max_compressed_chunk_size();    
+    
+    format_specific_init();
     max_comp_ctas = compute_compression_max_block_occupancy();
     max_decomp_ctas = compute_decompression_max_block_occupancy();
-    ManagerBase<FormatSpecHeader>::finish_init();
+    
+    ManagerBase<FormatSpecHeader>::finish_init();    
   }
 
 private: // helper API overrides
@@ -178,7 +182,7 @@ private: // helper API overrides
       const size_t decomp_buffer_size, 
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) final override
-  {
+  {    
     const uint32_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
     
     // Pad so that the comp chunk offsets are properly aligned
@@ -188,7 +192,7 @@ private: // helper API overrides
     uint32_t* decomp_chunk_checksums = comp_chunk_checksums + num_chunks;
     uint8_t* comp_data_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + num_chunks);
 
-    gpuErrchk(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));    
+    CudaUtils::check(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));    
     
     do_batch_compress(
         common_header,
@@ -211,6 +215,12 @@ private: // helper API overrides
   {
     return max_comp_ctas * max_comp_chunk_size;
   }
+
+  /**
+   * @brief Optional helper that is called in the finish_init sequence
+   */  
+  virtual void format_specific_init() 
+  {}
 
 };
 
