@@ -107,7 +107,7 @@ gen_data(const int max_byte, const size_t size, std::mt19937& rng)
 
 // Load dataset from binary file into an array of type T
 template <typename T>
-std::vector<T> load_dataset_from_binary(char* fname, size_t* input_elts)
+std::vector<T> load_dataset_from_binary(char* fname, size_t* input_element_count)
 {
   FILE* fileptr = fopen(fname, "rb");
 
@@ -121,12 +121,12 @@ std::vector<T> load_dataset_from_binary(char* fname, size_t* input_elts)
   size_t filelen = ftell(fileptr);
   rewind(fileptr);
 
-  // If input_elts is already set, use it, otherwise load the whole file
-  if (*input_elts == 0 || filelen / sizeof(T) < *input_elts) {
-    *input_elts = filelen / sizeof(T);
+  // If input_element_count is already set, use it, otherwise load the whole file
+  if (*input_element_count == 0 || filelen / sizeof(T) < *input_element_count) {
+    *input_element_count = filelen / sizeof(T);
   }
 
-  const size_t numElements = *input_elts;
+  const size_t numElements = *input_element_count;
 
   std::vector<T> buffer(numElements);
 
@@ -136,7 +136,7 @@ std::vector<T> load_dataset_from_binary(char* fname, size_t* input_elts)
     throw std::runtime_error(
         "Failed to read file: " + std::string(fname) + " read "
         + std::to_string(numRead) + "/"
-        + std::to_string(*input_elts * sizeof(T)) + " elements.");
+        + std::to_string(*input_element_count * sizeof(T)) + " elements.");
   }
 
   fclose(fileptr);
@@ -145,7 +145,7 @@ std::vector<T> load_dataset_from_binary(char* fname, size_t* input_elts)
 
 // Load dataset from binary file into an array of type T
 template <typename T>
-std::vector<T> load_dataset_from_txt(char* fname, size_t* input_elts)
+std::vector<T> load_dataset_from_txt(char* fname, size_t* input_element_count)
 {
 
   std::vector<T> buffer;
@@ -161,7 +161,7 @@ std::vector<T> load_dataset_from_txt(char* fname, size_t* input_elts)
   size_t i = 0;
   constexpr size_t MAX_LINE_LEN = 100;
   char line[MAX_LINE_LEN];
-  while (fgets(line, MAX_LINE_LEN, fileptr) && i < *input_elts) {
+  while (fgets(line, MAX_LINE_LEN, fileptr) && i < *input_element_count) {
     //    std::stringstream row(line);
     buffer.push_back((T)std::stof(line));
     i++;

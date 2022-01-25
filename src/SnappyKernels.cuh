@@ -15,7 +15,7 @@
  */
 
 #include "SnappyBlockUtils.cuh"
-#include "SnappyKernels.h"
+#include "SnappyTypes.h"
 #include "CudaUtils.h"
 
 namespace nvcomp {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,15 +42,15 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
 {
   using T = uint8_t;
 
-  size_t input_elts = 0;
+  size_t input_element_count = 0;
   std::vector<T> data;
-  data = load_dataset_from_binary<T>(fname, &input_elts);
+  data = load_dataset_from_binary<T>(fname, &input_element_count);
 
   // Make sure dataset fits on GPU to benchmark total compression
   size_t freeMem;
   size_t totalMem;
-  cudaMemGetInfo(&freeMem, &totalMem);
-  if (freeMem < input_elts * sizeof(T)) {
+  CUDA_CHECK(cudaMemGetInfo(&freeMem, &totalMem));
+  if (freeMem < input_element_count * sizeof(T)) {
     std::cout << "Insufficient GPU memory to perform compression." << std::endl;
     exit(1);
   }
@@ -59,7 +59,7 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
   std::cout << "uncompressed (B): " << data.size() * sizeof(T) << std::endl;
 
   T* d_in_data;
-  const size_t in_bytes = sizeof(T) * input_elts;
+  const size_t in_bytes = sizeof(T) * input_element_count;
   CUDA_CHECK(cudaMalloc((void**)&d_in_data, in_bytes));
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
@@ -99,8 +99,8 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
   auto end = std::chrono::steady_clock::now();
   comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
 
-  cudaFree(d_comp_scratch);
-  cudaFree(d_in_data);
+  CUDA_CHECK(cudaFree(d_comp_scratch));
+  CUDA_CHECK(cudaFree(d_in_data));
 
   std::cout << "comp_size: " << comp_out_bytes
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
@@ -135,20 +135,20 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
   std::cout << "decompression throughput (GB/s): "
             << gbs(start, end, decomp_bytes) << std::endl;
 
-  cudaFree(d_comp_out);
+  CUDA_CHECK(cudaFree(d_comp_out));
 
   benchmark_assert(
-      decomp_bytes == input_elts * sizeof(T),
+      decomp_bytes == input_element_count * sizeof(T),
       "Decompressed result incorrect size.");
 
-  std::vector<T> res(input_elts);
+  std::vector<T> res(input_element_count);
   cudaMemcpy(
       res.data(),
       decomp_out_ptr,
-      input_elts * sizeof(T),
+      input_element_count * sizeof(T),
       cudaMemcpyDeviceToHost);
   
-  cudaFree(decomp_out_ptr);
+  CUDA_CHECK(cudaFree(decomp_out_ptr));
   
   // check the size
 #if VERBOSE > 1

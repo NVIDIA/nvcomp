@@ -1,7 +1,5 @@
-#pragma once
-
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +25,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#pragma once
 
 #include <memory>
 
@@ -74,7 +74,7 @@ public:
   {
     size_t max_comp_chunk_size;
     nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-        uncomp_chunk_size, nvcompBatchedLZ4DefaultOpts, &max_comp_chunk_size);
+        get_uncomp_chunk_size(), nvcompBatchedLZ4DefaultOpts, &max_comp_chunk_size);
     return max_comp_chunk_size;
   }
 
@@ -109,15 +109,15 @@ public:
         decomp_buffer_size,
         comp_data_buffer,
         scratch_buffer,
-        uncomp_chunk_size,
+        get_uncomp_chunk_size(),
         &common_header->comp_data_size,
         ix_chunk,
         num_chunks,
-        max_comp_chunk_size,
+        get_max_comp_chunk_size(),
         hash_table_size,
         comp_chunk_offsets,
         comp_chunk_sizes,
-        max_comp_ctas,
+        get_max_comp_ctas(),
         format_spec->data_type,
         user_stream,
         output_status);
@@ -134,12 +134,12 @@ public:
     lz4HlifBatchDecompress(
         comp_data_buffer,
         decomp_buffer,
-        uncomp_chunk_size,
+        get_uncomp_chunk_size(),
         ix_chunk,
         num_chunks,
         comp_chunk_offsets,
         comp_chunk_sizes,
-        max_decomp_ctas,
+        get_max_decomp_ctas(),
         user_stream,
         output_status);
   }
@@ -147,13 +147,13 @@ public:
 private: // helper overrides
   size_t compute_scratch_buffer_size() final override
   {
-    return max_comp_ctas * (hash_table_size * sizeof(offset_type) 
-         + max_comp_chunk_size);
+    return get_max_comp_ctas() * (hash_table_size * sizeof(offset_type) 
+         + get_max_comp_chunk_size());
   }  
 
   void format_specific_init() final override 
   {
-    hash_table_size = lowlevel::lz4GetHashTableSize(max_comp_chunk_size);
+    hash_table_size = lowlevel::lz4GetHashTableSize(get_max_comp_chunk_size());
   }
 };
 

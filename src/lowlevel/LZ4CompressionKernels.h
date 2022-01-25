@@ -27,20 +27,12 @@
  */
 
 #include "../common.h"
+#include "LZ4Types.h"
 
 namespace nvcomp
 {
 namespace lowlevel
 {
-
-using offset_type = uint16_t;
-using word_type = uint32_t;
-
-// This restricts us to 4GB chunk sizes (total buffer can be up to
-// max(size_t)). We actually artificially restrict it to much less, to
-// limit what we have to test, as well as to encourage users to exploit some
-// parallelism.
-using position_type = uint32_t;
 
 extern const int COMP_THREADS_PER_CHUNK;
 extern const int DECOMP_THREADS_PER_CHUNK;

@@ -1,7 +1,5 @@
-#pragma once
-
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#pragma once
+
 #include <memory>
 #include <vector>
 
@@ -44,7 +44,7 @@ namespace nvcomp {
  *****************************************************************************/
 
 /**
- * @brief Config used to aggregate information about a particular compression.
+ * @brief Config used to aggregate information about the compression of a particular buffer.
  * 
  * Contains a "PinnedPtrHandle" to an nvcompStatus. After the compression is complete,
  * the user can check the result status which resides in pinned host memory.
@@ -117,7 +117,7 @@ struct nvcompManagerBase {
    * @brief Configure the compression. 
    *
    * This routine computes the size of the required result buffer. The result config also
-   * contains the nvcompStatus* that allows error checking. 
+   * contains the nvcompStatus* that allows error checking. Synchronizes the device (cudaMemcpy)
    * 
    * @param decomp_buffer_size The uncompressed input data size.
    * \return comp_config Result
@@ -142,13 +142,14 @@ struct nvcompManagerBase {
   /**
    * @brief Configure the decompression. 
    *
-   * Initiates synchronous mem copies to retrieve blocking information
-   * from the compressed device buffer. In the base case, this is just the size of the compressed buffer. 
+   * Synchronizes the user stream. 
+   * 
+   * In the base case, this only computes the size of the decompressed buffer from the compressed buffer header. 
    * 
    * @param comp_buffer The compressed input data (GPU accessible).
    * \return decomp_config Result
    */
-  virtual DecompressionConfig configure_decompression(uint8_t* comp_buffer) = 0;
+  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) = 0;
 
   /**
    * @brief Perform decompression asynchronously.
@@ -156,7 +157,7 @@ struct nvcompManagerBase {
    * @param decomp_buffer The location to output the decompressed data to (GPU accessible).
    * @param comp_buffer The compressed input data (GPU accessible).
    * @param decomp_config Resulted from configure_decompression given this decomp_buffer_size.
-   * Contains nvcompStatus* in pinned host memory to allow error checking.
+   * Contains nvcompStatus* in CPU/GPU-accessible memory to allow error checking.
    */
   virtual void decompress(
       uint8_t* decomp_buffer, 
@@ -204,8 +205,8 @@ struct nvcompManagerBase {
  * 
  * - Intended that all Managers will inherit from this class directly or indirectly.
  *
- * - Contains a pinned memory pool for result statuses to avoid repeated 
- *   cudaHostAlloc calls on subsequent compressions / decompressions.
+ * - Contains a CPU/GPU-accessible memory pool for result statuses to avoid repeated 
+ *   allocations when tasked with multiple compressions / decompressions.
  * 
  * - Templated on the particular format's FormatSpecHeader so that some operations can be shared here. 
  *   This is likely to be inherited by template classes. In this case, 
@@ -289,20 +290,21 @@ public: // API
     return CompressionConfig{status_pool, max_comp_size};
   }
 
-  virtual DecompressionConfig configure_decompression(uint8_t* comp_buffer) override
+  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) override
   {
-    CommonHeader* common_header = reinterpret_cast<CommonHeader*>(comp_buffer);
+    const CommonHeader* common_header = reinterpret_cast<const CommonHeader*>(comp_buffer);
     DecompressionConfig decomp_config{status_pool};
     
-    CudaUtils::check(cudaMemcpy(&decomp_config.decomp_data_size, 
+    CudaUtils::check(cudaMemcpyAsync(&decomp_config.decomp_data_size, 
         &common_header->decomp_data_size, 
         sizeof(size_t),
-        cudaMemcpyDefault));
+        cudaMemcpyDefault,
+        user_stream));
     
     do_configure_decompression(decomp_config, common_header);
 
     return decomp_config;
-  }
+}
 
   void set_scratch_buffer(uint8_t* new_scratch_buffer) final override
   {
@@ -403,7 +405,7 @@ private: // helpers
    */
   virtual void do_configure_decompression(
       DecompressionConfig& decomp_config,
-      CommonHeader* common_header) = 0; 
+      const CommonHeader* common_header) = 0; 
 
   /**
    * @brief Computes the required scratch buffer size 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,20 +28,38 @@
 #pragma once
 
 #include "CudaUtils.h"
-#include "LZ4Kernels.h"
 #include "TempSpaceBroker.h"
 #include "common.h"
 
 #include "cuda_runtime.h"
 #include "nvcomp_cub.cuh"
+#include "LZ4Types.h"
 
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <vector>
 
-using double_word_type = uint64_t;
-using item_type = uint32_t;
+namespace {
+  // Detail type helpers -- used to reference 4 / 8-byte values
+  using word_type = uint32_t;
+  using double_word_type = uint64_t;
+}
+
+/**
+ * @brief The number of threads to use per chunk in compression.
+ */
+const int LZ4_COMP_THREADS_PER_CHUNK = 32;
+
+/**
+ * @brief The number of threads to use per chunk in decompression.
+ */
+const int LZ4_DECOMP_THREADS_PER_CHUNK = 32;
+
+/**
+ * @brief The number of chunks to decompression concurrently per threadblock.
+ */
+const int LZ4_DECOMP_CHUNKS_PER_BLOCK = 2;
 
 #define OOB_CHECKING 1 // Prevent's crashing of corrupt lz4 sequences
 

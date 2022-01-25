@@ -1,7 +1,5 @@
-#pragma once
-
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#pragma once
+
 #include "nvcompManager.hpp"
 
 namespace nvcomp {
@@ -51,11 +51,13 @@ struct BatchManager : ManagerBase<FormatSpecHeader> {
 
 protected: // members
   uint32_t* ix_chunk;
+  using ManagerBase<FormatSpecHeader>::user_stream;
+
+private: // members
   uint32_t max_comp_ctas;
   uint32_t max_decomp_ctas;
   size_t max_comp_chunk_size;
   size_t uncomp_chunk_size;
-  using ManagerBase<FormatSpecHeader>::user_stream;
 
 public: // API
   BatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
@@ -97,14 +99,20 @@ public: // API
         config.get_status());
   }
   
+  /**
+   * @brief Configures the decompression
+   * 
+   * Synchronizes the user_stream
+   */ 
   virtual void do_configure_decompression(
       DecompressionConfig& decomp_config,
-      CommonHeader* common_header) final override 
+      const CommonHeader* common_header) final override 
   {
-    CudaUtils::check(cudaMemcpy(&decomp_config.num_chunks, 
+    CudaUtils::check(cudaMemcpyAsync(&decomp_config.num_chunks, 
         &common_header->num_chunks, 
         sizeof(size_t),
-        cudaMemcpyDefault));
+        cudaMemcpyDefault,
+        user_stream));
   }
 
 private: // pure virtual functions
@@ -159,6 +167,24 @@ protected: // derived helpers
     
     ManagerBase<FormatSpecHeader>::finish_init();    
   }
+
+protected: // accessors
+  uint32_t get_max_comp_ctas() {
+    return max_comp_ctas;
+  }
+
+  uint32_t get_max_decomp_ctas() {
+    return max_decomp_ctas;
+  }
+
+  size_t get_max_comp_chunk_size() {
+    return max_comp_chunk_size;
+  }
+
+  size_t get_uncomp_chunk_size() {
+    return uncomp_chunk_size;
+  }
+
 
 private: // helper API overrides
   size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) final override

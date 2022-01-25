@@ -1,7 +1,5 @@
-#pragma once
-
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +25,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#pragma once
 
 #include <memory>
 
@@ -55,8 +55,6 @@ public:
   {
     CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(SnappyFormatSpecHeader), cudaHostAllocDefault));
 
-    max_comp_chunk_size = compute_max_compressed_chunk_size();    
-    
     finish_init();
   }
 
@@ -72,7 +70,7 @@ public:
   {
     size_t max_comp_chunk_size;
     nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
-        uncomp_chunk_size, nvcompBatchedSnappyDefaultOpts, &max_comp_chunk_size);
+        get_uncomp_chunk_size(), nvcompBatchedSnappyDefaultOpts, &max_comp_chunk_size);
     return max_comp_chunk_size;
   }
 
@@ -107,14 +105,14 @@ public:
         decomp_buffer_size,
         comp_data_buffer,
         scratch_buffer,
-        uncomp_chunk_size,
+        get_uncomp_chunk_size(),
         &common_header->comp_data_size,
         ix_chunk,
         num_chunks,
-        max_comp_chunk_size,
+        get_max_comp_chunk_size(),
         comp_chunk_offsets,
         comp_chunk_sizes,
-        max_comp_ctas,
+        get_max_comp_ctas(),
         user_stream,
         output_status);
   }
@@ -130,12 +128,12 @@ public:
     snappyHlifBatchDecompress(
         comp_data_buffer,
         decomp_buffer,
-        uncomp_chunk_size,
+        get_uncomp_chunk_size(),
         ix_chunk,
         num_chunks,
         comp_chunk_offsets,
         comp_chunk_sizes,
-        max_decomp_ctas,
+        get_max_decomp_ctas(),
         user_stream,
         output_status);
   }
