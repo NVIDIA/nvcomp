@@ -37,8 +37,8 @@ namespace nvcomp {
 // Static values that should be exposed.
 // These could be static members of the PinnedPtrPool 
 // but it's complicated by PinnedPtrPool being a template class
-static constexpr size_t PINNED_POOL_PREALLOC_SIZE_BYTES = 4096; // Allocate a page
-static constexpr size_t PINNED_POOL_REALLOC_SIZE_BYTES = 4096; // Reallocate a page
+static constexpr size_t PINNED_POOL_PREALLOC_SIZE = 10; // Initial allocation
+static constexpr size_t PINNED_POOL_REALLOC_SIZE = 100; // Reallocations
 
 /** 
  * @brief A memory pool that can allocate pinned host memory in batches 
@@ -57,8 +57,6 @@ struct PinnedPtrPool {
 private: // data
   std::vector<T*> alloced_buffers; 
   std::vector<T*> pool;
-  static const size_t POOL_PREALLOC_SIZE = PINNED_POOL_PREALLOC_SIZE_BYTES / sizeof(T);
-  static const size_t POOL_REALLOC_SIZE = PINNED_POOL_REALLOC_SIZE_BYTES / sizeof(T);
 
 public: // API
 
@@ -68,11 +66,11 @@ public: // API
   {
     T*& first_alloc = alloced_buffers[0];
 
-    pool.reserve(POOL_PREALLOC_SIZE);
+    pool.reserve(PINNED_POOL_PREALLOC_SIZE);
 
-    CudaUtils::check(cudaHostAlloc(&first_alloc, POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(&first_alloc, PINNED_POOL_PREALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
 
-    for (size_t ix = 0; ix < POOL_PREALLOC_SIZE; ++ix) {
+    for (size_t ix = 0; ix < PINNED_POOL_PREALLOC_SIZE; ++ix) {
       pool.push_back(first_alloc + ix);
     }
   }
@@ -147,8 +145,8 @@ public: // API
       alloced_buffers.push_back(nullptr);
       T*& new_alloc = alloced_buffers.back();
 
-      CudaUtils::check(cudaHostAlloc(&new_alloc, POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
-      for (size_t ix = 0; ix < POOL_REALLOC_SIZE; ++ix) {
+      CudaUtils::check(cudaHostAlloc(&new_alloc, PINNED_POOL_REALLOC_SIZE * sizeof(T), cudaHostAllocDefault));
+      for (size_t ix = 0; ix < PINNED_POOL_REALLOC_SIZE; ++ix) {
         pool.push_back(new_alloc + ix);
       }
     } 
@@ -186,7 +184,7 @@ private: // helpers that PoolTestWrapper will use
    * @brief Get the total number of T instances that have been allocated
    */ 
   size_t get_alloced_size() {
-    return (alloced_buffers.size() - 1) * POOL_REALLOC_SIZE + POOL_PREALLOC_SIZE;
+    return (alloced_buffers.size() - 1) * PINNED_POOL_REALLOC_SIZE + PINNED_POOL_PREALLOC_SIZE;
   }  
 
   friend struct PoolTestWrapper<T>;

@@ -66,8 +66,8 @@ void test_pinned_ptr_pool() {
   typedef std::shared_ptr<typename PinnedPool::PinnedPtrHandle> PinnedPtr;
   PoolTestWrapper<T> test_wrapper{pool};
 
-  constexpr size_t num_pinned_prealloc = PINNED_POOL_PREALLOC_SIZE_BYTES / sizeof(T);
-  constexpr size_t num_pinned_realloc = PINNED_POOL_REALLOC_SIZE_BYTES / sizeof(T);
+  constexpr size_t num_pinned_prealloc = PINNED_POOL_PREALLOC_SIZE;
+  constexpr size_t num_pinned_realloc = PINNED_POOL_REALLOC_SIZE;
   REQUIRE(test_wrapper.get_alloced_size() == num_pinned_prealloc);
   REQUIRE(test_wrapper.get_current_pool_size() == num_pinned_prealloc);
 
