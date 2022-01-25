@@ -90,7 +90,6 @@ void test_lz4(const std::vector<T>& input, nvcompType_t data_type, const size_t 
 
   manager.compress(
       reinterpret_cast<const uint8_t*>(d_in_data),
-      in_bytes,
       d_comp_out,
       comp_config);
 

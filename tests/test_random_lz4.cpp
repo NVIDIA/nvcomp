@@ -86,7 +86,6 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
 
     batch_manager.compress(
         d_in_data,
-        in_bytes,
         d_comp_out,
         comp_config);
 

@@ -90,7 +90,6 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   auto start = std::chrono::steady_clock::now();
   batch_manager.compress(
       d_in_data,
-      in_bytes,
       d_comp_out,
       compress_config);
   CUDA_CHECK(cudaStreamSynchronize(stream));

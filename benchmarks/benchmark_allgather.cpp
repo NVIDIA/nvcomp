@@ -361,7 +361,6 @@ static void run_nvcomp_benchmark(
       const int idx = gpu * chunks_per_gpu + chunkIdx;
       managers[idx]->compress(
           dev_ptrs[idx],
-          chunk_bytes[idx],
           d_comp_out[idx],
           comp_configs[idx]);
     }

@@ -53,16 +53,18 @@ private:
   std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
 
 public:
+  size_t uncompressed_buffer_size;
   size_t max_compressed_buffer_size;
+  size_t num_chunks;
 
   /**
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
-  CompressionConfig(
-      PinnedPtrPool<nvcompStatus_t>& pool, 
-      size_t max_compressed_buffer_size)
+  CompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool, size_t uncompressed_buffer_size)
     : status(pool.allocate()),
-      max_compressed_buffer_size(max_compressed_buffer_size)
+      uncompressed_buffer_size(uncompressed_buffer_size),
+      max_compressed_buffer_size(0),
+      num_chunks(0)
   {
     *get_status() = nvcompSuccess;
   }
@@ -127,19 +129,16 @@ struct nvcompManagerBase {
    * @brief Perform compression asynchronously.
    *
    * @param decomp_buffer The uncompressed input data (GPU accessible).
-   * @param decomp_buffer_size The length of the uncompressed input data.
    * @param comp_buffer The location to output the compressed data to (GPU accessible).
-   * @param comp_config Resulted from configure_compression given this decomp_buffer_size.
-   * Contains the nvcompStatus* that allows error checking. 
+   * @param comp_config Resulted from configure_compression for this decomp_buffer.
    */
   virtual void compress(
       const uint8_t* decomp_buffer, 
-      const size_t decomp_buffer_size, 
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) = 0;
 
   /**
-   * @brief Configure the decompression. 
+   * @brief Configure the decompression using a compressed buffer. 
    *
    * Synchronizes the user stream. 
    * 
@@ -149,6 +148,18 @@ struct nvcompManagerBase {
    * \return decomp_config Result
    */
   virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) = 0;
+
+  /**
+   * @brief Configure the decompression using a CompressionConfig object. 
+   *
+   * Does not synchronize the user stream. 
+   * 
+   * In the base case, this only computes the size of the decompressed buffer from the compressed buffer header. 
+   * 
+   * @param comp_buffer The compressed input data (GPU accessible).
+   * \return decomp_config Result
+   */
+  virtual DecompressionConfig configure_decompression(const CompressionConfig& comp_config) = 0;
 
   /**
    * @brief Perform decompression asynchronously.

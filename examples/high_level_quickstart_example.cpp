@@ -61,7 +61,7 @@ void execute_example(uint8_t* device_input_data, const size_t in_bytes)
   uint8_t* comp_buffer;
   cudaMalloc(&comp_buffer, comp_config.max_compressed_buffer_size);
   
-  nvcomp_manager.compress(device_input_data, in_bytes, comp_buffer, comp_config);
+  nvcomp_manager.compress(device_input_data, comp_buffer, comp_config);
 
   // Construct a new nvcomp manager from the compressed buffer.
   // Note we could use the nvcomp_manager from above, but here we demonstrate how to create a manager 

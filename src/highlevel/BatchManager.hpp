@@ -116,6 +116,16 @@ public: // API
         user_stream));
   }
 
+  /**
+   * @brief Optionally does additional decompression configuration without syncing the stream
+   */
+  virtual void do_configure_decompression(
+      DecompressionConfig& decomp_config,
+      const CompressionConfig& comp_config) 
+  {
+    decomp_config.num_chunks = comp_config.num_chunks;
+  } 
+
 private: // pure virtual functions
   /**
    * @brief Computes the maximum compressed chunk size given the member variable
@@ -179,16 +189,14 @@ protected: // accessors
 
 
 private: // helper API overrides
-  size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) final override
+  size_t calculate_max_compressed_output_size(CompressionConfig& comp_config) final override
   {
-    const size_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
+    const size_t comp_buffer_size = max_comp_chunk_size * comp_config.num_chunks;
 
-    const size_t comp_buffer_size = max_comp_chunk_size * num_chunks;
-
-    const size_t chunk_offsets_size = sizeof(ChunkStartOffset_t) * num_chunks;
-    const size_t chunk_sizes_size = sizeof(uint32_t) * num_chunks;
+    const size_t chunk_offsets_size = sizeof(ChunkStartOffset_t) * comp_config.num_chunks;
+    const size_t chunk_sizes_size = sizeof(uint32_t) * comp_config.num_chunks;
     // *2 for decomp and comp checksums
-    const size_t checksum_size = sizeof(Checksum_t) * num_chunks * 2;
+    const size_t checksum_size = sizeof(Checksum_t) * comp_config.num_chunks * 2;
 
     return sizeof(CommonHeader) + sizeof(FormatSpecHeader) + 
         chunk_offsets_size + chunk_sizes_size + checksum_size + comp_buffer_size;
@@ -197,37 +205,39 @@ private: // helper API overrides
   void do_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer, 
-      const size_t decomp_buffer_size, 
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) final override
   {    
     CompressArgs compress_args;
     compress_args.common_header = common_header;
     compress_args.decomp_buffer = decomp_buffer;
-    compress_args.decomp_buffer_size = decomp_buffer_size;
+    compress_args.decomp_buffer_size = comp_config.uncompressed_buffer_size;
     compress_args.scratch_buffer = ManagerBase<FormatSpecHeader>::scratch_buffer;
     compress_args.uncomp_chunk_size = uncomp_chunk_size;
     compress_args.ix_output = &common_header->comp_data_size;
     compress_args.ix_chunk = ix_chunk;
     
-    const uint32_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
-    compress_args.num_chunks = num_chunks;
+    compress_args.num_chunks = comp_config.num_chunks;
     compress_args.max_comp_chunk_size = max_comp_chunk_size;
 
     // Pad so that the comp chunk offsets are properly aligned
     compress_args.comp_chunk_offsets = roundUpToAlignment<size_t>(comp_buffer);
-    compress_args.comp_chunk_sizes = compress_args.comp_chunk_offsets + num_chunks;
-    
-    // Extract the location of the start of the compressed data
-    uint32_t* comp_chunk_checksums = reinterpret_cast<uint32_t*>(compress_args.comp_chunk_sizes + num_chunks);
-    uint32_t* decomp_chunk_checksums = comp_chunk_checksums + num_chunks;
-    compress_args.comp_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + num_chunks);
+    compress_args.comp_chunk_sizes = compress_args.comp_chunk_offsets + comp_config.num_chunks;    
 
+    uint32_t* comp_chunk_checksums = reinterpret_cast<uint32_t*>(compress_args.comp_chunk_sizes + comp_config.num_chunks);
+    uint32_t* decomp_chunk_checksums = comp_chunk_checksums + comp_config.num_chunks;
+    
+    compress_args.comp_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + comp_config.num_chunks);
     compress_args.output_status = comp_config.get_status();
 
     CudaUtils::check(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));    
     
     do_batch_compress(compress_args);
+  }
+
+  virtual void do_configure_compression(CompressionConfig& config) final override
+  {
+    config.num_chunks = roundUpDiv(config.uncompressed_buffer_size, uncomp_chunk_size);
   }
 
   /**
