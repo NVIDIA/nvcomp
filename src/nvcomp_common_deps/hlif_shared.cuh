@@ -29,9 +29,13 @@
 #pragma once
 
 #include <cassert>
+#include <cooperative_groups.h>
+#include <stdio.h>
 
 #include "shared_types.h"
 #include "hlif_shared_types.h"
+
+namespace cg = cooperative_groups;
 
 // Compress wrapper must meet this requirement
 struct hlif_compress_wrapper {
@@ -281,8 +285,20 @@ HlifCompressBatchKernel(
       compressor);
 }
 
+/**
+ * @brief Decompresses one or more chunks at a time using a given CTA
+ * 
+ * Takes in a DecompressT, which executes a device function to decompress a chunk
+ * 
+ * Can decompress multiple chunks / CTA. In this case, the "X" threads in the block
+ * decompress a single chunk. Threadidx.y indicates the chunk index within the CTA.
+ * 
+ * If 
+ */  
+
 template<typename DecompressT,
-         int chunks_per_block>
+         int chunks_per_block,
+         typename GroupT>
 __device__ inline void HlifDecompressBatch(
     const uint8_t* comp_buffer, 
     uint8_t* decomp_buffer, 
@@ -293,13 +309,9 @@ __device__ inline void HlifDecompressBatch(
     const size_t* comp_chunk_sizes,
     uint8_t* share_buffer,
     nvcompStatus_t* kernel_output_status,
-    DecompressT decompressor)
+    DecompressT& decompressor,
+    GroupT&& cg_group)
 {
-  bool use_warp_sync = blockDim.x == 32;
-  if (not use_warp_sync) {
-    assert(blockDim.y == 1);
-  }
-
   assert(chunks_per_block == blockDim.y);
   
   __shared__ uint32_t ix_chunks[chunks_per_block];
@@ -309,11 +321,7 @@ __device__ inline void HlifDecompressBatch(
     this_ix_chunk = blockIdx.x * chunks_per_block + threadIdx.y;
   }
 
-  if (use_warp_sync) {
-    __syncwarp();
-  } else {
-    __syncthreads();
-  }
+  cg_group.sync();
 
   int initial_chunks = gridDim.x * chunks_per_block;  
   while (this_ix_chunk < num_chunks) {
@@ -330,11 +338,7 @@ __device__ inline void HlifDecompressBatch(
       this_ix_chunk = initial_chunks + atomicAdd(ix_chunk, uint32_t{1});
     }
 
-    if (use_warp_sync) {
-      __syncwarp();
-    } else {
-      __syncthreads();
-    }
+    cg_group.sync();
   }
 
   // Check for errors. Any error should be reported in the global status value
@@ -344,6 +348,52 @@ __device__ inline void HlifDecompressBatch(
     }
   }
 }    
+
+template<typename DecompressT,
+         int chunks_per_block>
+__device__ void HlifDecompressBatch(
+    const uint8_t* comp_buffer, 
+    uint8_t* decomp_buffer, 
+    const size_t raw_chunk_size,
+    uint32_t* ix_chunk,
+    const size_t num_chunks,
+    const size_t* comp_chunk_offsets,
+    const size_t* comp_chunk_sizes,
+    uint8_t* share_buffer,
+    nvcompStatus_t* kernel_output_status,
+    DecompressT& decompressor)
+{
+  // Dispatches to get a cooperative group per-chunk
+  auto cta_group = cg::this_thread_block();
+  if (chunks_per_block == 1) {
+    HlifDecompressBatch<DecompressT, chunks_per_block>(
+        comp_buffer, 
+        decomp_buffer, 
+        raw_chunk_size,
+        ix_chunk,
+        num_chunks,
+        comp_chunk_offsets,
+        comp_chunk_sizes,
+        share_buffer,
+        kernel_output_status,
+        decompressor,
+        cta_group);
+  } else {
+    HlifDecompressBatch<DecompressT, chunks_per_block>(
+        comp_buffer, 
+        decomp_buffer, 
+        raw_chunk_size,
+        ix_chunk,
+        num_chunks,
+        comp_chunk_offsets,
+        comp_chunk_sizes,
+        share_buffer,
+        kernel_output_status,
+        decompressor,
+        cg::tiled_partition<32>(cta_group));
+    assert(blockDim.x == 32);
+  }
+}
 
 template<typename DecompressT,
          int chunks_per_block = 1,
@@ -363,18 +413,17 @@ HlifDecompressBatchKernel(
   extern __shared__ uint8_t share_buffer[];
   __shared__ nvcompStatus_t output_status[chunks_per_block];
   DecompressT decompressor{decompress_arg, share_buffer, &output_status[threadIdx.y]};
-
   HlifDecompressBatch<DecompressT, chunks_per_block>(
-      comp_buffer, 
-      decomp_buffer, 
-      raw_chunk_size,
-      ix_chunk,
-      num_chunks,
-      comp_chunk_offsets,
-      comp_chunk_sizes,
-      share_buffer,
-      kernel_output_status,
-      decompressor);
+        comp_buffer, 
+        decomp_buffer, 
+        raw_chunk_size,
+        ix_chunk,
+        num_chunks,
+        comp_chunk_offsets,
+        comp_chunk_sizes,
+        share_buffer,
+        kernel_output_status,
+        decompressor);
 }
 
 template<typename DecompressT,
@@ -395,14 +444,14 @@ HlifDecompressBatchKernel(
   DecompressT decompressor{share_buffer, &output_status[threadIdx.y]};
 
   HlifDecompressBatch<DecompressT, chunks_per_block>(
-      comp_buffer, 
-      decomp_buffer, 
-      raw_chunk_size,
-      ix_chunk,
-      num_chunks,
-      comp_chunk_offsets,
-      comp_chunk_sizes,
-      share_buffer,
-      kernel_output_status,
-      decompressor);
+        comp_buffer, 
+        decomp_buffer, 
+        raw_chunk_size,
+        ix_chunk,
+        num_chunks,
+        comp_chunk_offsets,
+        comp_chunk_sizes,
+        share_buffer,
+        kernel_output_status,
+        decompressor);
 }
