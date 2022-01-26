@@ -277,11 +277,7 @@ public: // API
     CudaUtils::check(cudaFreeHost(common_header_cpu));
     if (scratch_buffer_filled) {
       if (manager_filled_scratch_buffer) {
-        #if CUDART_VERSION >= 11020
-          CudaUtils::check(cudaFreeAsync(scratch_buffer, user_stream));
-        #else 
-          CudaUtils::check(cudaFree(scratch_buffer));
-        #endif
+        CudaUtils::check(cudaFree(scratch_buffer));
       }
     }
   }
