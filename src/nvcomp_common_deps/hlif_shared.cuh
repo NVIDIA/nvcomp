@@ -329,13 +329,17 @@ __device__ inline void HlifDecompressBatch(
     DecompressT& decompressor,
     GroupT&& cg_group)
 {
-  assert(chunks_per_block == blockDim.y);
+  // If chunks_per_block is 1, any blockDim is allowed
+  // Otherwise, the y index is the chunk index
+  assert(chunks_per_block == 1 || chunks_per_block == blockDim.y);
   
   __shared__ uint32_t ix_chunks[chunks_per_block];
 
-  volatile uint32_t& this_ix_chunk = *(ix_chunks + threadIdx.y);
-  if (threadIdx.x == 0) {
-    this_ix_chunk = blockIdx.x * chunks_per_block + threadIdx.y;
+  int init_chunk_offset = chunks_per_block == 1 ? 0 : threadIdx.y;
+
+  volatile uint32_t& this_ix_chunk = *(ix_chunks + init_chunk_offset);
+  if (cg_group.thread_rank() == 0) {
+    this_ix_chunk = blockIdx.x * chunks_per_block + init_chunk_offset;
   }
 
   cg_group.sync();
@@ -351,7 +355,7 @@ __device__ inline void HlifDecompressBatch(
         comp_chunk_sizes[this_ix_chunk],
         raw_chunk_size); 
 
-    if (threadIdx.x == 0) {
+    if (cg_group.thread_rank() == 0) {
       this_ix_chunk = initial_chunks + atomicAdd(ix_chunk, uint32_t{1});
     }
 
@@ -359,7 +363,7 @@ __device__ inline void HlifDecompressBatch(
   }
 
   // Check for errors. Any error should be reported in the global status value
-  if (threadIdx.x == 0) {
+  if (cg_group.thread_rank() == 0) {
     if (decompressor.get_output_status() != nvcompSuccess) {
       *kernel_output_status = decompressor.get_output_status();
     }
