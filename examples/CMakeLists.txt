@@ -45,3 +45,8 @@ endif()
 # Add quickstart example
 add_executable(low_level_quickstart_example low_level_quickstart_example.cpp)
 target_link_libraries(low_level_quickstart_example PRIVATE nvcomp CUDA::cudart)
+target_include_directories(low_level_quickstart_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+add_executable(high_level_quickstart_example high_level_quickstart_example.cpp)
+target_link_libraries(high_level_quickstart_example PRIVATE nvcomp CUDA::cudart)
+target_include_directories(high_level_quickstart_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)

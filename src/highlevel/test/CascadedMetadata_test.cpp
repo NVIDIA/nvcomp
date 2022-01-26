@@ -28,8 +28,8 @@
 
 #define CATCH_CONFIG_MAIN
 
-#include "../../tests/catch.hpp"
-#include "../CascadedMetadata.h"
+#include "tests/catch.hpp"
+#include "highlevel/CascadedMetadata.h"
 
 #include <cstdlib>
 

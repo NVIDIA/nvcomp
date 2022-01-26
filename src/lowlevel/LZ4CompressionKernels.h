@@ -26,12 +26,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
+#include "../common.h"
+#include "LZ4Types.h"
 
 namespace nvcomp
 {
 namespace lowlevel
 {
+
+extern const int COMP_THREADS_PER_CHUNK;
+extern const int DECOMP_THREADS_PER_CHUNK;
+extern const int DECOMP_CHUNKS_PER_BLOCK;
 
 /**
  * @brief Compress a batch of memory locations.
@@ -103,5 +108,9 @@ size_t lz4DecompressComputeTempSize(
 size_t lz4ComputeMaxSize(const size_t chunk_size);
 
 size_t lz4MaxChunkSize();
+
+size_t lz4GetHashTableSize(size_t max_chunk_size);
+
 } // namespace lowlevel
+
 } // namespace nvcomp
