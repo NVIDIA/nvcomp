@@ -275,12 +275,14 @@ public: // API
   
   virtual ~ManagerBase() {
     CudaUtils::check(cudaFreeHost(common_header_cpu));
-    if (manager_filled_scratch_buffer) {
-      #if CUDART_VERSION >= 11020
-        CudaUtils::check(cudaFreeAsync(scratch_buffer, user_stream));
-      #else 
-        CudaUtils::check(cudaFree(scratch_buffer));
-      #endif
+    if (scratch_buffer_filled) {
+      if (manager_filled_scratch_buffer) {
+        #if CUDART_VERSION >= 11020
+          CudaUtils::check(cudaFreeAsync(scratch_buffer, user_stream));
+        #else 
+          CudaUtils::check(cudaFree(scratch_buffer));
+        #endif
+      }
     }
   }
 
@@ -357,6 +359,16 @@ public: // API
       const DecompressionConfig& config)
   {
     assert(finished_init);
+
+    if (not scratch_buffer_filled) {
+      #if CUDART_VERSION >= 11020
+        CudaUtils::check(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
+      #else
+        CudaUtils::check(cudaMalloc(&scratch_buffer, scratch_buffer_size));
+      #endif
+      scratch_buffer_filled = true;
+      manager_filled_scratch_buffer = true;
+    }    
 
     const uint8_t* new_comp_buffer = comp_buffer + sizeof(CommonHeader) + sizeof(FormatSpecHeader);
 
