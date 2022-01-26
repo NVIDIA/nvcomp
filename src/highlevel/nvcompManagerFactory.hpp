@@ -83,6 +83,10 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
       // TODO
       break;
     }
+    case FormatType::NotSupportedError:
+    {
+      assert(false);
+    }
   }
 
   return res;

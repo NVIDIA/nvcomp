@@ -89,11 +89,11 @@ public:
         comp_chunk_size);
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t get_output_status() {
     return *status;
   }
 
-  __device__ FormatType get_format_type() final override {
+  __device__ FormatType get_format_type() {
     return FormatType::LZ4;
   }
 
@@ -115,7 +115,7 @@ public:
       uint8_t* decomp_buffer,
       const uint8_t* comp_buffer,
       const size_t comp_chunk_size,
-      const size_t decomp_buffer_size) final override
+      const size_t decomp_buffer_size)
   {
     decompressStream(
         this_shared_buffer,
@@ -128,7 +128,7 @@ public:
         true /* output decompressed */);
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t get_output_status() {
     return *status;
   }
 };

@@ -39,7 +39,8 @@ enum FormatType : uint8_t {
   ANS = 2,
   GDeflate = 3,
   Cascaded = 4,
-  Bitcomp = 5  
+  Bitcomp = 5,
+  NotSupportedError = 6  
 };
 
 struct CommonHeader {

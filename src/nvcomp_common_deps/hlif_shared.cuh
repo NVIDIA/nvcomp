@@ -39,31 +39,49 @@ namespace cg = cooperative_groups;
 
 // Compress wrapper must meet this requirement
 struct hlif_compress_wrapper {
-  virtual __device__ void compress_chunk(
-      uint8_t* tmp_output_buffer,
-      const uint8_t* this_decomp_buffer,
-      const size_t decomp_size,
-      const size_t max_comp_chunk_size, 
-      size_t* comp_chunk_size) = 0;
+  __device__ void compress_chunk(
+      uint8_t* /*tmp_output_buffer*/,
+      const uint8_t* /*this_decomp_buffer*/,
+      const size_t /*decomp_size*/,
+      const size_t /*max_comp_chunk_size*/, 
+      size_t*) /*comp_chunk_size*/
+  {
+    assert(false); // This must be implemented in the derived class
+  }
   
-  virtual __device__ nvcompStatus_t& get_output_status() = 0;
+  __device__ nvcompStatus_t get_output_status()
+  {
+    assert(false); // This must be implemented in the derived class
+    return nvcompErrorNotSupported;
+  } 
 
-  virtual __device__ FormatType get_format_type() = 0;
+  __device__ FormatType get_format_type()
+  {
+    assert(false); // This must be implemented in the derived class
+    return NotSupportedError;
+  }
 
-  virtual __device__ ~hlif_compress_wrapper() {};
+  __device__ ~hlif_compress_wrapper() {};
 };
 
 // Decompress wrapper must meet this requirement
 struct hlif_decompress_wrapper {
-  virtual __device__ void decompress_chunk(
-      uint8_t* decomp_buffer,
-      const uint8_t* comp_buffer,
-      const size_t comp_chunk_size,
-      const size_t decomp_buffer_size) = 0;
+  __device__ void decompress_chunk(
+      uint8_t*, /*decomp_buffer*/
+      const uint8_t*, /*comp_buffer*/
+      const size_t, /*comp_chunk_size*/
+      const size_t) /*decomp_buffer_size*/
+  {
+    assert(false); // This must be implemented in the derived class
+  }
       
-  virtual __device__ nvcompStatus_t& get_output_status() = 0;
+  __device__ nvcompStatus_t get_output_status()
+  {
+    assert(false); // This must be implemented in the derived class
+    return nvcompErrorNotSupported;
+  }
   
-  virtual __device__ ~hlif_decompress_wrapper() {};
+  __device__ ~hlif_decompress_wrapper() {}
 };
 
 __device__ inline void fill_common_header(

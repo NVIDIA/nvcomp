@@ -60,11 +60,11 @@ public:
         comp_chunk_size);
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t get_output_status() {
     return *status;
   }
 
-  __device__ FormatType get_format_type() final override {
+  __device__ FormatType get_format_type() {
     return FormatType::Snappy;
   }
 };
@@ -94,7 +94,7 @@ public:
         nullptr); // device_uncompressed_bytes -- unnecessary for HLIF
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t get_output_status() {
     return *status;
   }
 };
