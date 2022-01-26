@@ -50,15 +50,16 @@ private:
   CascadedFormatSpecHeader* format_spec;
 
 public:
-  CascadedBatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
+  CascadedBatchManager(
+      size_t uncomp_chunk_size,
+      const nvcompBatchedCascadedOpts_t& options = nvcompBatchedCascadedDefaultOpts,
+      cudaStream_t user_stream = 0,
+      int device_id = 0)
     : BatchManager(uncomp_chunk_size, user_stream, device_id),
       format_spec()
   {
     gpuErrchk(cudaHostAlloc(&format_spec, sizeof(CascadedFormatSpecHeader), cudaHostAllocDefault));
-
-    // Assign default options
-    format_spec->options = nvcompBatchedCascadedDefaultOpts;
-    format_spec->options.chunk_size = uncomp_chunk_size;
+    format_spec->options = options;
 
     max_comp_chunk_size = compute_max_compressed_chunk_size();
 
