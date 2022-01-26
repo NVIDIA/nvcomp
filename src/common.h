@@ -43,8 +43,7 @@
 using ssize_t = ptrdiff_t;
 #endif
 
-namespace nvcomp
-{
+namespace nvcomp {
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -80,8 +79,8 @@ gbs(const std::chrono::time_point<std::chrono::steady_clock>& start,
 #pragma GCC diagnostic pop
 #endif
 
-namespace
-{
+namespace {
+
 template <typename T>
 T* align(T* const ptr, const size_t alignment)
 {
@@ -159,7 +158,7 @@ struct make_larger
 template <typename U, typename T>
 using larger_t = typename make_larger<U, T>::type;
 
-} // namespace
+} // namespace 
 
 __inline__ size_t sizeOfnvcompType(nvcompType_t type)
 {

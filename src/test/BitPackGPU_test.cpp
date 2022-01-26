@@ -34,8 +34,6 @@
 #include "nvcomp.hpp"
 #include "unpack.h"
 
-#include "highlevel/CascadedCommon.h"
-
 #include "cuda_runtime.h"
 
 #include <cstdlib>

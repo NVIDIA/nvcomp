@@ -26,8 +26,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "highlevel/CascadedCommon.h"
-
 #include "CudaUtils.h"
 #include "RunLengthEncodeGPU.h"
 #include "TempSpaceBroker.h"

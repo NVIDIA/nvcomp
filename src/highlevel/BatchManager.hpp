@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include "nvcompManager.hpp"
+#include "ManagerBase.hpp"
+#include "src/common.h"
 
 namespace nvcomp {
 

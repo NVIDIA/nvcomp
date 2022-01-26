@@ -28,8 +28,8 @@
 
 
 #include "nvcompManager.hpp"
-#include "LZ4BatchManager.hpp"
-#include "SnappyBatchManager.hpp"
+#include "lz4.hpp"
+#include "snappy.hpp"
 
 namespace nvcomp {
 

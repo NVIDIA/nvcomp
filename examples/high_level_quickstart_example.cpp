@@ -30,8 +30,8 @@
 #include <assert.h>
 #include <iostream>
 
-#include "src/highlevel/nvcompManager.hpp"
-#include "src/highlevel/nvcompManagerFactory.hpp"
+#include "nvcomp/nvcompManager.hpp"
+#include "nvcomp/nvcompManagerFactory.hpp"
 
 /* 
   To build, execute

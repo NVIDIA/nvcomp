@@ -81,81 +81,46 @@ void test_lz4(const std::vector<T>& input, nvcompType_t data_type, const size_t 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  size_t comp_temp_bytes = 0;
-  size_t comp_out_bytes = 0;
-  void* d_comp_temp;
-  void* d_comp_out;
-
-  LZ4Compressor compressor(chunk_size, data_type);
-  compressor.configure(in_bytes, &comp_temp_bytes, &comp_out_bytes);
-  REQUIRE(comp_temp_bytes > 0);
-  REQUIRE(comp_out_bytes > 0);
-
-  // allocate temp buffer
-  CUDA_CHECK(cudaMalloc(&d_comp_temp, comp_temp_bytes));
+  LZ4BatchManager manager{chunk_size, data_type, stream};
+  auto comp_config = manager.configure_compression(in_bytes);
 
   // Allocate output buffer
-  CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
+  uint8_t* d_comp_out;
+  CUDA_CHECK(cudaMalloc(&d_comp_out, comp_config.max_compressed_buffer_size));
 
-  size_t* comp_out_bytes_ptr;
-  cudaMalloc((void**)&comp_out_bytes_ptr, sizeof(size_t));
-  compressor.compress_async(
-      d_in_data,
+  manager.compress(
+      reinterpret_cast<const uint8_t*>(d_in_data),
       in_bytes,
-      d_comp_temp,
-      comp_temp_bytes,
       d_comp_out,
-      comp_out_bytes_ptr,
-      stream);
+      comp_config);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
-  CUDA_CHECK(cudaMemcpy(
-      &comp_out_bytes,
-      comp_out_bytes_ptr,
-      sizeof(comp_out_bytes),
-      cudaMemcpyDeviceToHost));
-  cudaFree(comp_out_bytes_ptr);
 
-  cudaFree(d_comp_temp);
+  size_t comp_out_bytes = manager.get_compressed_output_size(d_comp_out);
+
   cudaFree(d_in_data);
 
   // Test to make sure copying the compressed file is ok
-  void* copied = 0;
+  uint8_t* copied = 0;
   CUDA_CHECK(cudaMalloc(&copied, comp_out_bytes));
   CUDA_CHECK(
       cudaMemcpy(copied, d_comp_out, comp_out_bytes, cudaMemcpyDeviceToDevice));
   cudaFree(d_comp_out);
   d_comp_out = copied;
 
-  LZ4Decompressor decompressor;
-
-  size_t decomp_temp_bytes;
-  size_t decomp_out_bytes;
-  decompressor.configure(
-      d_comp_out,
-      comp_out_bytes,
-      &decomp_temp_bytes,
-      &decomp_out_bytes,
-      stream);
-
-  void* d_decomp_temp;
-  cudaMalloc(&d_decomp_temp, decomp_temp_bytes);
+  auto decomp_config = manager.configure_decompression(d_comp_out);
 
   T* out_ptr;
-  cudaMalloc(&out_ptr, decomp_out_bytes);
+  cudaMalloc(&out_ptr, decomp_config.decomp_data_size);
 
   // make sure the data won't match input if not written to, so we can verify
   // correctness
-  cudaMemset(out_ptr, 0, decomp_out_bytes);
+  cudaMemset(out_ptr, 0, decomp_config.decomp_data_size);
 
-  decompressor.decompress_async(
+  manager.decompress(
+      reinterpret_cast<uint8_t*>(out_ptr),
       d_comp_out,
-      comp_out_bytes,
-      d_decomp_temp,
-      decomp_temp_bytes,
-      out_ptr,
-      decomp_out_bytes,
-      stream);
+      decomp_config);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   // Copy result back to host
@@ -168,7 +133,6 @@ void test_lz4(const std::vector<T>& input, nvcompType_t data_type, const size_t 
 
   cudaFree(d_comp_out);
   cudaFree(out_ptr);
-  cudaFree(d_decomp_temp);
 }
 
 } // namespace

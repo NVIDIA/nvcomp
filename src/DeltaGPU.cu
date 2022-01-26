@@ -26,8 +26,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "highlevel/CascadedCommon.h"
-
 #include "DeltaGPU.h"
 #include "common.h"
 #include "type_macros.h"

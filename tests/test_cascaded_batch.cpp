@@ -31,7 +31,7 @@
 #include "../src/common.h"
 #include "catch.hpp"
 #include "nvcomp.hpp"
-#include "nvcomp/cascaded.hpp"
+#include "nvcomp/cascaded.h"
 #include <cuda_runtime.h>
 
 #include <cstdint>

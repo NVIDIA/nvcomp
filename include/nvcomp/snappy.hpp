@@ -32,74 +32,68 @@
 
 #include "src/Check.h"
 #include "src/CudaUtils.h"
-#include "src/lowlevel/LZ4CompressionKernels.h"
-#include "src/highlevel/LZ4HlifKernels.h"
-#include "nvcomp/lz4.h"
 #include "src/common.h"
+#include "nvcomp/snappy.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "BatchManager.hpp"
+#include "src/highlevel/SnappyHlifKernels.h"
+#include "src/highlevel/BatchManager.hpp"
 
 namespace nvcomp {
 
-struct LZ4FormatSpecHeader {
-  nvcompType_t data_type;
+struct SnappyFormatSpecHeader {
+  // Empty for now
 };
 
-struct LZ4BatchManager : BatchManager<LZ4FormatSpecHeader> {
+struct SnappyBatchManager : BatchManager<SnappyFormatSpecHeader> {
 private:
-  size_t hash_table_size;
-  LZ4FormatSpecHeader* format_spec;
+  SnappyFormatSpecHeader* format_spec;
 
 public:
-  LZ4BatchManager(size_t uncomp_chunk_size, nvcompType_t data_type, cudaStream_t user_stream = 0, const int device_id = 0)
+  SnappyBatchManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0)
     : BatchManager(uncomp_chunk_size, user_stream, device_id),      
-      hash_table_size(),
       format_spec()
   {
-    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(LZ4FormatSpecHeader), cudaHostAllocDefault));
-    format_spec->data_type = data_type;
+    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(SnappyFormatSpecHeader), cudaHostAllocDefault));
 
     finish_init();
   }
 
-  virtual ~LZ4BatchManager() 
+  virtual ~SnappyBatchManager() 
   {
     CudaUtils::check(cudaFreeHost(format_spec));
   }
 
-  LZ4BatchManager(const LZ4BatchManager&) = delete;
-  LZ4BatchManager& operator=(const LZ4BatchManager&) = delete;
+  SnappyBatchManager& operator=(const SnappyBatchManager&) = delete;     
+  SnappyBatchManager(const SnappyBatchManager&) = delete;     
 
   size_t compute_max_compressed_chunk_size() final override 
   {
     size_t max_comp_chunk_size;
-    nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
-        get_uncomp_chunk_size(), nvcompBatchedLZ4DefaultOpts, &max_comp_chunk_size);
+    nvcompBatchedSnappyCompressGetMaxOutputChunkSize(
+        get_uncomp_chunk_size(), nvcompBatchedSnappyDefaultOpts, &max_comp_chunk_size);
     return max_comp_chunk_size;
   }
 
   uint32_t compute_compression_max_block_occupancy() final override 
   {
-    return batchedLZ4CompMaxBlockOccupancy(format_spec->data_type, device_id);
+    return snappyHlifCompMaxBlockOccupancy(device_id);
   }
 
   uint32_t compute_decompression_max_block_occupancy() final override 
   {
-    return batchedLZ4DecompMaxBlockOccupancy(format_spec->data_type, device_id); 
-  }
+    return snappyHlifDecompMaxBlockOccupancy(device_id); 
+  }  
 
-  LZ4FormatSpecHeader* get_format_header() final override 
+  SnappyFormatSpecHeader* get_format_header() final override 
   {
     return format_spec;
   }
 
   void do_batch_compress(const CompressArgs& compress_args) final override
   {
-    lz4HlifBatchCompress(
+    snappyHlifBatchCompress(
         compress_args,
-        hash_table_size,
         get_max_comp_ctas(),
-        format_spec->data_type,
         user_stream);
   }
 
@@ -111,7 +105,7 @@ public:
       const size_t* comp_chunk_sizes,
       nvcompStatus_t* output_status) final override
   {        
-    lz4HlifBatchDecompress(
+    snappyHlifBatchDecompress(
         comp_data_buffer,
         decomp_buffer,
         get_uncomp_chunk_size(),
@@ -122,18 +116,6 @@ public:
         get_max_decomp_ctas(),
         user_stream,
         output_status);
-  }
-
-private: // helper overrides
-  size_t compute_scratch_buffer_size() final override
-  {
-    return get_max_comp_ctas() * (hash_table_size * sizeof(offset_type) 
-         + get_max_comp_chunk_size());
-  }  
-
-  void format_specific_init() final override 
-  {
-    hash_table_size = lowlevel::lz4GetHashTableSize(get_max_comp_chunk_size());
   }
 };
 

@@ -32,19 +32,17 @@
 #include <vector>
 
 #include "benchmark_common.h"
-#include "src/highlevel/nvcompManager.hpp"
+#include "nvcomp.hpp"
+#include "nvcomp/nvcompManagerFactory.hpp"
 
 using namespace nvcomp;
 
 const int chunk_size = 1 << 16;
 
-void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
+template<typename T = uint8_t>
+void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
 {
-  using T = uint8_t;
-
-  size_t input_element_count = 0;
-  std::vector<T> data;
-  data = load_dataset_from_binary<T>(fname, &input_element_count);
+  size_t input_element_count = data.size();
 
   // Make sure dataset fits on GPU to benchmark total compression
   size_t freeMem;
@@ -160,4 +158,14 @@ void run_benchmark(char* fname, nvcompManagerBase& batch_manager, int verbose_me
 #endif
 
   benchmark_assert(res == data, "Decompressed data does not match input.");
+}
+
+void run_benchmark_from_file(char* fname, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
+{
+  using T = uint8_t;
+
+  size_t input_elts = 0;
+  std::vector<T> data;
+  data = load_dataset_from_binary<T>(fname, &input_elts);
+  run_benchmark(data, batch_manager, verbose_memory, stream);
 }
