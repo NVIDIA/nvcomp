@@ -93,34 +93,14 @@ public:
     return format_spec;
   }
 
-  void do_batch_compress(
-      CommonHeader* common_header,
-      const uint8_t* decomp_buffer,
-      const size_t decomp_buffer_size,
-      uint8_t* comp_data_buffer,
-      const uint32_t num_chunks,
-      size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes,
-      nvcompStatus_t* output_status) final override
+  void do_batch_compress(const CompressArgs& compress_args) final override
   {
     lz4HlifBatchCompress(
-        common_header,
-        decomp_buffer,
-        decomp_buffer_size,
-        comp_data_buffer,
-        scratch_buffer,
-        get_uncomp_chunk_size(),
-        &common_header->comp_data_size,
-        ix_chunk,
-        num_chunks,
-        get_max_comp_chunk_size(),
+        compress_args,
         hash_table_size,
-        comp_chunk_offsets,
-        comp_chunk_sizes,
         get_max_comp_ctas(),
         format_spec->data_type,
-        user_stream,
-        output_status);
+        user_stream);
   }
 
   void do_batch_decompress(

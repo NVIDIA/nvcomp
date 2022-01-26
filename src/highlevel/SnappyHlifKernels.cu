@@ -100,39 +100,15 @@ public:
 };
 
 void snappyHlifBatchCompress(
-    CommonHeader* common_header,
-    const uint8_t* decomp_buffer, 
-    const size_t decomp_buffer_size, 
-    uint8_t* comp_buffer, 
-    uint8_t* tmp_buffer,
-    const size_t raw_chunk_size,
-    size_t* ix_output,
-    uint32_t* ix_chunk,
-    const size_t num_chunks,
-    const size_t max_comp_chunk_size,
-    size_t* comp_chunk_offsets,
-    size_t* comp_chunk_sizes,
+    const CompressArgs& comp_args,
     const uint32_t max_ctas,
-    cudaStream_t stream,
-    nvcompStatus_t* output_status) 
+    cudaStream_t stream) 
 {
   const dim3 grid(max_ctas);
   const dim3 block(COMP_THREADS_PER_BLOCK);
 
   HlifCompressBatchKernel<snappy_compress_wrapper><<<grid, block, 0, stream>>>(
-      common_header,
-      decomp_buffer, 
-      decomp_buffer_size, 
-      comp_buffer, 
-      tmp_buffer,
-      raw_chunk_size,
-      ix_output,
-      ix_chunk,
-      num_chunks,
-      max_comp_chunk_size,
-      comp_chunk_offsets,
-      comp_chunk_sizes,
-      output_status);      
+      comp_args);      
 }
 
 void snappyHlifBatchDecompress(

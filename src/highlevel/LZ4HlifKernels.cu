@@ -48,7 +48,7 @@ using item_type = uint32_t;
 
 namespace nvcomp {
 
-struct CompressArgStruct {
+struct LZ4CompressorArgs {
   const position_type hash_table_size;
 };
 
@@ -61,7 +61,7 @@ private:
 
 public:
   __device__ lz4_compress_wrapper(
-      const CompressArgStruct input,
+      const LZ4CompressorArgs input,
       uint8_t* tmp_buffer,
       uint8_t*, /*share_buffer*/
       nvcompStatus_t* status)
@@ -134,23 +134,11 @@ public:
 };
 
 void lz4HlifBatchCompress(
-    CommonHeader* common_header,
-    const uint8_t* decomp_buffer, 
-    const size_t decomp_buffer_size, 
-    uint8_t* comp_buffer, 
-    uint8_t* tmp_buffer,
-    const size_t raw_chunk_size,
-    size_t* ix_output,
-    uint32_t* ix_chunk,
-    const size_t num_chunks,
-    const size_t max_comp_chunk_size,
+    const CompressArgs& compress_args,
     const position_type hash_table_size,
-    size_t* comp_chunk_offsets,
-    size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
     nvcompType_t data_type,
-    cudaStream_t stream,
-    nvcompStatus_t* output_status) 
+    cudaStream_t stream) 
 {
   const dim3 grid(max_ctas);
   const dim3 block(LZ4_COMP_THREADS_PER_CHUNK);
@@ -160,56 +148,20 @@ void lz4HlifBatchCompress(
     case NVCOMP_TYPE_CHAR:
     case NVCOMP_TYPE_UCHAR:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint8_t>><<<grid, block, 0, stream>>>(
-          common_header,
-          decomp_buffer, 
-          decomp_buffer_size, 
-          comp_buffer, 
-          tmp_buffer,
-          raw_chunk_size,
-          ix_output,
-          ix_chunk,
-          num_chunks,
-          max_comp_chunk_size,
-          comp_chunk_offsets,
-          comp_chunk_sizes,
-          output_status,
-          CompressArgStruct{hash_table_size});
+          compress_args,
+          LZ4CompressorArgs{hash_table_size});
       break;
     case NVCOMP_TYPE_SHORT:
     case NVCOMP_TYPE_USHORT:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint16_t>><<<grid, block, 0, stream>>>(
-          common_header,
-          decomp_buffer, 
-          decomp_buffer_size, 
-          comp_buffer, 
-          tmp_buffer,
-          raw_chunk_size,
-          ix_output,
-          ix_chunk,
-          num_chunks,
-          max_comp_chunk_size,
-          comp_chunk_offsets,
-          comp_chunk_sizes,
-          output_status,
-          CompressArgStruct{hash_table_size});
+          compress_args,
+          LZ4CompressorArgs{hash_table_size});
       break;
     case NVCOMP_TYPE_INT:
     case NVCOMP_TYPE_UINT:
       HlifCompressBatchKernel<lz4_compress_wrapper<uint32_t>><<<grid, block, 0, stream>>>(
-          common_header,
-          decomp_buffer, 
-          decomp_buffer_size, 
-          comp_buffer, 
-          tmp_buffer,
-          raw_chunk_size,
-          ix_output,
-          ix_chunk,
-          num_chunks,
-          max_comp_chunk_size,
-          comp_chunk_offsets,
-          comp_chunk_sizes,
-          output_status,
-          CompressArgStruct{hash_table_size});
+          compress_args,
+          LZ4CompressorArgs{hash_table_size});
       break;
     default:
       throw std::invalid_argument("Unsupported input data type");
@@ -257,7 +209,7 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
     case NVCOMP_TYPE_UCHAR:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &num_blocks_per_sm, 
-          HlifCompressBatchKernel<lz4_compress_wrapper<uint8_t>, CompressArgStruct>, 
+          HlifCompressBatchKernel<lz4_compress_wrapper<uint8_t>, LZ4CompressorArgs>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
       break;
@@ -265,7 +217,7 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
     case NVCOMP_TYPE_USHORT:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &num_blocks_per_sm, 
-          HlifCompressBatchKernel<lz4_compress_wrapper<uint16_t>, CompressArgStruct>, 
+          HlifCompressBatchKernel<lz4_compress_wrapper<uint16_t>, LZ4CompressorArgs>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
       break;
@@ -273,7 +225,7 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
     case NVCOMP_TYPE_UINT:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &num_blocks_per_sm, 
-          HlifCompressBatchKernel<lz4_compress_wrapper<uint32_t>, CompressArgStruct>, 
+          HlifCompressBatchKernel<lz4_compress_wrapper<uint32_t>, LZ4CompressorArgs>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
       break;

@@ -33,23 +33,11 @@
 namespace nvcomp {
 
 void lz4HlifBatchCompress(
-    CommonHeader* common_header,
-    const uint8_t* decomp_buffer, 
-    const size_t decomp_buffer_size, 
-    uint8_t* comp_buffer, 
-    uint8_t* tmp_buffer,
-    const size_t raw_chunk_size,
-    uint64_t* ix_output,
-    uint32_t* ix_chunk,
-    const size_t num_chunks,
-    const size_t max_comp_chunk_size,
+    const CompressArgs& compress_args,
     const position_type hash_table_size,
-    size_t* comp_chunk_offsets,
-    size_t* comp_chunk_sizes,
     const uint32_t max_ctas,
     nvcompType_t data_type,
-    cudaStream_t stream,
-    nvcompStatus_t* output_status);
+    cudaStream_t stream);
 
 void lz4HlifBatchDecompress(
     const uint8_t* comp_buffer, 

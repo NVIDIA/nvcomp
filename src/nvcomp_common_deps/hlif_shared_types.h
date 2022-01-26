@@ -30,6 +30,8 @@
 
 #include <stdint.h>
 
+#include "shared_types.h"
+
 typedef uint64_t ChunkStartOffset_t;
 typedef uint32_t Checksum_t;
 
@@ -58,5 +60,21 @@ struct CommonHeader {
   bool include_per_chunk_decomp_buffer_checksums;
   size_t uncomp_chunk_size;
   uint32_t comp_data_offset;
+};
+
+struct CompressArgs {
+  CommonHeader* common_header;
+  const uint8_t* decomp_buffer;
+  size_t decomp_buffer_size; 
+  uint8_t* comp_buffer; 
+  uint8_t* scratch_buffer;
+  size_t uncomp_chunk_size;
+  size_t* ix_output;
+  uint32_t* ix_chunk;
+  size_t num_chunks;
+  size_t max_comp_chunk_size;
+  size_t* comp_chunk_offsets;
+  size_t* comp_chunk_sizes;
+  nvcompStatus_t* output_status;
 };
 

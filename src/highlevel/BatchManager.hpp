@@ -135,15 +135,7 @@ private: // pure virtual functions
   /**
    * @brief Does the batch level compression
    */ 
-  virtual void do_batch_compress(
-      CommonHeader* common_header,
-      const uint8_t* decomp_buffer,
-      const size_t decomp_buffer_size,
-      uint8_t* comp_data_buffer,
-      const uint32_t num_chunks,
-      size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes,
-      nvcompStatus_t* output_status) = 0;
+  virtual void do_batch_compress(const CompressArgs& compress_args) = 0;
 
   /**
    * @brief Does the batch level decompression
@@ -155,7 +147,6 @@ private: // pure virtual functions
       const size_t* comp_chunk_offsets,
       const size_t* comp_chunk_sizes,
       nvcompStatus_t* output_status) = 0;
-
 
 protected: // derived helpers
   void finish_init() {
@@ -209,26 +200,33 @@ private: // helper API overrides
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) final override
   {    
-    const uint32_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
+    CompressArgs compress_args;
+    compress_args.common_header = common_header;
+    compress_args.decomp_buffer = decomp_buffer;
+    compress_args.decomp_buffer_size = decomp_buffer_size;
+    compress_args.scratch_buffer = ManagerBase<FormatSpecHeader>::scratch_buffer;
+    compress_args.uncomp_chunk_size = uncomp_chunk_size;
+    compress_args.ix_output = &common_header->comp_data_size;
+    compress_args.ix_chunk = ix_chunk;
     
+    const uint32_t num_chunks = roundUpDiv(decomp_buffer_size, uncomp_chunk_size);
+    compress_args.num_chunks = num_chunks;
+    compress_args.max_comp_chunk_size = max_comp_chunk_size;
+
     // Pad so that the comp chunk offsets are properly aligned
-    size_t* comp_chunk_offsets = roundUpToAlignment<size_t>(comp_buffer);
-    size_t* comp_chunk_sizes = comp_chunk_offsets + num_chunks;
-    uint32_t* comp_chunk_checksums = reinterpret_cast<uint32_t*>(comp_chunk_sizes + num_chunks);
+    compress_args.comp_chunk_offsets = roundUpToAlignment<size_t>(comp_buffer);
+    compress_args.comp_chunk_sizes = compress_args.comp_chunk_offsets + num_chunks;
+    
+    // Extract the location of the start of the compressed data
+    uint32_t* comp_chunk_checksums = reinterpret_cast<uint32_t*>(compress_args.comp_chunk_sizes + num_chunks);
     uint32_t* decomp_chunk_checksums = comp_chunk_checksums + num_chunks;
-    uint8_t* comp_data_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + num_chunks);
+    compress_args.comp_buffer = reinterpret_cast<uint8_t*>(decomp_chunk_checksums + num_chunks);
+
+    compress_args.output_status = comp_config.get_status();
 
     CudaUtils::check(cudaMemsetAsync(ix_chunk, 0, sizeof(uint32_t), user_stream));    
     
-    do_batch_compress(
-        common_header,
-        decomp_buffer,
-        decomp_buffer_size,
-        comp_data_buffer,
-        num_chunks,
-        comp_chunk_offsets,
-        comp_chunk_sizes,
-        comp_config.get_status());
+    do_batch_compress(compress_args);
   }
 
   /**
