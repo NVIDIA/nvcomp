@@ -293,7 +293,6 @@ HlifCompressBatchKernel(
  * Can decompress multiple chunks / CTA. In this case, the "X" threads in the block
  * decompress a single chunk. Threadidx.y indicates the chunk index within the CTA.
  * 
- * If 
  */  
 
 template<typename DecompressT,

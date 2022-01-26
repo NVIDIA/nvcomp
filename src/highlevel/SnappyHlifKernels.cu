@@ -162,32 +162,32 @@ void snappyHlifBatchDecompress(
 
 size_t snappyHlifCompMaxBlockOccupancy(const int device_id) 
 {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
+  cudaDeviceProp device_prop;
+  cudaGetDeviceProperties(&device_prop, device_id);
+  int num_blocks_per_sm;
   constexpr int shmem_size = 0;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &numBlocksPerSM, 
+      &num_blocks_per_sm, 
       HlifCompressBatchKernel<snappy_compress_wrapper>, 
       COMP_THREADS_PER_BLOCK,
       shmem_size);
   
-  return deviceProp.multiProcessorCount * numBlocksPerSM;
+  return device_prop.multiProcessorCount * num_blocks_per_sm;
 }
 
 size_t snappyHlifDecompMaxBlockOccupancy(const int device_id) 
 {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
+  cudaDeviceProp device_prop;
+  cudaGetDeviceProperties(&device_prop, device_id);
+  int num_blocks_per_sm;
   constexpr int shmem_size = 0;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &numBlocksPerSM, 
+      &num_blocks_per_sm, 
       HlifDecompressBatchKernel<snappy_decompress_wrapper, 1>, 
       DECOMP_THREADS_PER_BLOCK, 
       shmem_size);
   
-  return deviceProp.multiProcessorCount * numBlocksPerSM;
+  return device_prop.multiProcessorCount * num_blocks_per_sm;
 }
 
 } // nvcomp namespace

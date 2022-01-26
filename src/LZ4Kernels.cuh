@@ -727,6 +727,8 @@ __device__ void compressStream(
 {
   assert(blockDim.x == LZ4_COMP_THREADS_PER_CHUNK);
 
+  static_assert(sizeof(T) <= 4, "Max alignment support is 4 bytes");
+
   static_assert(
       LZ4_COMP_THREADS_PER_CHUNK <= 32,
       "Compression can be done with at "

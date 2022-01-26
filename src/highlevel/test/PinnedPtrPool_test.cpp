@@ -48,12 +48,12 @@ struct PoolTestWrapper {
     : pool(pool)
   {}
 
-  size_t get_current_pool_size() {
-    return pool.get_current_pool_size();
+  size_t get_current_available_pointer_count() {
+    return pool.get_current_available_pointer_count();
   }
 
-  size_t get_alloced_size() {
-    return pool.get_alloced_size();
+  size_t capacity() {
+    return pool.capacity();
   }   
 };
 
@@ -68,37 +68,37 @@ void test_pinned_ptr_pool() {
 
   constexpr size_t num_pinned_prealloc = PINNED_POOL_PREALLOC_SIZE;
   constexpr size_t num_pinned_realloc = PINNED_POOL_REALLOC_SIZE;
-  REQUIRE(test_wrapper.get_alloced_size() == num_pinned_prealloc);
-  REQUIRE(test_wrapper.get_current_pool_size() == num_pinned_prealloc);
+  REQUIRE(test_wrapper.capacity() == num_pinned_prealloc);
+  REQUIRE(test_wrapper.get_current_available_pointer_count() == num_pinned_prealloc);
 
   vector<PinnedPtr> pinned_ptrs;
   for (size_t i = 1; i <= num_pinned_prealloc; ++i)
   {
     pinned_ptrs.push_back(pool.allocate());
     
-    REQUIRE(test_wrapper.get_current_pool_size() == num_pinned_prealloc - i);
-    REQUIRE(test_wrapper.get_alloced_size() == num_pinned_prealloc);
+    REQUIRE(test_wrapper.get_current_available_pointer_count() == num_pinned_prealloc - i);
+    REQUIRE(test_wrapper.capacity() == num_pinned_prealloc);
     
     **pinned_ptrs.back() = i;
   }
 
-  REQUIRE(test_wrapper.get_alloced_size() == num_pinned_prealloc);
-  REQUIRE(test_wrapper.get_current_pool_size() == 0);
+  REQUIRE(test_wrapper.capacity() == num_pinned_prealloc);
+  REQUIRE(test_wrapper.get_current_available_pointer_count() == 0);
 
   pinned_ptrs.pop_back(); // return one to the pool
-  REQUIRE(test_wrapper.get_alloced_size() == num_pinned_prealloc);
-  REQUIRE(test_wrapper.get_current_pool_size() == 1);
+  REQUIRE(test_wrapper.capacity() == num_pinned_prealloc);
+  REQUIRE(test_wrapper.get_current_available_pointer_count() == 1);
 
   for (size_t i = 0; i < 2; ++i) {
     pinned_ptrs.push_back(pool.allocate());
   }
 
-  REQUIRE(test_wrapper.get_current_pool_size() == num_pinned_realloc - 1);
-  REQUIRE(test_wrapper.get_alloced_size() == num_pinned_realloc + num_pinned_prealloc);
+  REQUIRE(test_wrapper.get_current_available_pointer_count() == num_pinned_realloc - 1);
+  REQUIRE(test_wrapper.capacity() == num_pinned_realloc + num_pinned_prealloc);
 
   pinned_ptrs.clear();
-  REQUIRE(test_wrapper.get_alloced_size() == num_pinned_realloc + num_pinned_prealloc);
-  REQUIRE(test_wrapper.get_current_pool_size() == num_pinned_realloc + num_pinned_prealloc);
+  REQUIRE(test_wrapper.capacity() == num_pinned_realloc + num_pinned_prealloc);
+  REQUIRE(test_wrapper.get_current_available_pointer_count() == num_pinned_realloc + num_pinned_prealloc);
 
 }
 

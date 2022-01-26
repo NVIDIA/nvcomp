@@ -176,14 +176,14 @@ private: // helpers that PoolTestWrapper will use
   /**
    * @brief Get the number of available pointers without additional allocations
    */ 
-  size_t get_current_pool_size() {
+  size_t get_current_available_pointer_count() {
     return pool.size();
   }
 
   /**
    * @brief Get the total number of T instances that have been allocated
    */ 
-  size_t get_alloced_size() {
+  size_t capacity() {
     return (alloced_buffers.size() - 1) * PINNED_POOL_REALLOC_SIZE + PINNED_POOL_PREALLOC_SIZE;
   }  
 

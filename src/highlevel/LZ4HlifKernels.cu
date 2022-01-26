@@ -68,7 +68,6 @@ public:
     : hash_table_size(input.hash_table_size),
       status(status)
   {
-    static_assert(sizeof(T) <= 4, "Max alignment support is 4 bytes");
     hash_table = reinterpret_cast<offset_type*>(tmp_buffer) + blockIdx.x * hash_table_size;
   }
       
@@ -249,15 +248,15 @@ void lz4HlifBatchDecompress(
 
 size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_id)
 {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
+  cudaDeviceProp device_prop;
+  cudaGetDeviceProperties(&device_prop, device_id);
+  int num_blocks_per_sm;
   switch (data_type) {
     case NVCOMP_TYPE_BITS:
     case NVCOMP_TYPE_CHAR:
     case NVCOMP_TYPE_UCHAR:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &numBlocksPerSM, 
+          &num_blocks_per_sm, 
           HlifCompressBatchKernel<lz4_compress_wrapper<uint8_t>, CompressArgStruct>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
@@ -265,7 +264,7 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
     case NVCOMP_TYPE_SHORT:
     case NVCOMP_TYPE_USHORT:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &numBlocksPerSM, 
+          &num_blocks_per_sm, 
           HlifCompressBatchKernel<lz4_compress_wrapper<uint16_t>, CompressArgStruct>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
@@ -273,7 +272,7 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
     case NVCOMP_TYPE_INT:
     case NVCOMP_TYPE_UINT:
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &numBlocksPerSM, 
+          &num_blocks_per_sm, 
           HlifCompressBatchKernel<lz4_compress_wrapper<uint32_t>, CompressArgStruct>, 
           LZ4_COMP_THREADS_PER_CHUNK, 
           0);
@@ -282,22 +281,22 @@ size_t batchedLZ4CompMaxBlockOccupancy(nvcompType_t data_type, const int device_
       throw std::invalid_argument("Unsupported input data type");
   }
   
-  return deviceProp.multiProcessorCount * numBlocksPerSM;
+  return device_prop.multiProcessorCount * num_blocks_per_sm;
 }
 
 size_t batchedLZ4DecompMaxBlockOccupancy(nvcompType_t data_type, const int device_id)
 {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
+  cudaDeviceProp device_prop;
+  cudaGetDeviceProperties(&device_prop, device_id);
+  int num_blocks_per_sm;
   constexpr int shmem_size = DECOMP_INPUT_BUFFER_SIZE * LZ4_DECOMP_CHUNKS_PER_BLOCK;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &numBlocksPerSM, 
+      &num_blocks_per_sm, 
       HlifDecompressBatchKernel<lz4_decompress_wrapper, LZ4_DECOMP_CHUNKS_PER_BLOCK>, 
       LZ4_DECOMP_THREADS_PER_CHUNK * LZ4_DECOMP_CHUNKS_PER_BLOCK, 
       shmem_size);
   
-  return deviceProp.multiProcessorCount * numBlocksPerSM;
+  return device_prop.multiProcessorCount * num_blocks_per_sm;
 }
 
 } // namespace nvcomp

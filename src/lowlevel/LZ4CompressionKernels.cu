@@ -58,8 +58,6 @@ __global__ void lz4CompressBatchKernel(
     offset_type* const temp_space,
     const position_type hash_table_size)
 {
-  static_assert(sizeof(T) <= sizeof(uint32_t), "Max alignment support is 4 bytes");
-
   const int bidx = blockIdx.x * blockDim.y + threadIdx.y;
 
   auto decomp_ptr = device_in_ptr[bidx];
