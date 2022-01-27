@@ -92,6 +92,7 @@ int main(int argc, char* argv[])
 
   if (fname == NULL) {
     print_usage();
+    return 1;
   }
 
   cudaSetDevice(gpu_num);
