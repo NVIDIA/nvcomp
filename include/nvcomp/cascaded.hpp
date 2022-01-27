@@ -35,8 +35,8 @@
 #include "src/common.h"
 #include "nvcomp/cascaded.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "CascadedHlifKernels.h"
-#include "BatchManager.hpp"
+#include "src/highlevel/CascadedHlifKernels.h"
+#include "src/highlevel/BatchManager.hpp"
 
 namespace nvcomp {
 
@@ -58,24 +58,25 @@ public:
     : BatchManager(uncomp_chunk_size, user_stream, device_id),
       format_spec()
   {
-    gpuErrchk(cudaHostAlloc(&format_spec, sizeof(CascadedFormatSpecHeader), cudaHostAllocDefault));
+    CudaUtils::check(cudaHostAlloc(
+        &format_spec, sizeof(CascadedFormatSpecHeader), cudaHostAllocDefault));
     format_spec->options = options;
-
-    max_comp_chunk_size = compute_max_compressed_chunk_size();
 
     finish_init();
   }
 
   virtual ~CascadedBatchManager()
   {
-    gpuErrchk(cudaFreeHost(format_spec));
+    CudaUtils::check(cudaFreeHost(format_spec));
   }
 
   size_t compute_max_compressed_chunk_size() final override
   {
     size_t max_comp_chunk_size;
     nvcompBatchedCascadedCompressGetMaxOutputChunkSize(
-        uncomp_chunk_size, nvcompBatchedCascadedDefaultOpts, &max_comp_chunk_size);
+        get_uncomp_chunk_size(),
+        nvcompBatchedCascadedDefaultOpts,
+        &max_comp_chunk_size);
     return max_comp_chunk_size;
   }
 
@@ -94,32 +95,12 @@ public:
     return format_spec;
   }
 
-  void do_batch_compress(
-      CommonHeader* common_header,
-      const uint8_t* decomp_buffer,
-      const size_t decomp_buffer_size,
-      uint8_t* comp_data_buffer,
-      const uint32_t num_chunks,
-      size_t* comp_chunk_offsets,
-      size_t* comp_chunk_sizes,
-      nvcompStatus_t* output_status) final override
+  void do_batch_compress(const CompressArgs& compress_args) final override
   {
     cascadedHlifBatchCompress(
-        common_header,
-        decomp_buffer,
-        decomp_buffer_size,
-        comp_data_buffer,
-        scratch_buffer,
-        uncomp_chunk_size,
-        &common_header->comp_data_size,
-        ix_chunk,
-        num_chunks,
-        max_comp_chunk_size,
-        comp_chunk_offsets,
-        comp_chunk_sizes,
-        max_comp_ctas,
+        compress_args,
+        get_max_comp_ctas(),
         user_stream,
-        output_status,
         &(format_spec->options));
   }
 
@@ -134,12 +115,12 @@ public:
     cascadedHlifBatchDecompress(
         comp_data_buffer,
         decomp_buffer,
-        uncomp_chunk_size,
+        get_uncomp_chunk_size(),
         ix_chunk,
         num_chunks,
         comp_chunk_offsets,
         comp_chunk_sizes,
-        max_decomp_ctas,
+        get_max_decomp_ctas(),
         user_stream,
         output_status,
         &(format_spec->options));

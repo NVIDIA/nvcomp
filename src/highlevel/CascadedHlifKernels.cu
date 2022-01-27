@@ -41,7 +41,6 @@ template <
     int chunk_size = default_chunk_size>
 struct cascaded_compress_wrapper : hlif_compress_wrapper
 {
-
 private:
   nvcompStatus_t* status;
   const nvcompBatchedCascadedOpts_t options;
@@ -75,11 +74,11 @@ public:
         options);
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t& get_output_status() {
     return *status;
   }
 
-  __device__ FormatType get_format_type() final override {
+  __device__ FormatType get_format_type() {
     return FormatType::Cascaded;
   }
 };
@@ -133,114 +132,43 @@ public:
         &actual_decompressed_bytes,
         shmem,
         &status);
-        //comp_buffer,
-        //comp_chunk_size,
-        //decomp_buffer,
-        //decomp_buffer_size,
-        //status,
-        //nullptr); // device_uncompressed_bytes -- unnecessary for HLIF
   }
 
-  __device__ nvcompStatus_t& get_output_status() final override {
+  __device__ nvcompStatus_t& get_output_status() {
     return *status;
   }
 };
 
 void cascadedHlifBatchCompress(
-    CommonHeader* common_header,
-    const uint8_t* decomp_buffer, 
-    const size_t decomp_buffer_size, 
-    uint8_t* comp_buffer, 
-    uint8_t* tmp_buffer,
-    const size_t raw_chunk_size,
-    size_t* ix_output,
-    uint32_t* ix_chunk,
-    const size_t num_chunks,
-    const size_t max_comp_chunk_size,
-    size_t* comp_chunk_offsets,
-    size_t* comp_chunk_sizes,
+    const CompressArgs& compress_args,
     const uint32_t max_ctas,
     cudaStream_t stream,
-    nvcompStatus_t* output_status,
     const nvcompBatchedCascadedOpts_t* options)
 {
   const dim3 batch_size(max_ctas);
   constexpr int threadblock_size = cascaded_compress_threadblock_size;
 
-  // FIXME: Handle shared memory!
   const nvcompType_t type = options->type;
   if (type == NVCOMP_TYPE_CHAR || type == NVCOMP_TYPE_UCHAR) {
     HlifCompressBatchKernel<
-        cascaded_compress_wrapper<uint8_t, size_t, threadblock_size>>
-        <<<batch_size, threadblock_size, 0, stream>>>(
-            common_header,
-            decomp_buffer,
-            decomp_buffer_size,
-            comp_buffer,
-            tmp_buffer,
-            raw_chunk_size,
-            ix_output,
-            ix_chunk,
-            num_chunks,
-            max_comp_chunk_size,
-            comp_chunk_offsets,
-            comp_chunk_sizes,
-            output_status,
-            *options);
+        cascaded_compress_wrapper<uint8_t, size_t, threadblock_size>,
+        const nvcompBatchedCascadedOpts_t&>
+        <<<batch_size, threadblock_size, 0, stream>>>(compress_args, *options);
   } else if (type == NVCOMP_TYPE_SHORT || type == NVCOMP_TYPE_USHORT) {
     HlifCompressBatchKernel<
-        cascaded_compress_wrapper<uint16_t, size_t, threadblock_size>>
-        <<<batch_size, threadblock_size, 0, stream>>>(
-            common_header,
-            decomp_buffer,
-            decomp_buffer_size,
-            comp_buffer,
-            tmp_buffer,
-            raw_chunk_size,
-            ix_output,
-            ix_chunk,
-            num_chunks,
-            max_comp_chunk_size,
-            comp_chunk_offsets,
-            comp_chunk_sizes,
-            output_status,
-            *options);
+        cascaded_compress_wrapper<uint16_t, size_t, threadblock_size>,
+        const nvcompBatchedCascadedOpts_t&>
+        <<<batch_size, threadblock_size, 0, stream>>>(compress_args, *options);
   } else if (type == NVCOMP_TYPE_INT || type == NVCOMP_TYPE_UINT) {
     HlifCompressBatchKernel<
-        cascaded_compress_wrapper<uint32_t, size_t, threadblock_size>>
-        <<<batch_size, threadblock_size, 0, stream>>>(
-            common_header,
-            decomp_buffer,
-            decomp_buffer_size,
-            comp_buffer,
-            tmp_buffer,
-            raw_chunk_size,
-            ix_output,
-            ix_chunk,
-            num_chunks,
-            max_comp_chunk_size,
-            comp_chunk_offsets,
-            comp_chunk_sizes,
-            output_status,
-            *options);
+        cascaded_compress_wrapper<uint32_t, size_t, threadblock_size>,
+        const nvcompBatchedCascadedOpts_t&>
+        <<<batch_size, threadblock_size, 0, stream>>>(compress_args, *options);
   } else if (type == NVCOMP_TYPE_LONGLONG || type == NVCOMP_TYPE_ULONGLONG) {
     HlifCompressBatchKernel<
-        cascaded_compress_wrapper<uint64_t, size_t, threadblock_size>>
-        <<<batch_size, threadblock_size, 0, stream>>>(
-            common_header,
-            decomp_buffer,
-            decomp_buffer_size,
-            comp_buffer,
-            tmp_buffer,
-            raw_chunk_size,
-            ix_output,
-            ix_chunk,
-            num_chunks,
-            max_comp_chunk_size,
-            comp_chunk_offsets,
-            comp_chunk_sizes,
-            output_status,
-            *options);
+        cascaded_compress_wrapper<uint64_t, size_t, threadblock_size>,
+        const nvcompBatchedCascadedOpts_t&>
+        <<<batch_size, threadblock_size, 0, stream>>>(compress_args, *options);
   }
 }
 
@@ -260,11 +188,12 @@ void cascadedHlifBatchDecompress(
   const dim3 batch_size(max_ctas);
   constexpr int threadblock_size = cascaded_decompress_threadblock_size;
 
-  // FIXME: Handle shared memory!
   const nvcompType_t type = options->type;
   if (type == NVCOMP_TYPE_CHAR || type == NVCOMP_TYPE_UCHAR) {
     HlifDecompressBatchKernel<
-        cascaded_decompress_wrapper<uint8_t, size_t, threadblock_size>>
+        cascaded_decompress_wrapper<uint8_t, size_t, threadblock_size>,
+        1,
+        const nvcompBatchedCascadedOpts_t&>
         <<<batch_size, threadblock_size, 0, stream>>>(
             comp_buffer,
             decomp_buffer,
@@ -277,7 +206,9 @@ void cascadedHlifBatchDecompress(
             *options);
   } else if (type == NVCOMP_TYPE_SHORT || type == NVCOMP_TYPE_USHORT) {
     HlifDecompressBatchKernel<
-        cascaded_decompress_wrapper<uint16_t, size_t, threadblock_size>>
+        cascaded_decompress_wrapper<uint16_t, size_t, threadblock_size>,
+        1,
+        const nvcompBatchedCascadedOpts_t&>
         <<<batch_size, threadblock_size, 0, stream>>>(
             comp_buffer,
             decomp_buffer,
@@ -290,7 +221,9 @@ void cascadedHlifBatchDecompress(
             *options);
   } else if (type == NVCOMP_TYPE_INT || type == NVCOMP_TYPE_UINT) {
     HlifDecompressBatchKernel<
-        cascaded_decompress_wrapper<uint32_t, size_t, threadblock_size>>
+        cascaded_decompress_wrapper<uint32_t, size_t, threadblock_size>,
+        1,
+        const nvcompBatchedCascadedOpts_t&>
         <<<batch_size, threadblock_size, 0, stream>>>(
             comp_buffer,
             decomp_buffer,
@@ -303,7 +236,9 @@ void cascadedHlifBatchDecompress(
             *options);
   } else if (type == NVCOMP_TYPE_LONGLONG || type == NVCOMP_TYPE_ULONGLONG) {
     HlifDecompressBatchKernel<
-        cascaded_decompress_wrapper<uint64_t, size_t, threadblock_size>>
+        cascaded_decompress_wrapper<uint64_t, size_t, threadblock_size>,
+        1,
+        const nvcompBatchedCascadedOpts_t&>
         <<<batch_size, threadblock_size, 0, stream>>>(
             comp_buffer,
             decomp_buffer,

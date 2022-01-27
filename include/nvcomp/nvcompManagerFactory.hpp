@@ -32,6 +32,7 @@
 #include "lz4.hpp"
 #include "snappy.hpp"
 #include "bitcomp.hpp"
+#include "cascaded.hpp"
 
 namespace nvcomp {
 
@@ -97,7 +98,11 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
     }
     case FormatType::Cascaded: 
     {
-      // TODO
+      CascadedFormatSpecHeader format_spec;
+      const CascadedFormatSpecHeader* gpu_format_header = reinterpret_cast<const CascadedFormatSpecHeader*>(comp_buffer + sizeof(CommonHeader));
+      CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(CascadedFormatSpecHeader), cudaMemcpyDefault, stream));
+
+      res = std::make_shared<CascadedBatchManager>( cpu_common_header.uncomp_chunk_size, format_spec.options, stream, device_id);
       break;
     }
     case FormatType::NotSupportedError:
