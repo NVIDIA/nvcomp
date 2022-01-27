@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  LZ4BatchManager batch_manager{chunk_size, data_type, stream};
+  LZ4Manager batch_manager{chunk_size, data_type, stream};
 
   run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
   CudaUtils::check(cudaStreamDestroy(stream));

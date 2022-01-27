@@ -26,29 +26,5 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
 
-#include <memory>
-
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "src/common.h"
-#include "nvcomp/snappy.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/SnappyHlifKernels.h"
-#include "src/highlevel/BatchManager.hpp"
-
-namespace nvcomp {
-
-struct SnappyFormatSpecHeader {
-  // Empty for now
-};
-
-struct SnappyManager : PimplManager {
-
-  SnappyManager(size_t uncomp_chunk_size, cudaStream_t user_stream = 0, int device_id = 0);
-
-  ~SnappyManager();
-};
-
-} // namespace nvcomp
+#include "LZ4Manager.hpp"

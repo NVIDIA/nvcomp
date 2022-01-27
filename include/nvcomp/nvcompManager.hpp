@@ -210,5 +210,69 @@ struct nvcompManagerBase {
   virtual ~nvcompManagerBase() = default;
 };
 
+struct PimplManager : nvcompManagerBase {
+
+protected:
+  std::unique_ptr<nvcompManagerBase> impl;
+
+public:
+  virtual ~PimplManager() {}
+
+  PimplManager() 
+    : impl(nullptr)
+  {}
+
+  PimplManager(const PimplManager&) = delete;
+  PimplManager& operator=(const PimplManager&) = delete;
+
+  virtual CompressionConfig configure_compression(const size_t decomp_buffer_size) 
+  {
+    return impl->configure_compression(decomp_buffer_size);
+  }
+
+  virtual void compress(
+      const uint8_t* decomp_buffer, 
+      uint8_t* comp_buffer,
+      const CompressionConfig& comp_config)
+  {
+    return impl->compress(
+        decomp_buffer,
+        comp_buffer,
+        comp_config);
+  }
+
+  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) 
+  {
+    return impl->configure_decompression(comp_buffer);
+  }
+
+  virtual DecompressionConfig configure_decompression(const CompressionConfig& comp_config)
+  {
+    return impl->configure_decompression(comp_config);
+  }
+
+  virtual void decompress(
+      uint8_t* decomp_buffer, 
+      const uint8_t* comp_buffer,
+      const DecompressionConfig& decomp_config)
+  {
+    return impl->decompress(decomp_buffer, comp_buffer, decomp_config);
+  }
+ 
+  virtual void set_scratch_buffer(uint8_t* new_scratch_buffer)
+  {
+    return impl->set_scratch_buffer(new_scratch_buffer);
+  }
+
+  virtual size_t get_required_scratch_buffer_size()
+  {
+    return impl->get_required_scratch_buffer_size();
+  }
+
+  virtual size_t get_compressed_output_size(uint8_t* comp_buffer)
+  {
+    return impl->get_compressed_output_size(comp_buffer);
+  }
+};
 
 } // namespace nvcomp
