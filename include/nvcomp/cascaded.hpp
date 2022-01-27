@@ -46,7 +46,6 @@ struct CascadedFormatSpecHeader {
 
 struct CascadedBatchManager : BatchManager<CascadedFormatSpecHeader> {
 private:
-  size_t hash_table_size;
   CascadedFormatSpecHeader* format_spec;
 
 public:
@@ -55,7 +54,7 @@ public:
       cudaStream_t user_stream = 0,
       int device_id = 0) :
       BatchManager(options.chunk_size, user_stream, device_id),
-      format_spec()
+      format_spec(nullptr)
   {
     CudaUtils::check(cudaHostAlloc(
         &format_spec, sizeof(CascadedFormatSpecHeader), cudaHostAllocDefault));
@@ -68,6 +67,9 @@ public:
   {
     CudaUtils::check(cudaFreeHost(format_spec));
   }
+
+  CascadedBatchManager(const CascadedBatchManager&) = delete;
+  CascadedBatchManager& operator=(const CascadedBatchManager&) = delete;
 
   size_t compute_max_compressed_chunk_size() final override
   {
