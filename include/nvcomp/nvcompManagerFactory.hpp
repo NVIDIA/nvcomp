@@ -30,6 +30,7 @@
 #include "nvcompManager.hpp"
 #include "lz4.hpp"
 #include "snappy.hpp"
+#include "bitcomp.hpp"
 
 namespace nvcomp {
 
@@ -72,7 +73,15 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
     }
     case FormatType::Bitcomp: 
     {
-      // TODO
+#ifdef ENABLE_BITCOMP
+      BitcompFormatSpecHeader format_spec;
+      const BitcompFormatSpecHeader* gpu_format_header = reinterpret_cast<const BitcompFormatSpecHeader*>(comp_buffer + sizeof(CommonHeader));
+      CudaUtils::check(cudaMemcpy(&format_spec, gpu_format_header, sizeof(BitcompFormatSpecHeader), cudaMemcpyDefault));
+
+      res = std::make_shared<BitcompManager>(format_spec.data_type, format_spec.algo, stream, device_id);
+#else
+      throw NVCompException(nvcompErrorNotSupported, "Bitcomp support not available in this build.");
+#endif
       break;
     }
     case FormatType::ANS: 
