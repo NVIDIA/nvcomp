@@ -30,8 +30,8 @@
 #define VERBOSE 0
 #endif
 
-#include "nvcomp/cascaded.hpp"
 #include "nvcomp/lz4.hpp"
+#include "nvcomp/nvcompManager.hpp"
 
 #include "benchmark_common.h"
 
@@ -291,8 +291,8 @@ static void run_nvcomp_benchmark(
     T** dev_ptrs,
     size_t* chunk_sizes,
     std::vector<T>* h_data,
-    Compressor** compressors,
-    Decompressor** decompressors)
+    nvcompManagerBase** managers,
+    std::vector<std::vector<cudaStream_t>>& streams)
 {
   const int chunks_per_gpu = chunks / gpus;
   const int STREAMS_PER_GPU = std::min(chunks_per_gpu, MAX_STREAMS);
@@ -302,42 +302,29 @@ static void run_nvcomp_benchmark(
     chunk_bytes[chunkIdx] = chunk_sizes[chunkIdx] * sizeof(T);
   }
 
-  // Create a compressor for each chunk
-  std::vector<size_t> temp_bytes(gpus);
-  std::vector<void*> d_comp_out(chunks);
+  // Create a compression result for each chunk
+  std::vector<uint8_t*> d_comp_out(chunks);
   size_t* comp_out_bytes;
   CUDA_CHECK(cudaMallocHost(&comp_out_bytes, chunks * sizeof(size_t)));
-  std::vector<std::vector<cudaStream_t>> streams;
-  create_gpu_streams(&streams, gpus, STREAMS_PER_GPU);
 
+  std::vector<CompressionConfig> comp_configs;
+  comp_configs.reserve(chunks * gpus);
+  
   // Allocate all memory buffers necessary for compression of each chunk
-  std::vector<std::vector<T*>> d_temp(gpus);
   for (int gpu = 0; gpu < gpus; ++gpu) {
     CUDA_CHECK(cudaSetDevice(gpu));
 
     // Create compressor for the chunk and allocate necessary memory
-    temp_bytes[gpu] = 0;
-    d_temp[gpu].resize(STREAMS_PER_GPU);
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
 
-      size_t temp_size;
-      size_t out_size;
-      compressors[idx]->configure(chunk_bytes[idx], &temp_size, &out_size);
+      auto comp_config = managers[idx]->configure_compression(chunk_bytes[idx]);
 
       // Allocate output buffers for each chunk on the GPU
-      comp_out_bytes[idx] = out_size;
+      comp_out_bytes[idx] = comp_config.max_compressed_buffer_size;
       CUDA_CHECK(cudaMalloc(&d_comp_out[idx], comp_out_bytes[idx]));
 
-      // biggest temp buffer requirement
-      if (temp_size > temp_bytes[gpu]) {
-        temp_bytes[gpu] = temp_size;
-      }
-    }
-
-    // Use one temp buffer for each stream on each gpu
-    for (int j = 0; j < STREAMS_PER_GPU; ++j) {
-      CUDA_CHECK(cudaMalloc(&d_temp[gpu][j], temp_bytes[gpu]));
+      comp_configs.push_back(std::move(comp_config));
     }
   }
 
@@ -372,14 +359,10 @@ static void run_nvcomp_benchmark(
     CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx]->compress_async(
+      managers[idx]->compress(
           dev_ptrs[idx],
-          chunk_bytes[idx],
-          d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
-          temp_bytes[gpu],
           d_comp_out[idx],
-          &comp_out_bytes[idx],
-          streams[gpu][chunkIdx % STREAMS_PER_GPU]);
+          comp_configs[idx]);
     }
   }
 
@@ -409,27 +392,18 @@ static void run_nvcomp_benchmark(
   }
 
   // Create decompressors for each chunk on each gpu
+  std::vector<DecompressionConfig> decomp_configs;
+  decomp_configs.reserve(chunks * gpus);
+
   for (int gpu = 0; gpu < gpus; ++gpu) {
     CUDA_CHECK(cudaSetDevice(gpu));
     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
       const int idx = gpu * chunks + chunkIdx;
-      if (gpu != chunkIdx) {
-        size_t temp_size;
-        size_t out_size;
-        decompressors[idx]->configure(
-            dest_ptrs[gpu][chunkIdx],
-            comp_out_bytes[chunkIdx],
-            &temp_size,
-            &out_size,
-            streams[gpu][chunkIdx % STREAMS_PER_GPU]);
+      auto decomp_config = managers[idx]->configure_decompression(dest_ptrs[gpu][chunkIdx]);
+      decomp_configs.push_back(decomp_config);
 
-        decomp_out_bytes[idx] = out_size;
-        if (temp_size > temp_bytes[gpu]) {
-          std::cerr << "Insufficient temp storage size for gpu " << gpu
-                    << ", chunk " << chunkIdx << ": " << temp_bytes[gpu]
-                    << ", needed:" << temp_size << std::endl;
-          exit(1);
-        }
+      if (gpu != chunkIdx) {
+        decomp_out_bytes[idx] = decomp_config.decomp_data_size;
       } else {
         decomp_out_bytes[idx] = chunk_bytes[chunkIdx];
       }
@@ -442,14 +416,10 @@ static void run_nvcomp_benchmark(
     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
       if (gpu != chunkIdx) {
         const int idx = gpu * chunks + chunkIdx;
-        decompressors[idx]->decompress_async(
-            dest_ptrs[gpu][chunkIdx],
-            comp_out_bytes[chunkIdx],
-            d_temp[gpu][chunkIdx % STREAMS_PER_GPU],
-            temp_bytes[gpu],
+        managers[idx]->decompress(
             d_decomp_out[gpu][chunkIdx],
-            decomp_out_bytes[idx],
-            streams[gpu][chunkIdx % STREAMS_PER_GPU]);
+            dest_ptrs[gpu][chunkIdx],
+            decomp_configs[idx]);
       }
     }
   }
@@ -472,11 +442,6 @@ static void run_nvcomp_benchmark(
     for (int j = 0; j < chunks_per_gpu; ++j) {
       const int idx = i * chunks_per_gpu + j;
       CUDA_CHECK(cudaFree(d_comp_out[idx]));
-    }
-    for (int j = 0; j < STREAMS_PER_GPU; ++j) {
-      if (j != i) {
-        CUDA_CHECK(cudaFree(d_temp[i][j]));
-      }
     }
   }
   CUDA_CHECK(cudaFreeHost(comp_out_bytes));
@@ -515,103 +480,87 @@ static void run_lz4_benchmark(
   using T = uint8_t;
 
   const int chunks_per_gpu = chunks / gpus;
+  const int STREAMS_PER_GPU = std::min(chunks_per_gpu, MAX_STREAMS);
 
-  Compressor** compressors = new Compressor*[gpus * chunks_per_gpu];
+  std::vector<std::vector<cudaStream_t>> streams;
+  create_gpu_streams(&streams, gpus, STREAMS_PER_GPU);
+
+  nvcompManagerBase** managers = new nvcompManagerBase*[gpus * chunks_per_gpu];
   // Allocate all memory buffers necessary for compression of each chunk
   for (int gpu = 0; gpu < gpus; ++gpu) {
     // Create compressor each chunk
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx] = new LZ4Compressor(1 << 16, NVCOMP_TYPE_CHAR);
-    }
-  }
-
-  // Create decompressors for each chunk on each gpu
-  Decompressor** decompressors = new Decompressor*[chunks * gpus];
-
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      // Create compressor for the chunk and allocate necessary memory
-      if (chunkIdx != gpu) {
-        decompressors[idx] = new LZ4Decompressor;
-      }
+      managers[idx] = new LZ4BatchManager{1 << 16, NVCOMP_TYPE_CHAR, streams[gpu][chunkIdx]};
     }
   }
 
   run_nvcomp_benchmark<T>(
-      gpus, chunks, dev_ptrs, chunk_sizes, h_data, compressors, decompressors);
+      gpus, chunks, dev_ptrs, chunk_sizes, h_data, managers, streams);
 
   for (int gpu = 0; gpu < gpus; ++gpu) {
     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
       const int idx = gpu * chunks_per_gpu + chunkIdx;
-      delete compressors[idx];
-    }
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      if (gpu != chunkIdx) {
-        delete decompressors[idx];
-      }
+      delete managers[idx];
     }
   }
-  delete[] compressors;
-  delete[] decompressors;
+  delete[] managers;
 }
 
 // Benchmark the performance of the All-gather operation using LZ4
 // compression/decompression to reduce data transfers
-template <typename T>
-static void run_cascaded_benchmark(
-    int gpus,
-    int chunks,
-    T** dev_ptrs,
-    size_t* chunk_sizes,
-    std::vector<T>* h_data,
-    int RLEs,
-    int deltas,
-    int bitPacking)
-{
-  const int chunks_per_gpu = chunks / gpus;
+// template <typename T>
+// static void run_cascaded_benchmark(
+//     int gpus,
+//     int chunks,
+//     T** dev_ptrs,
+//     size_t* chunk_sizes,
+//     std::vector<T>* h_data,
+//     int RLEs,
+//     int deltas,
+//     int bitPacking)
+// {
+//   const int chunks_per_gpu = chunks / gpus;
 
-  Compressor** compressors = new Compressor*[gpus];
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      compressors[idx] = new CascadedCompressor(
-          nvcomp::TypeOf<T>(), RLEs, deltas, bitPacking);
-    }
-  }
+//   Compressor** compressors = new Compressor*[gpus];
+//   for (int gpu = 0; gpu < gpus; ++gpu) {
+//     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+//       const int idx = gpu * chunks_per_gpu + chunkIdx;
+//       compressors[idx] = new CascadedCompressor(
+//           nvcomp::TypeOf<T>(), RLEs, deltas, bitPacking);
+//     }
+//   }
 
-  // Create decompressors for each chunk on each gpu
-  Decompressor** decompressors = new Decompressor*[chunks * gpus];
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      if (gpu != chunkIdx) {
-        // Create compressor for the chunk and allocate necessary memory
-        decompressors[idx] = new CascadedDecompressor;
-      }
-    }
-  }
+//   // Create decompressors for each chunk on each gpu
+//   Decompressor** decompressors = new Decompressor*[chunks * gpus];
+//   for (int gpu = 0; gpu < gpus; ++gpu) {
+//     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+//       const int idx = gpu * chunks + chunkIdx;
+//       if (gpu != chunkIdx) {
+//         // Create compressor for the chunk and allocate necessary memory
+//         decompressors[idx] = new CascadedDecompressor;
+//       }
+//     }
+//   }
 
-  run_nvcomp_benchmark<T>(
-      gpus, chunks, dev_ptrs, chunk_sizes, h_data, compressors, decompressors);
+//   run_nvcomp_benchmark<T>(
+//       gpus, chunks, dev_ptrs, chunk_sizes, h_data, compressors, decompressors);
 
-  for (int gpu = 0; gpu < gpus; ++gpu) {
-    for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
-      const int idx = gpu * chunks_per_gpu + chunkIdx;
-      delete compressors[idx];
-    }
-    for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
-      const int idx = gpu * chunks + chunkIdx;
-      if (gpu != chunkIdx) {
-        delete decompressors[idx];
-      }
-    }
-  }
-  delete[] compressors;
-  delete[] decompressors;
-}
+//   for (int gpu = 0; gpu < gpus; ++gpu) {
+//     for (int chunkIdx = 0; chunkIdx < chunks_per_gpu; ++chunkIdx) {
+//       const int idx = gpu * chunks_per_gpu + chunkIdx;
+//       delete compressors[idx];
+//     }
+//     for (int chunkIdx = 0; chunkIdx < chunks; ++chunkIdx) {
+//       const int idx = gpu * chunks + chunkIdx;
+//       if (gpu != chunkIdx) {
+//         delete decompressors[idx];
+//       }
+//     }
+//   }
+//   delete[] compressors;
+//   delete[] decompressors;
+// }
 
 static void enable_nvlink(int gpus)
 {
@@ -691,6 +640,9 @@ int main(int argc, char* argv[])
     print_usage();
     return 1;
   }
+
+  printf("For cascaded, RLEs %d deltas %d bitpack %d\n", RLEs, deltas, bitPacking);
+
   // TODO check if all options have been found
   if (fname == NULL) {
     std::cerr << "Missing filename." << std::endl;
@@ -716,74 +668,74 @@ int main(int argc, char* argv[])
 
   int rv = 0;
   if (dtype == "int") {
-    std::vector<int32_t*> data_ptrs(chunks);
-    std::vector<size_t> data_sizes(chunks);
-    std::vector<int32_t> h_data;
-    load_chunks_to_devices<int32_t>(
-        fname,
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data);
-    run_cascaded_benchmark<int32_t>(
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data,
-        RLEs,
-        deltas,
-        bitPacking);
-    for (int chunk = 0; chunk < chunks; ++chunk) {
-      CUDA_CHECK(cudaFree(data_ptrs[chunk]));
-    }
+    // std::vector<int32_t*> data_ptrs(chunks);
+    // std::vector<size_t> data_sizes(chunks);
+    // std::vector<int32_t> h_data;
+    // load_chunks_to_devices<int32_t>(
+    //     fname,
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data);
+    // run_cascaded_benchmark<int32_t>(
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data,
+    //     RLEs,
+    //     deltas,
+    //     bitPacking);
+    // for (int chunk = 0; chunk < chunks; ++chunk) {
+    //   CUDA_CHECK(cudaFree(data_ptrs[chunk]));
+    // }
   } else if (dtype == "long") {
-    std::vector<int64_t*> data_ptrs(chunks);
-    std::vector<size_t> data_sizes(chunks);
-    std::vector<int64_t> h_data;
-    load_chunks_to_devices<int64_t>(
-        fname,
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data);
-    run_cascaded_benchmark<int64_t>(
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data,
-        RLEs,
-        deltas,
-        bitPacking);
-    for (int chunk = 0; chunk < chunks; ++chunk) {
-      CUDA_CHECK(cudaFree(data_ptrs[chunk]));
-    }
+    // std::vector<int64_t*> data_ptrs(chunks);
+    // std::vector<size_t> data_sizes(chunks);
+    // std::vector<int64_t> h_data;
+    // load_chunks_to_devices<int64_t>(
+    //     fname,
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data);
+    // run_cascaded_benchmark<int64_t>(
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data,
+    //     RLEs,
+    //     deltas,
+    //     bitPacking);
+    // for (int chunk = 0; chunk < chunks; ++chunk) {
+    //   CUDA_CHECK(cudaFree(data_ptrs[chunk]));
+    // }
   } else if (dtype == "int8") {
-    std::vector<int8_t*> data_ptrs(chunks);
-    std::vector<size_t> data_sizes(chunks);
-    std::vector<int8_t> h_data;
-    load_chunks_to_devices<int8_t>(
-        fname,
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data);
-    run_cascaded_benchmark<int8_t>(
-        gpu_num,
-        chunks,
-        data_ptrs.data(),
-        data_sizes.data(),
-        &h_data,
-        RLEs,
-        deltas,
-        bitPacking);
-    for (int chunk = 0; chunk < chunks; ++chunk) {
-      CUDA_CHECK(cudaFree(data_ptrs[chunk]));
-    }
+    // std::vector<int8_t*> data_ptrs(chunks);
+    // std::vector<size_t> data_sizes(chunks);
+    // std::vector<int8_t> h_data;
+    // load_chunks_to_devices<int8_t>(
+    //     fname,
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data);
+    // run_cascaded_benchmark<int8_t>(
+    //     gpu_num,
+    //     chunks,
+    //     data_ptrs.data(),
+    //     data_sizes.data(),
+    //     &h_data,
+    //     RLEs,
+    //     deltas,
+    //     bitPacking);
+    // for (int chunk = 0; chunk < chunks; ++chunk) {
+    //   CUDA_CHECK(cudaFree(data_ptrs[chunk]));
+    // }
   } else if (dtype == "byte" || dtype == "uint8") {
     std::vector<uint8_t*> data_ptrs(chunks);
     std::vector<size_t> data_sizes(chunks);

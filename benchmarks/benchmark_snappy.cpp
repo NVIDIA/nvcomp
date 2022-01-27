@@ -30,8 +30,9 @@
 #define VERBOSE 0
 #endif
 
-#include "src/highlevel/LZ4BatchManager.hpp"
-#include "benchmark_hlif_v2.hpp"
+#include "nvcomp/snappy.hpp"
+
+#include "benchmark_hlif.hpp"
 
 #include <string.h>
 #include <string>
@@ -43,20 +44,17 @@ static void print_usage()
   printf("Usage: benchmark_lz4 [OPTIONS]\n");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
-  printf("  %-35s Data type (default 'char', options are 'char', 'short', 'int')\n", "-t, --type");
   printf(
       "  %-35s Output GPU memory allocation sizes (default off)\n",
       "-m --memory");
   exit(1);
 }
 
-
 int main(int argc, char* argv[])
 {
   char* fname = NULL;
   int gpu_num = 0;
   int verbose_memory = 0;
-  nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
   // Parse command-line arguments
   char** argv_end = argv + argc;
@@ -87,19 +85,6 @@ int main(int argc, char* argv[])
       gpu_num = atoi(optarg);
       continue;
     }
-    if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
-      if (strcmp(optarg, "char") == 0) {
-        data_type = NVCOMP_TYPE_CHAR;
-      } else if (strcmp(optarg, "short") == 0) {
-        data_type = NVCOMP_TYPE_SHORT;
-      } else if (strcmp(optarg, "int") == 0) {
-        data_type = NVCOMP_TYPE_INT;
-      } else {
-        print_usage();
-        return 1;
-      }
-      continue;
-    }
 
     print_usage();
     return 1;
@@ -114,9 +99,9 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  LZ4BatchManager batch_manager{chunk_size, data_type, stream};
+  SnappyBatchManager batch_manager{chunk_size, stream};
 
-  run_benchmark(fname, batch_manager, verbose_memory, stream);
+  run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
   CudaUtils::check(cudaStreamDestroy(stream));
 
   return 0;

@@ -1,5 +1,7 @@
+#pragma once
+
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,241 +28,113 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVCOMP_LZ4_HPP
-#define NVCOMP_LZ4_HPP
+#include <memory>
 
-#include "lz4.h"
-#include "nvcomp.hpp"
+#include "src/Check.h"
+#include "src/CudaUtils.h"
+#include "src/lowlevel/LZ4CompressionKernels.h"
+#include "src/highlevel/LZ4HlifKernels.h"
+#include "nvcomp/lz4.h"
+#include "src/common.h"
+#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "src/highlevel/BatchManager.hpp"
 
-namespace nvcomp
-{
-/**
- * @brief C++ wrapper for LZ4 compressor.
- */
-class LZ4Compressor : public Compressor
-{
-public:
-  /**
-   * @brief Create a new LZ4 compressor.
-   *
-   * @param chunk_size size of chunks that are eached compressed separately.
-   * A value of `0` will result in the default chunk size being used.
-   * @param data_type The type of data to compress.
-   */
-  explicit LZ4Compressor(size_t chunk_size, nvcompType_t data_type);
+namespace nvcomp {
 
-  /**
-   * @brief Create a new LZ4 compressor with the default chunk size.
-   */
-  LZ4Compressor();
-
-  // disable copying
-  LZ4Compressor(const LZ4Compressor&) = delete;
-  LZ4Compressor& operator=(const LZ4Compressor&) = delete;
-
-  /**
-   * @brief Configure the compressor for the given input, and get the necessary
-   * spaces.
-   *
-   * @param in_bytes The size of the input in bytes.
-   * @param temp_bytes The temporary workspace required (output).
-   * @param out_bytes The maximum possible output size (output).
-   */
-  void configure(
-      const size_t in_bytes, size_t* temp_bytes, size_t* out_bytes) override;
-
-  /**
-   * @brief Perform compression asynchronously.
-   *
-   * @param in_ptr The uncompressed input data (GPU accessible).
-   * @param in_bytes The length of the uncompressed input data.
-   * @param temp_ptr The temporary workspace (GPU accessible).
-   * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The location to output data to (GPU accessible).
-   * @param out_bytes The size of the output location on input, and the size of
-   * the compressed data on output (CPU accessible, but must be pinned or
-   * managed memory for this function to be asynchronous).
-   * @param stream The stream to operate on.
-   *
-   * @throw NVCompException If compression fails to launch on the stream.
-   */
-  void compress_async(
-      const void* in_ptr,
-      const size_t in_bytes,
-      void* temp_ptr,
-      const size_t temp_bytes,
-      void* out_ptr,
-      size_t* out_bytes,
-      cudaStream_t stream) override;
-
-private:
-  size_t m_chunk_size;
-  nvcompType_t m_data_type;
+struct LZ4FormatSpecHeader {
+  nvcompType_t data_type;
 };
 
-class LZ4Decompressor : public Decompressor
-{
-public:
-  LZ4Decompressor();
-
-  ~LZ4Decompressor();
-
-  // disable copying
-  LZ4Decompressor(const LZ4Decompressor&) = delete;
-  LZ4Decompressor& operator=(const LZ4Decompressor&) = delete;
-
-  /**
-   * @brief Configure the decompressor. This synchronizes with the stream.
-   *
-   * @param in_ptr The compressed data on the device.
-   * @param in_bytes The size of the compressed data.
-   * @param temp_bytes The temporary space required for decompression (output).
-   * @param out_bytes The size of the uncompressed data (output).
-   * @param stream The stream to operate on for copying data from the device to
-   * the host.
-   */
-  void configure(
-      const void* in_ptr,
-      const size_t in_bytes,
-      size_t* temp_bytes,
-      size_t* out_bytes,
-      cudaStream_t stream) override;
-
-  /**
-   * @brief Decompress the given data asynchronously.
-   *
-   * @param temp_ptr The temporary workspace on the device to use.
-   * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The location to write the uncompressed data to on the
-   * device.
-   * @param out_num_elements The size of the output location in number of
-   * elements.
-   * @param stream The stream to operate on.
-   *
-   * @throw NVCompException If decompression fails to launch on the stream.
-   */
-  void decompress_async(
-      const void* in_ptr,
-      const size_t in_bytes,
-      void* temp_ptr,
-      const size_t temp_bytes,
-      void* out_ptr,
-      const size_t out_bytes,
-      cudaStream_t stream) override;
-
+struct LZ4BatchManager : BatchManager<LZ4FormatSpecHeader> {
 private:
-  void* m_metadata_ptr;
-  size_t m_metadata_bytes;
-};
+  size_t hash_table_size;
+  LZ4FormatSpecHeader* format_spec;
 
-/******************************************************************************
- * METHOD IMPLEMENTATIONS *****************************************************
- *****************************************************************************/
+public:
+  LZ4BatchManager(size_t uncomp_chunk_size, nvcompType_t data_type, cudaStream_t user_stream = 0, const int device_id = 0)
+    : BatchManager(uncomp_chunk_size, user_stream, device_id),      
+      hash_table_size(),
+      format_spec()
+  {
+    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(LZ4FormatSpecHeader), cudaHostAllocDefault));
+    format_spec->data_type = data_type;
 
-inline LZ4Compressor::LZ4Compressor(const size_t chunk_size, nvcompType_t data_type) :
-    m_chunk_size(chunk_size),
-    m_data_type(data_type)
-{
-  // do nothing
-}
-
-inline LZ4Compressor::LZ4Compressor() : LZ4Compressor(0, NVCOMP_TYPE_CHAR)
-{
-  // do nothing
-}
-
-inline void LZ4Compressor::configure(
-    const size_t in_bytes, size_t* const temp_bytes, size_t* const out_bytes)
-{
-  nvcompLZ4FormatOpts opts{m_chunk_size};
-
-  size_t metadata_bytes;
-  nvcompStatus_t status = nvcompLZ4CompressConfigure(
-      opts.chunk_size == 0 ? nullptr : &opts,
-      m_data_type,
-      in_bytes,
-      &metadata_bytes,
-      temp_bytes,
-      out_bytes);
-  throwExceptionIfError(status, "nvcompLZ4CompressConfigure() failed");
-}
-
-inline void LZ4Compressor::compress_async(
-    const void* const in_ptr,
-    const size_t in_bytes,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    void* const out_ptr,
-    size_t* const out_bytes,
-    cudaStream_t stream)
-{
-  nvcompLZ4FormatOpts opts{m_chunk_size};
-  nvcompStatus_t status = nvcompLZ4CompressAsync(
-      opts.chunk_size == 0 ? nullptr : &opts,
-      m_data_type,
-      in_ptr,
-      in_bytes,
-      temp_ptr,
-      temp_bytes,
-      out_ptr,
-      out_bytes,
-      stream);
-  throwExceptionIfError(status, "nvcompLZ4CompressAsync() failed");
-}
-
-inline LZ4Decompressor::LZ4Decompressor() :
-    m_metadata_ptr(nullptr),
-    m_metadata_bytes(0)
-{
-  // do nothing
-}
-
-inline LZ4Decompressor::~LZ4Decompressor()
-{
-  if (m_metadata_ptr) {
-    nvcompLZ4DestroyMetadata(m_metadata_ptr);
+    finish_init();
   }
-}
 
-inline void LZ4Decompressor::configure(
-    const void* const in_ptr,
-    const size_t in_bytes,
-    size_t* const temp_bytes,
-    size_t* const out_bytes,
-    cudaStream_t stream)
-{
-  nvcompStatus_t status = nvcompLZ4DecompressConfigure(
-      in_ptr,
-      in_bytes,
-      &m_metadata_ptr,
-      &m_metadata_bytes,
-      temp_bytes,
-      out_bytes,
-      stream);
-  throwExceptionIfError(status, "nvcompLZ4Configure() failed");
-}
+  virtual ~LZ4BatchManager() 
+  {
+    CudaUtils::check(cudaFreeHost(format_spec));
+  }
 
-inline void LZ4Decompressor::decompress_async(
-    const void* const in_ptr,
-    const size_t in_bytes,
-    void* const temp_ptr,
-    const size_t temp_bytes,
-    void* const out_ptr,
-    const size_t out_bytes,
-    cudaStream_t stream)
-{
-  nvcompStatus_t status = nvcompLZ4DecompressAsync(
-      in_ptr,
-      in_bytes,
-      m_metadata_ptr,
-      m_metadata_bytes,
-      temp_ptr,
-      temp_bytes,
-      out_ptr,
-      out_bytes,
-      stream);
-  throwExceptionIfError(status, "nvcompLZ4QeueryMetadataAsync() failed");
-}
+  LZ4BatchManager(const LZ4BatchManager&) = delete;
+  LZ4BatchManager& operator=(const LZ4BatchManager&) = delete;
+
+  size_t compute_max_compressed_chunk_size() final override 
+  {
+    size_t max_comp_chunk_size;
+    nvcompBatchedLZ4CompressGetMaxOutputChunkSize(
+        get_uncomp_chunk_size(), nvcompBatchedLZ4DefaultOpts, &max_comp_chunk_size);
+    return max_comp_chunk_size;
+  }
+
+  uint32_t compute_compression_max_block_occupancy() final override 
+  {
+    return batchedLZ4CompMaxBlockOccupancy(format_spec->data_type, device_id);
+  }
+
+  uint32_t compute_decompression_max_block_occupancy() final override 
+  {
+    return batchedLZ4DecompMaxBlockOccupancy(format_spec->data_type, device_id); 
+  }
+
+  LZ4FormatSpecHeader* get_format_header() final override 
+  {
+    return format_spec;
+  }
+
+  void do_batch_compress(const CompressArgs& compress_args) final override
+  {
+    lz4HlifBatchCompress(
+        compress_args,
+        hash_table_size,
+        get_max_comp_ctas(),
+        format_spec->data_type,
+        user_stream);
+  }
+
+  void do_batch_decompress(
+      const uint8_t* comp_data_buffer,
+      uint8_t* decomp_buffer,
+      const uint32_t num_chunks,
+      const size_t* comp_chunk_offsets,
+      const size_t* comp_chunk_sizes,
+      nvcompStatus_t* output_status) final override
+  {        
+    lz4HlifBatchDecompress(
+        comp_data_buffer,
+        decomp_buffer,
+        get_uncomp_chunk_size(),
+        ix_chunk,
+        num_chunks,
+        comp_chunk_offsets,
+        comp_chunk_sizes,
+        get_max_decomp_ctas(),
+        user_stream,
+        output_status);
+  }
+
+private: // helper overrides
+  size_t compute_scratch_buffer_size() final override
+  {
+    return get_max_comp_ctas() * (hash_table_size * sizeof(offset_type) 
+         + get_max_comp_chunk_size());
+  }  
+
+  void format_specific_init() final override 
+  {
+    hash_table_size = lowlevel::lz4GetHashTableSize(get_max_comp_chunk_size());
+  }
+};
 
 } // namespace nvcomp
-#endif

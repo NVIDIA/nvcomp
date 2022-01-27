@@ -33,172 +33,11 @@
 
 #include "src/Check.h"
 #include "src/CudaUtils.h"
-#include "src/common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
 #include "PinnedPtrs.hpp"
+#include "nvcomp/nvcompManager.hpp"
 
 namespace nvcomp {
-
-/******************************************************************************
- * CLASSES ********************************************************************
- *****************************************************************************/
-
-/**
- * @brief Config used to aggregate information about the compression of a particular buffer.
- * 
- * Contains a "PinnedPtrHandle" to an nvcompStatus. After the compression is complete,
- * the user can check the result status which resides in pinned host memory.
- */
-struct CompressionConfig {
-private: 
-  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
-
-public:
-  size_t max_compressed_buffer_size;
-
-  /**
-   * @brief Construct the config given an nvcompStatus_t memory pool
-   */
-  CompressionConfig(
-      PinnedPtrPool<nvcompStatus_t>& pool, 
-      size_t max_compressed_buffer_size)
-    : status(pool.allocate()),
-      max_compressed_buffer_size(max_compressed_buffer_size)
-  {
-    *get_status() = nvcompSuccess;
-  }
-
-  /**
-   * @brief Get the raw nvcompStatus_t*
-   */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
-};
-
-/**
- * @brief Config used to aggregate information about a particular decompression.
- * 
- * Contains a "PinnedPtrHandle" to an nvcompStatus. After the decompression is complete,
- * the user can check the result status which resides in pinned host memory.
- */
-struct DecompressionConfig {
-private: 
-  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
-
-public:
-  size_t decomp_data_size;
-  uint32_t num_chunks;
-
-  /**
-   * @brief Construct the config given an nvcompStatus_t memory pool
-   */
-  DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(pool.allocate()),
-      decomp_data_size(),
-      num_chunks()
-  {
-    *get_status() = nvcompSuccess;
-  }
-
-  /**
-   * @brief Get the raw nvcompStatus_t*
-   */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
-};
-
-/**
- * @brief Abstract base class that defines the nvCOMP high level interface
- */
-struct nvcompManagerBase {
-  /**
-   * @brief Configure the compression. 
-   *
-   * This routine computes the size of the required result buffer. The result config also
-   * contains the nvcompStatus* that allows error checking. Synchronizes the device (cudaMemcpy)
-   * 
-   * @param decomp_buffer_size The uncompressed input data size.
-   * \return comp_config Result
-   */
-  virtual CompressionConfig configure_compression(const size_t decomp_buffer_size) = 0;
-
-  /**
-   * @brief Perform compression asynchronously.
-   *
-   * @param decomp_buffer The uncompressed input data (GPU accessible).
-   * @param decomp_buffer_size The length of the uncompressed input data.
-   * @param comp_buffer The location to output the compressed data to (GPU accessible).
-   * @param comp_config Resulted from configure_compression given this decomp_buffer_size.
-   * Contains the nvcompStatus* that allows error checking. 
-   */
-  virtual void compress(
-      const uint8_t* decomp_buffer, 
-      const size_t decomp_buffer_size, 
-      uint8_t* comp_buffer,
-      const CompressionConfig& comp_config) = 0;
-
-  /**
-   * @brief Configure the decompression. 
-   *
-   * Synchronizes the user stream. 
-   * 
-   * In the base case, this only computes the size of the decompressed buffer from the compressed buffer header. 
-   * 
-   * @param comp_buffer The compressed input data (GPU accessible).
-   * \return decomp_config Result
-   */
-  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) = 0;
-
-  /**
-   * @brief Perform decompression asynchronously.
-   *
-   * @param decomp_buffer The location to output the decompressed data to (GPU accessible).
-   * @param comp_buffer The compressed input data (GPU accessible).
-   * @param decomp_config Resulted from configure_decompression given this decomp_buffer_size.
-   * Contains nvcompStatus* in CPU/GPU-accessible memory to allow error checking.
-   */
-  virtual void decompress(
-      uint8_t* decomp_buffer, 
-      const uint8_t* comp_buffer,
-      const DecompressionConfig& decomp_config) = 0;
-  
-  /**
-   * @brief Allows the user to provide a user-allocated scratch buffer.
-   * 
-   * If this routine is not called before compression / decompression is called, the manager
-   * allocates the required scratch buffer. If this is called after the manager has allocated a 
-   * scratch buffer, the manager frees the scratch buffer it allocated then switches to use 
-   * the new user-provided one.
-   * 
-   * @param new_scratch_buffer The location (GPU accessible) to use for comp/decomp scratch space
-   * 
-   */
-  virtual void set_scratch_buffer(uint8_t* new_scratch_buffer) = 0;
-
-  /** 
-   * @brief Computes the size of the required scratch space
-   * 
-   * This scratch space size is constant and based on the configuration of the manager and the 
-   * maximum occupancy on the device.
-   * 
-   * \return The required scratch buffer size
-   */ 
-  virtual size_t get_required_scratch_buffer_size() = 0;
-  
-  /** 
-   * @brief Computes the compressed output size of a given buffer 
-   * 
-   * Synchronously copies the size of the compressed buffer to a stack variable for return.
-   * 
-   * @param comp_buffer The start pointer of the compressed buffer to assess.
-   * \return Size of the compressed buffer
-   */ 
-  virtual size_t get_compressed_output_size(uint8_t* comp_buffer) = 0;
-
-  virtual ~nvcompManagerBase() = default;
-};
 
 /**
  * @brief ManagerBase contains shared functionality amongst the different nvcompManager types
@@ -283,12 +122,17 @@ public: // API
   }
 
   CompressionConfig configure_compression(const size_t decomp_buffer_size) final override
-  {
-    const size_t max_comp_size = calculate_max_compressed_output_size(decomp_buffer_size);
-    return CompressionConfig{status_pool, max_comp_size};
+  {    
+    CompressionConfig comp_config{status_pool, decomp_buffer_size};
+
+    do_configure_compression(comp_config);
+
+    comp_config.max_compressed_buffer_size = calculate_max_compressed_output_size(comp_config);
+
+    return comp_config;
   }
 
-  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) override
+  virtual DecompressionConfig configure_decompression(const uint8_t* comp_buffer) final override
   {
     const CommonHeader* common_header = reinterpret_cast<const CommonHeader*>(comp_buffer);
     DecompressionConfig decomp_config{status_pool};
@@ -302,7 +146,18 @@ public: // API
     do_configure_decompression(decomp_config, common_header);
 
     return decomp_config;
-}
+  }
+
+  virtual DecompressionConfig configure_decompression(const CompressionConfig& comp_config) final override
+  {
+    DecompressionConfig decomp_config{status_pool};
+    
+    decomp_config.decomp_data_size = comp_config.uncompressed_buffer_size;    
+    
+    do_configure_decompression(decomp_config, comp_config);
+
+    return decomp_config;
+  }
 
   void set_scratch_buffer(uint8_t* new_scratch_buffer) final override
   {
@@ -323,7 +178,6 @@ public: // API
 
   virtual void compress(
       const uint8_t* decomp_buffer, 
-      const size_t decomp_buffer_size, 
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) 
   {
@@ -346,7 +200,7 @@ public: // API
     CudaUtils::check(cudaMemsetAsync(&common_header->comp_data_size, 0, sizeof(uint64_t), user_stream));
 
     uint8_t* new_comp_buffer = comp_buffer + sizeof(CommonHeader) + sizeof(FormatSpecHeader);
-    do_compress(common_header, decomp_buffer, decomp_buffer_size, new_comp_buffer, comp_config);
+    do_compress(common_header, decomp_buffer, new_comp_buffer, comp_config);
   }
 
   virtual void decompress(
@@ -392,7 +246,6 @@ private: // helpers
   virtual void do_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer, 
-      const size_t decomp_buffer_size, 
       uint8_t* comp_buffer,
       const CompressionConfig& comp_config) = 0;
 
@@ -416,6 +269,18 @@ private: // helpers
       const CommonHeader* common_header) = 0; 
 
   /**
+   * @brief Optionally does additional decompression configuration 
+   */
+  virtual void do_configure_decompression(
+      DecompressionConfig& decomp_config,
+      const CompressionConfig& comp_config) = 0; 
+
+  /**
+   * @brief Optionally does additional compression configuration 
+   */
+  virtual void do_configure_compression(CompressionConfig&) {}
+
+  /**
    * @brief Computes the required scratch buffer size 
    */
   virtual size_t compute_scratch_buffer_size() = 0;
@@ -424,12 +289,13 @@ private: // helpers
    * @brief Computes the maximum compressed output size for a given
    * uncompressed buffer.
    */
-  virtual size_t calculate_max_compressed_output_size(size_t decomp_buffer_size) = 0;
+  virtual size_t calculate_max_compressed_output_size(CompressionConfig& comp_config) = 0;
 
   /**
    * @brief Retrieves a CPU-accessible pointer to the FormatSpecHeader
    */
   virtual FormatSpecHeader* get_format_header() = 0;
+
 };
 
 } // namespace nvcomp

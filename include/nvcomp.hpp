@@ -72,74 +72,7 @@ private:
   nvcompStatus_t m_err;
 };
 
-/**
- * @brief Top-level compressor class. This class takes in data on the device,
- * and compresses it to another location on the device.
- */
-class Compressor
-{
-public:
-  /**
-   * @brief Virtual destructor.
-   */
-  virtual ~Compressor() = default;
 
-  virtual void
-  configure(const size_t in_bytes, size_t* temp_bytes, size_t* out_bytes)
-      = 0;
-
-  /**
-   * @brief Launch asynchronous compression. If the `out_bytes` is pageable
-   * memory, this method will block.
-   *
-   * @param temp_ptr The temporary workspace on the device.
-   * @param temp_bytes The size of the temporary workspace.
-   * @param out_ptr The output location the the device (for compressed data).
-   * @param out_bytes The size of the output location on the device on input,
-   * and the size of the compressed data on output.
-   * @param stream The stream to operate on.
-   *
-   * @throw NVCompException If compression fails to launch on the stream.
-   */
-  virtual void compress_async(
-      const void* in_ptr,
-      const size_t in_bytes,
-      void* temp_ptr,
-      const size_t temp_bytes,
-      void* out_ptr,
-      size_t* out_bytes,
-      cudaStream_t stream)
-      = 0;
-};
-
-/**
- * @brief Top-level decompress class. The compression type is read from the
- * metadata at the start of the compressed data.
- */
-class Decompressor
-{
-
-public:
-  virtual ~Decompressor() = default;
-
-  virtual void configure(
-      const void* in_ptr,
-      const size_t in_bytes,
-      size_t* temp_bytes,
-      size_t* out_bytes,
-      cudaStream_t stream)
-      = 0;
-
-  virtual void decompress_async(
-      const void* in_ptr,
-      const size_t in_bytes,
-      void* temp_ptr,
-      const size_t temp_bytes,
-      void* out_ptr,
-      const size_t out_bytes,
-      cudaStream_t stream)
-      = 0;
-};
 
 /******************************************************************************
  * INLINE DEFINITIONS AND HELPER FUNCTIONS ************************************

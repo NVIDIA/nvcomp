@@ -30,8 +30,8 @@
 #include <assert.h>
 #include <iostream>
 
-#include "src/highlevel/nvcompManager.hpp"
-#include "src/highlevel/nvcompManagerFactory.hpp"
+#include "nvcomp/nvcompManager.hpp"
+#include "nvcomp/nvcompManagerFactory.hpp"
 
 /* 
   To build, execute
@@ -61,13 +61,15 @@ void execute_example(uint8_t* device_input_data, const size_t in_bytes)
   uint8_t* comp_buffer;
   cudaMalloc(&comp_buffer, comp_config.max_compressed_buffer_size);
   
-  nvcomp_manager.compress(device_input_data, in_bytes, comp_buffer, comp_config);
+  nvcomp_manager.compress(device_input_data, comp_buffer, comp_config);
 
   // Construct a new nvcomp manager from the compressed buffer.
   // Note we could use the nvcomp_manager from above, but here we demonstrate how to create a manager 
   // for the use case where a buffer is received and the user doesn't know how it was compressed
+  // Also note, creating the manager in this way synchronizes the stream, as the compressed buffer must be read to 
+  // construct the manager
   auto decomp_nvcomp_manager = create_manager(comp_buffer, stream);
-  
+
   DecompressionConfig decomp_config = decomp_nvcomp_manager->configure_decompression(comp_buffer);
   uint8_t* res_decomp_buffer;
   cudaMalloc(&res_decomp_buffer, decomp_config.decomp_data_size);

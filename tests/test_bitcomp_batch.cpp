@@ -29,7 +29,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include "nvcomp.hpp"
-#include "nvcomp/bitcomp.hpp"
+#include "nvcomp/bitcomp.h"
 
 #include "catch.hpp"
 
