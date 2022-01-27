@@ -67,9 +67,11 @@ public:
         threadblock_size,
         chunk_size>(
         1,
-        reinterpret_cast<const data_type*const*>(&this_decomp_buffer),
+        0,
+        1,
+        reinterpret_cast<const data_type* const*>(&this_decomp_buffer),
         &decomp_size,
-        reinterpret_cast<void*const*>(&tmp_output_buffer),
+        reinterpret_cast<void* const*>(&tmp_output_buffer),
         comp_chunk_size,
         options);
   }
@@ -124,6 +126,8 @@ public:
         size_type,
         threadblock_size,
         chunk_size>(
+        1,
+        0,
         1,
         reinterpret_cast<const void* const*>(&comp_buffer),
         &comp_chunk_size,

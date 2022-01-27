@@ -744,6 +744,8 @@ template <
     int chunk_size = default_chunk_size>
 __device__ void do_cascaded_compression_kernel(
     int batch_size,
+    int batch_start,
+    int batch_stride,
     const data_type* const* uncompressed_data,
     const size_type* uncompressed_bytes,
     void* const* compressed_data,
@@ -814,8 +816,8 @@ __device__ void do_cascaded_compression_kernel(
   __shared__ size_type num_outputs;
   size_type out_bytes;
 
-  for (int partition_idx = blockIdx.x; partition_idx < batch_size;
-       partition_idx += gridDim.x) {
+  for (int partition_idx = batch_start; partition_idx < batch_size;
+       partition_idx += batch_stride) {
     const auto input_buffer = uncompressed_data[partition_idx];
     const auto input_bytes = uncompressed_bytes[partition_idx];
     assert(input_bytes <= UINT32_MAX);
@@ -1087,6 +1089,8 @@ template <
     int chunk_size = default_chunk_size>
 __device__ void cascaded_decompression_fcn(
     int batch_size,
+    int batch_start,
+    int batch_stride,
     const void* const* compressed_data,
     const size_type* compressed_bytes,
     void* const* decompressed_data,
@@ -1153,8 +1157,8 @@ __device__ void cascaded_decompression_fcn(
   // RLE offsets
   uint32_t* rle_offsets = static_cast<uint32_t*>(shmem);
 
-  for (int partition_idx = blockIdx.x; partition_idx < batch_size;
-       partition_idx += gridDim.x) {
+  for (int partition_idx = batch_start; partition_idx < batch_size;
+       partition_idx += batch_stride) {
     if (compressed_data[partition_idx] == nullptr
         || compressed_bytes[partition_idx] < partition_metadata_size) {
       // Compressed buffer should at least have enough space for partition

@@ -88,6 +88,8 @@ __global__ void cascaded_compression_kernel(
       threadblock_size,
       chunk_size>(
       batch_size,
+      blockIdx.x,
+      gridDim.x,
       uncompressed_data,
       uncompressed_bytes,
       compressed_data,
@@ -151,6 +153,8 @@ __global__ void cascaded_decompression_kernel_type_check(
           size_type,
           threadblock_size>(
           batch_size,
+          blockIdx.x,
+          gridDim.x,
           compressed_data,
           compressed_bytes,
           decompressed_data,
@@ -171,6 +175,8 @@ __global__ void cascaded_decompression_kernel_type_check(
           size_type,
           threadblock_size>(
           batch_size,
+          blockIdx.x,
+          gridDim.x,
           compressed_data,
           compressed_bytes,
           decompressed_data,
@@ -191,6 +197,8 @@ __global__ void cascaded_decompression_kernel_type_check(
           size_type,
           threadblock_size>(
           batch_size,
+          blockIdx.x,
+          gridDim.x,
           compressed_data,
           compressed_bytes,
           decompressed_data,
@@ -211,6 +219,8 @@ __global__ void cascaded_decompression_kernel_type_check(
           size_type,
           threadblock_size>(
           batch_size,
+          blockIdx.x,
+          gridDim.x,
           compressed_data,
           compressed_bytes,
           decompressed_data,
