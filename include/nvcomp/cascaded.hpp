@@ -51,11 +51,10 @@ private:
 
 public:
   CascadedBatchManager(
-      size_t uncomp_chunk_size,
       const nvcompBatchedCascadedOpts_t& options = nvcompBatchedCascadedDefaultOpts,
       cudaStream_t user_stream = 0,
-      int device_id = 0)
-    : BatchManager(uncomp_chunk_size, user_stream, device_id),
+      int device_id = 0) :
+      BatchManager(options.chunk_size, user_stream, device_id),
       format_spec()
   {
     CudaUtils::check(cudaHostAlloc(
