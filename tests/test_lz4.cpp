@@ -229,8 +229,10 @@ TEST_CASE("comp/decomp LZ4-chunksizes-uint64", "[nvcomp][small]")
 
   const size_t num = 2000000;
 
+  // NOTE: the LZ4 scratch space for HLIF scales with the maximum number of
+  // CTAs and the chunk size, so very large chunks would result in OOM
   std::vector<size_t> chunk_sizes{
-      32768, 32769, 50000, 65535, 65536, 90103, 16777216};
+      32768, 32769, 50000, 65535, 65536, 90103};
 
   for (const size_t chunk : chunk_sizes) {
     std::vector<T> input = buildRuns<T>(num, 5);
