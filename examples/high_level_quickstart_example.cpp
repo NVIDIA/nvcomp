@@ -66,8 +66,10 @@ void execute_example(uint8_t* device_input_data, const size_t in_bytes)
   // Construct a new nvcomp manager from the compressed buffer.
   // Note we could use the nvcomp_manager from above, but here we demonstrate how to create a manager 
   // for the use case where a buffer is received and the user doesn't know how it was compressed
+  // Also note, creating the manager in this way synchronizes the stream, as the compressed buffer must be read to 
+  // construct the manager
   auto decomp_nvcomp_manager = create_manager(comp_buffer, stream);
-  
+
   DecompressionConfig decomp_config = decomp_nvcomp_manager->configure_decompression(comp_buffer);
   uint8_t* res_decomp_buffer;
   cudaMalloc(&res_decomp_buffer, decomp_config.decomp_data_size);

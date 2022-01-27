@@ -103,7 +103,7 @@ __device__ inline void fill_common_header(
   compress_args.common_header->comp_data_offset = (uintptr_t)compress_args.comp_buffer - (uintptr_t)compress_args.common_header;
 }
 
-__device__ inline void copyscratchBuffer(
+__device__ inline void copyScratchBuffer(
     size_t* comp_chunk_offsets,
     size_t* comp_chunk_sizes,
     const uint8_t* scratch_output_buffer,
@@ -179,7 +179,7 @@ __device__ inline void HlifCompressBatch(
 
     __syncthreads();
 
-    copyscratchBuffer(
+    copyScratchBuffer(
         compression_args.comp_chunk_offsets,
         compression_args.comp_chunk_sizes,
         scratch_output_buffer,

@@ -156,7 +156,7 @@ struct nvcompManagerBase {
    * 
    * In the base case, this only computes the size of the decompressed buffer from the compressed buffer header. 
    * 
-   * @param comp_buffer The compressed input data (GPU accessible).
+   * @param comp_config The config used to compress a buffer
    * \return decomp_config Result
    */
   virtual DecompressionConfig configure_decompression(const CompressionConfig& comp_config) = 0;
