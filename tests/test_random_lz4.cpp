@@ -75,23 +75,23 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
     CUDA_CHECK(
         cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
-    LZ4BatchManager batch_manager(chunk_size, NVCOMP_TYPE_CHAR, stream);
+    LZ4Manager lz4_manager(chunk_size, NVCOMP_TYPE_CHAR, stream);
     
-    auto comp_config = batch_manager.configure_compression(in_bytes);
+    auto comp_config = lz4_manager.configure_compression(in_bytes);
     CUDA_CHECK(cudaMalloc(&d_comp_out, comp_config.max_compressed_buffer_size));
 
     size_t* comp_out_bytes_ptr;
     CUDA_CHECK(cudaMallocHost(
         (void**)&comp_out_bytes_ptr, sizeof(*comp_out_bytes_ptr)));
 
-    batch_manager.compress(
+    lz4_manager.compress(
         d_in_data,
         d_comp_out,
         comp_config);
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
     
-    size_t comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
+    size_t comp_out_bytes = lz4_manager.get_compressed_output_size(d_comp_out);
 
     cudaFree(d_in_data);
 
@@ -104,22 +104,22 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
     // the compressed data and the stream is passed
     // between compression and decompression
 
-    LZ4BatchManager batch_manager(chunk_size, NVCOMP_TYPE_CHAR, stream);
+    LZ4Manager lz4_manager(chunk_size, NVCOMP_TYPE_CHAR, stream);
     
-    auto decomp_config = batch_manager.configure_decompression(d_comp_out);
+    auto decomp_config = lz4_manager.configure_decompression(d_comp_out);
 
-    const auto temp_bytes = batch_manager.get_required_scratch_buffer_size();
+    const auto temp_bytes = lz4_manager.get_required_scratch_buffer_size();
 
     uint8_t* temp_ptr;
     cudaMalloc(&temp_ptr, temp_bytes);
-    batch_manager.set_scratch_buffer(temp_ptr);
+    lz4_manager.set_scratch_buffer(temp_ptr);
 
     uint8_t* out_ptr = NULL;
     cudaMalloc(&out_ptr, decomp_config.decomp_data_size);
 
     auto start = std::chrono::steady_clock::now();
 
-    batch_manager.decompress(
+    lz4_manager.decompress(
         out_ptr,
         d_comp_out,
         decomp_config);

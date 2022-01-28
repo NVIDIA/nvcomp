@@ -55,7 +55,7 @@ void execute_example(uint8_t* device_input_data, const size_t in_bytes)
   const int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
-  LZ4BatchManager nvcomp_manager{chunk_size, data_type, stream};
+  LZ4Manager nvcomp_manager{chunk_size, data_type, stream};
   CompressionConfig comp_config = nvcomp_manager.configure_compression(in_bytes);
 
   uint8_t* comp_buffer;

@@ -99,9 +99,9 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  SnappyBatchManager batch_manager{chunk_size, stream};
+  SnappyManager manager{chunk_size, stream};
 
-  run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
+  run_benchmark_from_file(fname, manager, verbose_memory, stream);
   CudaUtils::check(cudaStreamDestroy(stream));
 
   return 0;

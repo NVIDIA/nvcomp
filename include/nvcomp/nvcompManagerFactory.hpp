@@ -52,7 +52,7 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
       CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(LZ4FormatSpecHeader), cudaMemcpyDefault, stream));
       CudaUtils::check(cudaStreamSynchronize(stream));
 
-      res = std::make_shared<LZ4BatchManager>(cpu_common_header.uncomp_chunk_size, format_spec.data_type, stream, device_id);
+      res = std::make_shared<LZ4Manager>(cpu_common_header.uncomp_chunk_size, format_spec.data_type, stream, device_id);
       break;
     }
     case FormatType::Snappy: 
@@ -62,7 +62,7 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
       CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(SnappyFormatSpecHeader), cudaMemcpyDefault, stream));
       CudaUtils::check(cudaStreamSynchronize(stream));
       
-      res = std::make_shared<SnappyBatchManager>(cpu_common_header.uncomp_chunk_size, stream, device_id);
+      res = std::make_shared<SnappyManager>(cpu_common_header.uncomp_chunk_size, stream, device_id);
       break;
     }
     case FormatType::GDeflate: 

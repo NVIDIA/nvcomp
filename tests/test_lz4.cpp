@@ -81,7 +81,7 @@ void test_lz4(const std::vector<T>& input, nvcompType_t data_type, const size_t 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  LZ4BatchManager manager{chunk_size, data_type, stream};
+  LZ4Manager manager{chunk_size, data_type, stream};
   auto comp_config = manager.configure_compression(in_bytes);
 
   // Allocate output buffer
