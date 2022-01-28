@@ -26,15 +26,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VERBOSE
-#define VERBOSE 0
-#endif
-
 #include "nvcomp/lz4.hpp"
 #include "benchmark_hlif.hpp"
 
 #include <string.h>
-#include <string>
 
 using namespace nvcomp;
 

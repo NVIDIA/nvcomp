@@ -26,10 +26,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VERBOSE
-#define VERBOSE 0
-#endif
-
 #include "nvcomp/cascaded.hpp"
 #include "benchmark_hlif.hpp"
 
