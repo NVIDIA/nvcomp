@@ -132,12 +132,15 @@ public:
 private: // helper overrides
   size_t compute_scratch_buffer_size() final override
   {
+    // TODO: reuse this code from gdeflate
+    constexpr size_t gdeflate_hash_table_size = 1U << 14;
     size_t chunk_size = get_uncomp_chunk_size();
     size_t tmp_space = sizeof(unsigned int)          + // num_symbols
                        sizeof(unsigned int)          + // num_literals
                        chunk_size * sizeof(uint16_t) + // length
                        chunk_size * sizeof(uint16_t) + // distance
-                       chunk_size * sizeof(uint8_t);   // literals
+                       chunk_size * sizeof(uint8_t)  + // literals
+                       gdeflate_hash_table_size * sizeof(uint16_t); // Hash tables
     tmp_space = ((tmp_space + 3) & (~3)); // round up to nearest 4 byte
     return get_max_comp_ctas() * (tmp_space + get_max_comp_chunk_size());
   }  
