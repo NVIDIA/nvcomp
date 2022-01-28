@@ -37,7 +37,6 @@
 
 namespace nvcomp {
 
-/*
 GdeflateManager implementation
 
 GdeflateManager::GdeflateManager(
@@ -54,7 +53,5 @@ GdeflateManager::GdeflateManager(
 
 GdeflateManager::~GdeflateManager() 
 {}
-*/
-
 
 } // namespace nvcomp

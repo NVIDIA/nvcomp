@@ -32,7 +32,6 @@
 
 #include "nvcompManager.hpp"
 
-/*
 namespace nvcomp {
 
 struct GdeflateManager : PimplManager {
@@ -41,7 +40,6 @@ struct GdeflateManager : PimplManager {
 
   ~GdeflateManager();
 };
-*/
 
 } // namespace nvcomp
 
