@@ -29,6 +29,7 @@
  */
 
 #ifdef ENABLE_BITCOMP
+#include <assert.h>
 
 #include "src/CudaUtils.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
