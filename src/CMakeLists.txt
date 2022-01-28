@@ -50,6 +50,9 @@ target_include_directories(nvcomp PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>")
 target_include_directories(nvcomp PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
+target_include_directories(nvcomp PUBLIC
+    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}>")
+
 if(DEFINED CUB_DIR)
   target_include_directories(nvcomp PRIVATE "${CUB_DIR}")
 endif()

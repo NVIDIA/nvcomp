@@ -34,10 +34,11 @@
 
 #include "GdeflateHlifKernels.h"
 #include "GdeflateBatchManager.hpp"
+#include "nvcomp/gdeflate.hpp"
 
 namespace nvcomp {
 
-GdeflateManager implementation
+// GdeflateManager implementation
 
 GdeflateManager::GdeflateManager(
     size_t uncomp_chunk_size, 
