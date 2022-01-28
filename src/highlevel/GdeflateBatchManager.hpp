@@ -38,7 +38,9 @@
 #include "nvcomp_common_deps/hlif_shared_types.h"
 #include "BatchManager.hpp"
 
+#ifdef ENABLE_GDEFLATE
 #include "GdeflateHlifKernels.h"
+#endif
 
 namespace nvcomp {
 
@@ -87,12 +89,22 @@ public:
 
   uint32_t compute_compression_max_block_occupancy() final override 
   {
+#ifdef ENABLE_GDEFLATE
     return gdeflate::hlif::batchedGdeflateCompMaxBlockOccupancy(device_id);
+#else
+    throw std::runtime_error("nvcomp configured without gdeflate support. Please check the README for configuration instructions");
+    return 0;
+#endif
   }
 
   uint32_t compute_decompression_max_block_occupancy() final override 
   {
+#ifdef ENABLE_GDEFLATE
     return gdeflate::hlif::batchedGdeflateDecompMaxBlockOccupancy(device_id); 
+#else
+    throw std::runtime_error("nvcomp configured without gdeflate support. Please check the README for configuration instructions");
+    return 0;
+#endif
   }
 
   nvcompBatchedGdeflateOpts_t* get_format_header() final override 
@@ -102,10 +114,15 @@ public:
 
   void do_batch_compress(const CompressArgs& compress_args) final override
   {
+#ifdef ENABLE_GDEFLATE
     gdeflate::hlif::gdeflateHlifBatchCompress(
         compress_args,
         get_max_comp_ctas(),
         user_stream);
+#else
+    (void)compress_args;
+    throw std::runtime_error("nvcomp configured without gdeflate support. Please check the README for configuration instructions");
+#endif
   }
 
   void do_batch_decompress(
@@ -116,6 +133,7 @@ public:
       const size_t* comp_chunk_sizes,
       nvcompStatus_t* output_status) final override
   {        
+#ifdef ENABLE_GDEFLATE
     gdeflate::hlif::gdeflateHlifBatchDecompress(
         comp_data_buffer,
         decomp_buffer,
@@ -127,6 +145,15 @@ public:
         get_max_decomp_ctas(),
         user_stream,
         output_status);
+#else
+    (void)comp_data_buffer;
+    (void)decomp_buffer;
+    (void)num_chunks;
+    (void)comp_chunk_offsets;
+    (void)comp_chunk_sizes;
+    (void)output_status;
+    throw std::runtime_error("nvcomp configured without gdeflate support. Please check the README for configuration instructions");
+#endif
   }
 
 private: // helper overrides

@@ -26,13 +26,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-#include "nvcomp/gdeflate.h"
-#include "src/common.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
-#include "BatchManager.hpp"
-
-#include "GdeflateHlifKernels.h"
 #include "GdeflateBatchManager.hpp"
 #include "nvcomp/gdeflate.hpp"
 
