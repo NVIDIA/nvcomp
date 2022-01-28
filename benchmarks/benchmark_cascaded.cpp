@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
   options.num_RLEs = num_rles;
   options.num_deltas = num_deltas;
   options.use_bp = (num_bps != 0);
-  CascadedBatchManager batch_manager{options, stream};
+  CascadedManager batch_manager{options, stream};
 
   run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
   CudaUtils::check(cudaStreamDestroy(stream));

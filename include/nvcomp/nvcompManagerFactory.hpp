@@ -104,7 +104,7 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
 
       assert(cpu_common_header.uncomp_chunk_size == format_spec.options.chunk_size);
 
-      res = std::make_shared<CascadedBatchManager>(format_spec.options, stream, device_id);
+      res = std::make_shared<CascadedManager>(format_spec.options, stream, device_id);
       break;
     }
     case FormatType::NotSupportedError:

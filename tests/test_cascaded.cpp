@@ -83,7 +83,7 @@ void test_cascaded(const std::vector<T>& input, nvcompType_t data_type)
 
   nvcompBatchedCascadedOpts_t options = nvcompBatchedCascadedDefaultOpts;
   options.type = data_type;
-  CascadedBatchManager manager{options, stream};
+  CascadedManager manager{options, stream};
   auto comp_config = manager.configure_compression(in_bytes);
 
   // Allocate output buffer

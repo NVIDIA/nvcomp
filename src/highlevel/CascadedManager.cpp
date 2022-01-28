@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *
@@ -28,22 +26,4 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cascaded.h"
-#include "nvcompManager.hpp"
-
-namespace nvcomp {
-
-struct CascadedFormatSpecHeader {
-  nvcompBatchedCascadedOpts_t options;
-};
-
-struct CascadedManager : PimplManager {
-  CascadedManager(
-      const nvcompBatchedCascadedOpts_t& options = nvcompBatchedCascadedDefaultOpts,
-      cudaStream_t user_stream = 0,
-      int device_id = 0);
-
-  virtual ~CascadedManager();
-};
-
-} // namespace nvcomp
+#include "CascadedManager.hpp"
