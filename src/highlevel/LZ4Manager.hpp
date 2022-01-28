@@ -130,7 +130,7 @@ private: // helper overrides
 
   void format_specific_init() final override 
   {
-    hash_table_size = lowlevel::lz4GetHashTableSize(get_max_comp_chunk_size());
+    hash_table_size = lowlevel::lz4GetHashTableSize(get_uncomp_chunk_size());
   }
 };
 
