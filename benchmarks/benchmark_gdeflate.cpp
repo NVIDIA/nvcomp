@@ -26,15 +26,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VERBOSE
-#define VERBOSE 0
-#endif
-
 #include "nvcomp/gdeflate.hpp"
 #include "benchmark_hlif.hpp"
 
 #include <string.h>
-#include <string>
 
 using namespace nvcomp;
 
@@ -93,6 +88,7 @@ int main(int argc, char* argv[])
 
   if (fname == NULL) {
     print_usage();
+    return 1;
   }
 
   cudaSetDevice(gpu_num);
