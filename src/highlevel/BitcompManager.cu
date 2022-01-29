@@ -35,6 +35,7 @@
 #include "nvcomp/nvcompManager.hpp"
 #include "src/highlevel/ManagerBase.hpp"
 #include "nvcomp/bitcomp.hpp"
+#include "BitcompManager.hpp"
 
 #ifdef ENABLE_BITCOMP
 
@@ -107,7 +108,7 @@ namespace nvcomp {
    * @param comp_config Resulted from configure_compression given this decomp_buffer_size.
    * 
    */
-  void BitcompManager::do_compress(
+  void BitcompSingleStreamManager::do_compress(
       CommonHeader* common_header,
       const uint8_t* decomp_buffer, 
       uint8_t* comp_buffer,
@@ -147,7 +148,7 @@ namespace nvcomp {
    * @param comp_buffer The compressed input data (GPU accessible).
    * @param decomp_config Resulted from configure_decompression given this decomp_buffer_size.
    */
-  void BitcompManager::do_decompress(
+  void BitcompSingleStreamManager::do_decompress(
       uint8_t* decomp_buffer, 
       const uint8_t* comp_buffer,
       const DecompressionConfig& config)
@@ -173,7 +174,7 @@ namespace nvcomp {
    * @brief Computes the maximum compressed output size for a given
    * uncompressed buffer.
    */
-  size_t BitcompManager::calculate_max_compressed_output_size(CompressionConfig& comp_config)
+  size_t BitcompSingleStreamManager::calculate_max_compressed_output_size(CompressionConfig& comp_config)
   {
     return bitcompMaxBuflen (comp_config.uncompressed_buffer_size);
   }

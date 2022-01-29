@@ -29,11 +29,8 @@
  */
 
 #ifdef ENABLE_BITCOMP
-#include <assert.h>
 
-#include "src/CudaUtils.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/ManagerBase.hpp"
+#include "nvcompManager.hpp"
 
 namespace nvcomp {
 
@@ -42,94 +39,11 @@ struct BitcompFormatSpecHeader {
   int algo;
 };
 
-struct BitcompManager : ManagerBase<BitcompFormatSpecHeader> {
-private:
-  BitcompFormatSpecHeader* format_spec;
+struct BitcompManager : PimplManager {
 
-public:
-  BitcompManager(nvcompType_t data_type, int bitcomp_algo = 0, cudaStream_t user_stream = 0, const int device_id = 0)
-    : ManagerBase(user_stream, device_id),      
-      format_spec()
-  {
-    CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(BitcompFormatSpecHeader), cudaHostAllocDefault));
-    format_spec->data_type = data_type;
-    format_spec->algo = bitcomp_algo;
+  BitcompManager(nvcompType_t data_type, int bitcomp_algo = 0, cudaStream_t user_stream = 0, const int device_id = 0);
 
-    finish_init();
-  }
-
-  virtual ~BitcompManager() 
-  {
-    CudaUtils::check(cudaFreeHost(format_spec));
-  }
-
-  BitcompManager(const BitcompManager&) = delete;
-  BitcompManager& operator=(const BitcompManager&) = delete;
-
-  /**
-   * @brief Required helper that actually does the compression 
-   * 
-   * @param common_header header filled in by this routine (GPU accessible)
-   * @param decomp_buffer The uncompressed input data (GPU accessible)
-   * @param decomp_buffer_size The length of the uncompressed input data
-   * @param comp_buffer The location to output the compressed data to (GPU accessible).
-   * @param comp_config Resulted from configure_compression given this decomp_buffer_size.
-   * 
-   */
-  void do_compress(
-      CommonHeader* common_header,
-      const uint8_t* decomp_buffer, 
-      uint8_t* comp_buffer,
-      const CompressionConfig& comp_config) final override;
-
-
-  /**
-   * @brief Required helper that actually does the decompression 
-   *
-   * @param decomp_buffer The location to output the decompressed data to (GPU accessible).
-   * @param comp_buffer The compressed input data (GPU accessible).
-   * @param decomp_config Resulted from configure_decompression given this decomp_buffer_size.
-   */
-  void do_decompress(
-      uint8_t* decomp_buffer, 
-      const uint8_t* comp_buffer,
-      const DecompressionConfig& config) final override;
-
-  /**
-   * @brief Optionally does additional decompression configuration 
-   */
-  void do_configure_decompression(DecompressionConfig&, const CommonHeader*) final override
-  {
-  }
-
-  /**
-   * @brief Optionally does additional decompression configuration
-   */
-  void do_configure_decompression(DecompressionConfig&, const CompressionConfig&) final override
-  {
-  }
-
-  /**
-   * @brief Computes the required scratch buffer size 
-   */
-  size_t compute_scratch_buffer_size() final override
-  {
-    return 0;
-  }
-
-  /**
-   * @brief Computes the maximum compressed output size for a given
-   * uncompressed buffer.
-   */
-  size_t calculate_max_compressed_output_size(CompressionConfig& comp_config) final override;
-
-  /**
-   * @brief Retrieves a CPU-accessible pointer to the FormatSpecHeader
-   */
-  BitcompFormatSpecHeader* get_format_header() final override
-  {
-    return format_spec;
-  }
+  ~BitcompManager();
 };
 
 } // namespace nvcomp
