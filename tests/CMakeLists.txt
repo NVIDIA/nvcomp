@@ -1,5 +1,9 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.c)
 
+if(NOT gdeflate_FOUND)
+list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "test_gdeflate_batch_c_api.c")
+list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "test_gdeflate.cpp")
+endif()
 if(NOT ans_FOUND)
 list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "test_ans_batch_c_api.c")
 endif()
