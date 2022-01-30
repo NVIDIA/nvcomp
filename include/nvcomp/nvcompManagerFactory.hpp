@@ -28,6 +28,7 @@
 
 
 #include "nvcompManager.hpp"
+#include "ans.hpp"
 #include "lz4.hpp"
 #include "snappy.hpp"
 #include "bitcomp.hpp"
@@ -86,7 +87,12 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
     }
     case FormatType::ANS: 
     {
-      // TODO
+      ANSFormatSpecHeader format_spec;
+      const ANSFormatSpecHeader* gpu_format_header = reinterpret_cast<const ANSFormatSpecHeader*>(comp_buffer + sizeof(CommonHeader));
+      CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(ANSFormatSpecHeader), cudaMemcpyDefault, stream));
+      CudaUtils::check(cudaStreamSynchronize(stream));
+
+      res = std::make_shared<ANSManager>(cpu_common_header.uncomp_chunk_size, stream, device_id);
       break;
     }
     case FormatType::Cascaded: 

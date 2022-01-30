@@ -52,7 +52,9 @@ namespace nvcomp {
  *   some usage trickery is suggested to get around dependent name lookup issues.
  *   https://en.cppreference.com/w/cpp/language/dependent_name
  *   
- */  
+ */
+#include <assert.h>
+
 template <typename FormatSpecHeader>
 struct ManagerBase : nvcompManagerBase {
 
