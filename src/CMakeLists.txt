@@ -44,6 +44,8 @@ target_include_directories(nvcomp PUBLIC
   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 endif()
 
+include_directories("./src")
+
 # dependencies of this target, should only include from `include/`
 target_include_directories(nvcomp PRIVATE
     "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/src>")
