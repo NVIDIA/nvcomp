@@ -51,6 +51,7 @@ typedef struct
  * Compression algorithm to use. Permitted values are:
  * 0 : high-throughput, low compression ratio (default)
  * 1 : low-throughput, high compression ratio
+ * 2 : highest-throughput, entropy-only compression (use for symmetric compression/decompression performance)
  */
   int algo;
 } nvcompBatchedGdeflateOpts_t;
