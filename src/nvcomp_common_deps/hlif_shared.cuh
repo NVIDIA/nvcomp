@@ -141,7 +141,7 @@ __device__ inline void HlifCompressBatch(
     const CompressArgs& compression_args,
     CompressT&& compressor)
 {
-  if (blockIdx.x == 0 and threadIdx.x == 0) {
+  if (blockIdx.x == 0 && threadIdx.x == 0) {
     fill_common_header(
         compression_args, 
         compressor.get_format_type());
@@ -171,7 +171,10 @@ __device__ inline void HlifCompressBatch(
 
     // Determine the right place to output this buffer.
     if (threadIdx.x == 0) {
-      static_assert(sizeof(uint64_t) == sizeof(unsigned long long int));
+      static_assert(
+          sizeof(uint64_t) == sizeof(unsigned long long int),
+          "The cast below assumes that uint64_t and unsigned long long int are "
+          "the same size.");
       compression_args.comp_chunk_offsets[this_ix_chunk] = atomicAdd(
           reinterpret_cast<unsigned long long int*>(compression_args.ix_output), 
           compression_args.comp_chunk_sizes[this_ix_chunk]);

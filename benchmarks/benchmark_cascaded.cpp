@@ -26,7 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "nvcomp/lz4.hpp"
+#include "nvcomp/cascaded.hpp"
 #include "benchmark_hlif.hpp"
 
 #include <string.h>
@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
   char* fname = NULL;
   int gpu_num = 0;
   int verbose_memory = 0;
-  nvcompType_t data_type = NVCOMP_TYPE_CHAR;
+  nvcompBatchedCascadedOpts_t options = nvcompBatchedCascadedDefaultOpts;
 
   // Parse command-line arguments
   char** argv_end = argv + argc;
@@ -84,15 +84,29 @@ int main(int argc, char* argv[])
     }
     if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
       if (strcmp(optarg, "char") == 0) {
-        data_type = NVCOMP_TYPE_CHAR;
+        options.type = NVCOMP_TYPE_CHAR;
       } else if (strcmp(optarg, "short") == 0) {
-        data_type = NVCOMP_TYPE_SHORT;
+        options.type = NVCOMP_TYPE_SHORT;
       } else if (strcmp(optarg, "int") == 0) {
-        data_type = NVCOMP_TYPE_INT;
+        options.type = NVCOMP_TYPE_INT;
+      } else if (strcmp(optarg, "longlong") == 0) {
+        options.type = NVCOMP_TYPE_LONGLONG;
       } else {
         print_usage();
         return 1;
       }
+      continue;
+    }
+    if (strcmp(arg, "--num_rles") == 0 || strcmp(arg, "-r") == 0) {
+      options.num_RLEs = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--num_deltas") == 0 || strcmp(arg, "-d") == 0) {
+      options.num_deltas = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--num_bps") == 0 || strcmp(arg, "-b") == 0) {
+      options.use_bp = (atoi(optarg) != 0);
       continue;
     }
 
@@ -110,7 +124,7 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  LZ4Manager batch_manager{chunk_size, data_type, stream};
+  CascadedManager batch_manager{options, stream};
 
   run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
   CudaUtils::check(cudaStreamDestroy(stream));
