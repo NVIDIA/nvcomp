@@ -22,9 +22,6 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
     # cudart_static.lib is already included.
     target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::nvml)
   endif()
-  target_include_directories(${BARE_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
-  target_include_directories(${BARE_NAME} PRIVATE
-      "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}>")
   target_include_directories(${BARE_NAME} PRIVATE
       "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/include>")
 endforeach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
