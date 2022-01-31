@@ -101,6 +101,7 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
       CascadedFormatSpecHeader format_spec;
       const CascadedFormatSpecHeader* gpu_format_header = reinterpret_cast<const CascadedFormatSpecHeader*>(comp_buffer + sizeof(CommonHeader));
       CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(CascadedFormatSpecHeader), cudaMemcpyDefault, stream));
+      CudaUtils::check(cudaStreamSynchronize(stream));
 
       assert(cpu_common_header.uncomp_chunk_size == format_spec.options.chunk_size);
 
