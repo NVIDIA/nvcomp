@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "nvcompManager.hpp"
+#include "gdeflate.h"
 
 namespace nvcomp {
 

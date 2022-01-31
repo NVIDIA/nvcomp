@@ -29,7 +29,6 @@
 
 #include "nvcompManager.hpp"
 #include "ans.hpp"
-#include "gdeflate.h"
 #include "gdeflate.hpp"
 #include "lz4.hpp"
 #include "snappy.hpp"
