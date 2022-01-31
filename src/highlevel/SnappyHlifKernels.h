@@ -29,7 +29,7 @@
 #pragma once
 
 #include "nvcomp.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 
 namespace nvcomp {
 

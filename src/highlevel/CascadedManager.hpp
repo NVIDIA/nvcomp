@@ -35,7 +35,7 @@
 #include "CudaUtils.h"
 #include "common.h"
 #include "nvcomp/cascaded.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 #include "highlevel/CascadedHlifKernels.h"
 #include "highlevel/BatchManager.hpp"
 
