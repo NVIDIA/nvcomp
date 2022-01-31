@@ -44,6 +44,7 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
   const CommonHeader* common_header = reinterpret_cast<const CommonHeader*>(comp_buffer);
   CommonHeader cpu_common_header;
   CudaUtils::check(cudaMemcpyAsync(&cpu_common_header, common_header, sizeof(CommonHeader), cudaMemcpyDefault, stream));
+  CudaUtils::check(cudaStreamSynchronize(stream));
 
   std::shared_ptr<nvcompManagerBase> res;
 
