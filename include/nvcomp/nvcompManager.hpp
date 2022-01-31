@@ -34,8 +34,8 @@
 // TODO: remove these dependencies on src/
 #include "Check.h"
 #include "CudaUtils.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
 #include "highlevel/PinnedPtrs.hpp"
+#include "nvcomp_common_deps/hlif_shared_types.h"
 
 namespace nvcomp {
 

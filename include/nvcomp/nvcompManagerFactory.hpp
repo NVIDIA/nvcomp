@@ -125,5 +125,4 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
   return res;
 }
 
-} // namespace nvcomp 
- 
+} // namespace nvcomp
