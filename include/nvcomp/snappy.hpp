@@ -30,13 +30,7 @@
 
 #include <memory>
 
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "src/common.h"
-#include "nvcomp/snappy.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/SnappyHlifKernels.h"
-#include "src/highlevel/BatchManager.hpp"
+#include "nvcompManager.hpp"
 
 namespace nvcomp {
 

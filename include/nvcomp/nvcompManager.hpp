@@ -31,10 +31,11 @@
 #include <memory>
 #include <vector>
 
-#include "src/Check.h"
-#include "src/CudaUtils.h"
+// TODO: remove these dependencies on src/
+#include "Check.h"
+#include "CudaUtils.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/PinnedPtrs.hpp"
+#include "highlevel/PinnedPtrs.hpp"
 
 namespace nvcomp {
 

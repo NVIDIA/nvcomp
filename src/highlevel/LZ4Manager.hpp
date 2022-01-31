@@ -31,14 +31,15 @@
 #include <memory>
 
 #include "nvcomp/lz4.hpp"
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "src/lowlevel/LZ4CompressionKernels.h"
-#include "src/highlevel/LZ4HlifKernels.h"
 #include "nvcomp/lz4.h"
-#include "src/common.h"
+
+#include "Check.h"
+#include "CudaUtils.h"
+#include "lowlevel/LZ4CompressionKernels.h"
+#include "LZ4HlifKernels.h"
+#include "common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/BatchManager.hpp"
+#include "BatchManager.hpp"
 
 namespace nvcomp {
 
