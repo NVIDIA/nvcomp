@@ -29,6 +29,7 @@
 
 #include "nvcompManager.hpp"
 #include "ans.hpp"
+#include "gdeflate.hpp"
 #include "lz4.hpp"
 #include "snappy.hpp"
 #include "bitcomp.hpp"
@@ -71,7 +72,12 @@ std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cu
     }
     case FormatType::GDeflate: 
     {
-      // TODO
+      nvcompBatchedGdeflateOpts_t format_spec;
+      const nvcompBatchedGdeflateOpts_t* gpu_format_header = reinterpret_cast<const nvcompBatchedGdeflateOpts_t*>(comp_buffer + sizeof(CommonHeader));
+      CudaUtils::check(cudaMemcpyAsync(&format_spec, gpu_format_header, sizeof(nvcompBatchedGdeflateOpts_t), cudaMemcpyDefault, stream));
+      CudaUtils::check(cudaStreamSynchronize(stream));
+
+      res = std::make_shared<GdeflateManager>(cpu_common_header.uncomp_chunk_size, format_spec.algo, stream, device_id);
       break;
     }
     case FormatType::Bitcomp: 
