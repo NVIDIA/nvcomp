@@ -24,8 +24,6 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   endif()
   target_include_directories(${BARE_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
   target_include_directories(${BARE_NAME} PRIVATE
-    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/src>")
-  target_include_directories(${BARE_NAME} PRIVATE
       "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}>")
   target_include_directories(${BARE_NAME} PRIVATE
       "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/include>")
