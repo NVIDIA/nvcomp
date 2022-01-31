@@ -53,7 +53,9 @@ void cascadedHlifBatchDecompress(
     nvcompStatus_t* output_status,
     const nvcompBatchedCascadedOpts_t* options);
 
-size_t cascadedHlifDecompMaxBlockOccupancy(const int device_id);
-size_t cascadedHlifCompMaxBlockOccupancy(const int device_id);
+size_t
+cascadedHlifDecompMaxBlockOccupancy(const int device_id, nvcompType_t type);
+size_t
+cascadedHlifCompMaxBlockOccupancy(const int device_id, nvcompType_t type);
 
 } // namespace nvcomp

@@ -80,12 +80,14 @@ public:
 
   uint32_t compute_compression_max_block_occupancy() final override
   {
-    return cascadedHlifCompMaxBlockOccupancy(device_id);
+    return cascadedHlifCompMaxBlockOccupancy(
+        device_id, format_spec->options.type);
   }
 
   uint32_t compute_decompression_max_block_occupancy() final override
   {
-    return cascadedHlifDecompMaxBlockOccupancy(device_id);
+    return cascadedHlifDecompMaxBlockOccupancy(
+        device_id, format_spec->options.type);
   }
 
   CascadedFormatSpecHeader* get_format_header() final override

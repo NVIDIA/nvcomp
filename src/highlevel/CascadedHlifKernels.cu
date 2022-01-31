@@ -257,44 +257,104 @@ void cascadedHlifBatchDecompress(
 
 }
 
-size_t cascadedHlifCompMaxBlockOccupancy(const int device_id)
+size_t cascadedHlifCompMaxBlockOccupancy(const int device_id, nvcompType_t type)
 {
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
-  // FIXME: Handle shared memory!
-  constexpr int shmem_size = 0;
+  int numBlocksPerSM = 1;
+  // This kernel only uses fixed-size shared memory, not shared memory
+  // determined at kernel invocation time.
+  constexpr int runtime_shmem_size = 0;
   constexpr int threadblock_size = cascaded_compress_threadblock_size;
-  // FIXME: Handle other data types!
-  cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &numBlocksPerSM, 
-      HlifCompressBatchKernel<
-          cascaded_compress_wrapper<uint8_t, size_t, threadblock_size>,
-          const nvcompBatchedCascadedOpts_t&>,
-      cascaded_compress_threadblock_size, // threads per block 
-      shmem_size);
-  
+  // The values will almost certainly be identical for all data types,
+  // but just in case, handle types separately.
+  if (type == NVCOMP_TYPE_CHAR || type == NVCOMP_TYPE_UCHAR) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifCompressBatchKernel<
+            cascaded_compress_wrapper<uint8_t, size_t, threadblock_size>,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_SHORT || type == NVCOMP_TYPE_USHORT) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifCompressBatchKernel<
+            cascaded_compress_wrapper<uint16_t, size_t, threadblock_size>,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_INT || type == NVCOMP_TYPE_UINT) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifCompressBatchKernel<
+            cascaded_compress_wrapper<uint32_t, size_t, threadblock_size>,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_LONGLONG || type == NVCOMP_TYPE_ULONGLONG) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifCompressBatchKernel<
+            cascaded_compress_wrapper<uint64_t, size_t, threadblock_size>,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  }
+
   return deviceProp.multiProcessorCount * numBlocksPerSM;
 }
 
-size_t cascadedHlifDecompMaxBlockOccupancy(const int device_id)
+size_t cascadedHlifDecompMaxBlockOccupancy(
+    const int device_id, nvcompType_t type)
 {
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, device_id);
-  int numBlocksPerSM;
-  // FIXME: Handle shared memory!
-  constexpr int shmem_size = 0;
+  int numBlocksPerSM = 1;
+  // This kernel only uses fixed-size shared memory, not shared memory
+  // determined at kernel invocation time.
+  constexpr int runtime_shmem_size = 0;
   constexpr int threadblock_size = cascaded_decompress_threadblock_size;
-  // FIXME: Handle other data types!
-  cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &numBlocksPerSM, 
-      HlifDecompressBatchKernel<
-          cascaded_decompress_wrapper<uint8_t, size_t, threadblock_size>,
-          1,
-          const nvcompBatchedCascadedOpts_t&>, 
-      cascaded_decompress_threadblock_size, // threads per block 
-      shmem_size);
-  
+  // The values will almost certainly be identical for all data types,
+  // but just in case, handle types separately.
+  if (type == NVCOMP_TYPE_CHAR || type == NVCOMP_TYPE_UCHAR) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifDecompressBatchKernel<
+            cascaded_decompress_wrapper<uint8_t, size_t, threadblock_size>,
+            1,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_SHORT || type == NVCOMP_TYPE_USHORT) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifDecompressBatchKernel<
+            cascaded_decompress_wrapper<uint16_t, size_t, threadblock_size>,
+            1,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_INT || type == NVCOMP_TYPE_UINT) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifDecompressBatchKernel<
+            cascaded_decompress_wrapper<uint32_t, size_t, threadblock_size>,
+            1,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  } else if (type == NVCOMP_TYPE_LONGLONG || type == NVCOMP_TYPE_ULONGLONG) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &numBlocksPerSM,
+        HlifDecompressBatchKernel<
+            cascaded_decompress_wrapper<uint64_t, size_t, threadblock_size>,
+            1,
+            const nvcompBatchedCascadedOpts_t&>,
+        threadblock_size,
+        runtime_shmem_size);
+  }
+
   return deviceProp.multiProcessorCount * numBlocksPerSM;
 }
 
