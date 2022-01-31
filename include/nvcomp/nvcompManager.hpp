@@ -31,11 +31,7 @@
 #include <memory>
 #include <vector>
 
-// TODO: remove these dependencies on src/
-#include "Check.h"
-#include "CudaUtils.h"
-#include "highlevel/PinnedPtrs.hpp"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp.h"
 
 namespace nvcomp {
 
@@ -44,16 +40,24 @@ namespace nvcomp {
  *****************************************************************************/
 
 /**
+ * Internal memory pool used for compression / decompression configs
+ */
+template<typename T>
+struct PinnedPtrPool;
+
+/**
  * @brief Config used to aggregate information about the compression of a particular buffer.
  * 
  * Contains a "PinnedPtrHandle" to an nvcompStatus. After the compression is complete,
  * the user can check the result status which resides in pinned host memory.
  */
 struct CompressionConfig {
-private: 
-  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
 
-public:
+private: // pimpl
+  struct CompressionConfigImpl;
+  std::shared_ptr<CompressionConfigImpl> impl;
+
+public: // API
   size_t uncompressed_buffer_size;
   size_t max_compressed_buffer_size;
   size_t num_chunks;
@@ -61,21 +65,17 @@ public:
   /**
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
-  CompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool, size_t uncompressed_buffer_size)
-    : status(pool.allocate()),
-      uncompressed_buffer_size(uncompressed_buffer_size),
-      max_compressed_buffer_size(0),
-      num_chunks(0)
-  {
-    *get_status() = nvcompSuccess;
-  }
+  CompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool, size_t uncompressed_buffer_size);
 
   /**
    * @brief Get the raw nvcompStatus_t*
    */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
+  nvcompStatus_t* get_status() const;
+  
+  CompressionConfig(CompressionConfig&& other);
+  CompressionConfig(const CompressionConfig& other);
+
+  ~CompressionConfig();
 };
 
 /**
@@ -85,30 +85,29 @@ public:
  * the user can check the result status which resides in pinned host memory.
  */
 struct DecompressionConfig {
-private: 
-  std::shared_ptr<PinnedPtrPool<nvcompStatus_t>::PinnedPtrHandle> status;
 
-public:
+private: // pimpl to hide pool implementation
+  struct DecompressionConfigImpl;
+  std::shared_ptr<DecompressionConfigImpl> impl;
+
+public: // API
   size_t decomp_data_size;
   uint32_t num_chunks;
 
   /**
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
-  DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(pool.allocate()),
-      decomp_data_size(),
-      num_chunks()
-  {
-    *get_status() = nvcompSuccess;
-  }
+  DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool);
 
   /**
-   * @brief Get the raw nvcompStatus_t*
+   * @brief Get the nvcompStatus_t*
    */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
+  nvcompStatus_t* get_status() const;
+
+  DecompressionConfig(DecompressionConfig&& other);
+  DecompressionConfig(const DecompressionConfig& other);
+
+  ~DecompressionConfig();
 };
 
 /**

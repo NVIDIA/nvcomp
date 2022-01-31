@@ -28,12 +28,12 @@
 
 #include <memory>
 
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "src/common.h"
+#include "Check.h"
+#include "CudaUtils.h"
+#include "common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
 #include "nvcomp/nvcompManager.hpp"
-#include "src/highlevel/ManagerBase.hpp"
+#include "highlevel/ManagerBase.hpp"
 #include "nvcomp/bitcomp.hpp"
 #include "BitcompManager.hpp"
 

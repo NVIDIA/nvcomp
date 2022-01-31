@@ -63,7 +63,7 @@ template<typename T>
 void test_pinned_ptr_pool() {
   typedef PinnedPtrPool<T> PinnedPool;
   PinnedPool pool{};
-  typedef std::shared_ptr<typename PinnedPool::PinnedPtrHandle> PinnedPtr;
+  typedef std::unique_ptr<typename PinnedPool::PinnedPtrHandle> PinnedPtr;
   PoolTestWrapper<T> test_wrapper{pool};
 
   constexpr size_t num_pinned_prealloc = PINNED_POOL_PREALLOC_SIZE;

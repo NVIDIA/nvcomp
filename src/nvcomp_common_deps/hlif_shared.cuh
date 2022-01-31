@@ -32,7 +32,6 @@
 #include <cooperative_groups.h>
 #include <stdio.h>
 
-#include "shared_types.h"
 #include "hlif_shared_types.h"
 
 namespace cg = cooperative_groups;

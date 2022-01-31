@@ -31,13 +31,13 @@
 #include <memory>
 
 #include "nvcomp/cascaded.hpp"
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "src/common.h"
+#include "Check.h"
+#include "CudaUtils.h"
+#include "common.h"
 #include "nvcomp/cascaded.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/CascadedHlifKernels.h"
-#include "src/highlevel/BatchManager.hpp"
+#include "highlevel/CascadedHlifKernels.h"
+#include "highlevel/BatchManager.hpp"
 
 namespace nvcomp {
 

@@ -31,10 +31,10 @@
 #include <cassert>
 #include <memory>
 
-#include "src/Check.h"
-#include "src/CudaUtils.h"
+#include "Check.h"
+#include "CudaUtils.h"
 #include "nvcomp/gdeflate.h"
-#include "src/common.h"
+#include "common.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
 #include "BatchManager.hpp"
 

@@ -117,19 +117,12 @@ void test_lz4(const std::vector<T>& data, size_t /*chunk_size*/)
     uint8_t* out_ptr = NULL;
     cudaMalloc(&out_ptr, decomp_config.decomp_data_size);
 
-    auto start = std::chrono::steady_clock::now();
-
     lz4_manager.decompress(
         out_ptr,
         d_comp_out,
         decomp_config);
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    // stop timing and the profiler
-    auto end = std::chrono::steady_clock::now();
-    std::cout << "throughput (GB/s): " << gbs(start, end, decomp_config.decomp_data_size)
-              << std::endl;
 
     cudaFree(d_comp_out);
     cudaFree(temp_ptr);
