@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#pragma once
+
 #include "nvcomp.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
 
