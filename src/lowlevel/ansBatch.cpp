@@ -49,6 +49,8 @@
 
 using namespace nvcomp;
 
+#define MAYBE_UNUSED(x) (void)(x)
+
 nvcompStatus_t nvcompBatchedANSDecompressGetTempSize(
     const size_t num_chunks,
     const size_t max_uncompressed_chunk_size,
@@ -164,6 +166,7 @@ nvcompStatus_t nvcompBatchedANSCompressAsync(
 {
 #ifdef ENABLE_ANS
   assert(format_opts.type == nvcompANSType_t::nvcomp_rANS);
+  MAYBE_UNUSED(format_opts);
   ans::ansType_t ans_type = ans::ansType_t::rANS;
 
   try {
