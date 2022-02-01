@@ -87,18 +87,25 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   }
 
   // Launch compression
-  std::vector<std::chrono::nanoseconds> compress_run_times(benchmark_exec_count);
+  cudaEvent_t start, end;
+  CUDA_CHECK(cudaEventCreate(&start));
+  CUDA_CHECK(cudaEventCreate(&end));
+
+  std::vector<float> compress_run_times(benchmark_exec_count);
   for (int ix_run = 0; ix_run < benchmark_exec_count; ++ix_run) {
-    auto start = std::chrono::steady_clock::now();
+    CUDA_CHECK(cudaEventRecord(start, stream));
     batch_manager.compress(
         d_in_data,
         d_comp_out,
         compress_config);
+
+    CUDA_CHECK(cudaEventRecord(end, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
-    auto end = std::chrono::steady_clock::now();
     comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
 
-    compress_run_times[ix_run] = end - start;
+    float compress_ms;
+    CUDA_CHECK(cudaEventElapsedTime(&compress_ms, start, end));
+    compress_run_times[ix_run] = compress_ms;
   }
 
   // compute average run time.
@@ -111,12 +118,13 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   
   CUDA_CHECK(cudaFree(d_in_data));
 
-  std::vector<std::chrono::nanoseconds> decompress_run_times(benchmark_exec_count);
+  std::vector<float> decompress_run_times(benchmark_exec_count);
   auto decomp_config = batch_manager.configure_decompression(d_comp_out);
   // allocate output buffer
   const size_t decomp_bytes = decomp_config.decomp_data_size;
   uint8_t* decomp_out_ptr;
   CUDA_CHECK(cudaMalloc(&decomp_out_ptr, decomp_bytes));
+  
   for (int ix_run = 0; ix_run < benchmark_exec_count; ++ix_run) {
     // get output size
     if (verbose_memory) {
@@ -125,16 +133,21 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
                 << std::endl;
     }
 
-    auto start = std::chrono::steady_clock::now();
+    CUDA_CHECK(cudaEventRecord(start, stream));
 
     // execute decompression (asynchronous)
     batch_manager.decompress(decomp_out_ptr, d_comp_out, decomp_config);
 
+    CUDA_CHECK(cudaEventRecord(end, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
-    auto end = std::chrono::steady_clock::now();
 
-    decompress_run_times[ix_run] = end - start;
+    float decompress_ms;
+    CUDA_CHECK(cudaEventElapsedTime(&decompress_ms, start, end));
+    decompress_run_times[ix_run] = decompress_ms;
   }
+
+  CUDA_CHECK(cudaEventDestroy(start));
+  CUDA_CHECK(cudaEventDestroy(end));
 
   std::cout << "decompression throughput (GB/s): "
             << average_gbs(decompress_run_times, decomp_bytes) << std::endl;

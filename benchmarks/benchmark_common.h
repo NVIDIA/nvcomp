@@ -111,6 +111,21 @@ average_gbs(
   return (double)s / avg_duration;
 }
 
+inline double
+average_gbs(
+    const std::vector<float>& durations,
+    size_t s)
+{
+  double duration_sum = 0;
+  for (auto duration : durations) {
+    duration_sum += duration;
+  }
+
+  double avg_duration = (duration_sum / durations.size()) / 1e3;
+
+  return (double)s / 1e9 / avg_duration;
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
