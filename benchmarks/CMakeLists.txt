@@ -4,6 +4,10 @@ if(NOT ans_FOUND)
   list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_ans.cpp")
 endif()
 
+if(NOT bitcomp_FOUND)
+  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_bitcomp.cpp")
+endif()
+
 foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   # cut off suffixes
   string(REPLACE ".cpp" "" EXAMPLE_NAME ${EXAMPLE_SOURCE})
