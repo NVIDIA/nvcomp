@@ -31,8 +31,6 @@ else()
   endif()
 endif()
 
-include_directories("${nvcomp_SOURCE_DIR}/src")
-
 set_property(TARGET nvcomp PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET nvcomp PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
 target_compile_options(nvcomp PRIVATE
@@ -46,12 +44,7 @@ target_include_directories(nvcomp PUBLIC
   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 endif()
 
-target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>")
-target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
-target_include_directories(nvcomp PUBLIC
-    "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}>")
+include_directories("${nvcomp_SOURCE_DIR}/src")
 
 if(DEFINED CUB_DIR)
   target_include_directories(nvcomp PRIVATE "${CUB_DIR}")

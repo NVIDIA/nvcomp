@@ -56,7 +56,7 @@ void run_tests(std::mt19937& rng)
 {
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
   cudaStream_t stream;
-  CudaUtils::check(cudaStreamCreate(&stream));
+  CUDA_CHECK(cudaStreamCreate(&stream));
   LZ4Manager batch_manager{CHUNK_SIZE, data_type, stream};
 
   // test all zeros
@@ -69,7 +69,7 @@ void run_tests(std::mt19937& rng)
     run_benchmark(gen_data(255, CHUNK_SIZE << b, rng), batch_manager, false, stream);
   }
 
-  CudaUtils::check(cudaStreamDestroy(stream));
+  CUDA_CHECK(cudaStreamDestroy(stream));
 }
 
 } // namespace

@@ -64,6 +64,40 @@ namespace nvcomp
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
+// returns nano-seconds
+inline uint64_t get_time(timespec start, timespec end)
+{
+  constexpr const uint64_t BILLION = 1000000000ULL;
+  const uint64_t elapsed_time
+      = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+  return elapsed_time;
+}
+
+// size in bytes, returns GB/s
+inline double gibs(struct timespec start, struct timespec end, size_t s)
+{
+  uint64_t t = get_time(start, end);
+  return (double)s / t * 1e9 / 1024 / 1024 / 1024;
+}
+
+// size in bytes, returns GB/s
+inline double
+gbs(const std::chrono::time_point<std::chrono::steady_clock>& start,
+    const std::chrono::time_point<std::chrono::steady_clock>& end,
+    size_t s)
+{
+  return (double)s / std::chrono::nanoseconds(end - start).count();
+}
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
 template <>
 inline nvcompType_t TypeOf<float>()
 {

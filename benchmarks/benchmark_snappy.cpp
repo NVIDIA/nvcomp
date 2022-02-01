@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
   SnappyManager manager{chunk_size, stream};
 
   run_benchmark_from_file(fname, manager, verbose_memory, stream);
-  CudaUtils::check(cudaStreamDestroy(stream));
+  CUDA_CHECK(cudaStreamDestroy(stream));
 
   return 0;
 }

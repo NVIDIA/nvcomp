@@ -44,7 +44,6 @@ static void print_usage()
   exit(1);
 }
 
-
 int main(int argc, char* argv[])
 {
   char* fname = NULL;
@@ -99,7 +98,7 @@ int main(int argc, char* argv[])
   GdeflateManager batch_manager{chunk_size, algo, stream};
 
   run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
-  CudaUtils::check(cudaStreamDestroy(stream));
+  CUDA_CHECK(cudaStreamDestroy(stream));
 
   return 0;
 }

@@ -78,7 +78,7 @@ public: // API
   /** 
    * @brief A wrapper for pinned ptrs, interacts with PinnedPtrPool.
    * 
-   * This class is intended to be held in a std::shared_ptr. Then, when the 
+   * This class is intended to be held in a std::unique. Then, when the 
    * user is finished, the destructor automatically returns the underlying memory
    * to the PinnedPtrPool.
    * 
@@ -138,7 +138,7 @@ public: // API
   /**
    * @brief Get a pointer to a T instance in pinned host memory from the pool
    */ 
-  std::shared_ptr<PinnedPtrHandle> allocate() 
+  std::unique_ptr<PinnedPtrHandle> allocate() 
   {
     if (pool.empty()) {
       // realloc
@@ -153,7 +153,7 @@ public: // API
     T* res = pool.back();
     pool.pop_back();
 
-    return std::make_shared<PinnedPtrHandle>(PinnedPtrHandle{*this, res});
+    return std::make_unique<PinnedPtrHandle>(PinnedPtrHandle{*this, res});
   }
 
   ~PinnedPtrPool() {

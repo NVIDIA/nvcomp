@@ -32,9 +32,9 @@
 #include <assert.h>
 
 #include "nvcomp/bitcomp.hpp"
-#include "src/CudaUtils.h"
+#include "CudaUtils.h"
 #include "nvcomp_common_deps/hlif_shared_types.h"
-#include "src/highlevel/ManagerBase.hpp"
+#include "highlevel/ManagerBase.hpp"
 
 namespace nvcomp {
 

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "ManagerBase.hpp"
-#include "src/common.h"
+#include "common.h"
 
 namespace nvcomp {
 

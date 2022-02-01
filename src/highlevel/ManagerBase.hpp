@@ -31,11 +31,12 @@
 #include <memory>
 #include <vector>
 
-#include "src/Check.h"
-#include "src/CudaUtils.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
-#include "PinnedPtrs.hpp"
 #include "nvcomp/nvcompManager.hpp"
+
+#include "Check.h"
+#include "CudaUtils.h"
+#include "PinnedPtrs.hpp"
+#include "nvcomp_common_deps/hlif_shared_types.h"
 
 namespace nvcomp {
 
