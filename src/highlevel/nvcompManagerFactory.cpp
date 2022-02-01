@@ -36,7 +36,7 @@
 #include "nvcomp/gdeflate.hpp"
 #include "nvcomp/cascaded.hpp"
 #include "nvcomp/bitcomp.hpp"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 #include "CudaUtils.h"
 
 namespace nvcomp {

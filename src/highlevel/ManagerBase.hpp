@@ -36,7 +36,7 @@
 #include "Check.h"
 #include "CudaUtils.h"
 #include "PinnedPtrs.hpp"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 
 namespace nvcomp {
 

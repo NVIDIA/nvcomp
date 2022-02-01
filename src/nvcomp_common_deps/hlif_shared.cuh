@@ -32,7 +32,8 @@
 #include <cooperative_groups.h>
 #include <stdio.h>
 
-#include "hlif_shared_types.h"
+#include "nvcomp/shared_types.h"
+#include "hlif_shared_types.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -135,27 +136,30 @@ __device__ inline void copyScratchBuffer(
   }
 }
 
-template<typename CompressT>
+template<int chunks_per_block, typename CompressT, typename GroupT>
 __device__ inline void HlifCompressBatch(
     const CompressArgs& compression_args,
-    CompressT&& compressor)
+    CompressT&& compressor,
+    GroupT&& cg_group)
 {
-  if (blockIdx.x == 0 && threadIdx.x == 0) {
+  if (blockIdx.x == 0 and cg::this_thread_block().thread_rank() == 0) {
     fill_common_header(
         compression_args, 
         compressor.get_format_type());
   }
 
-  __shared__ uint32_t this_ix_chunk;
+  __shared__ uint32_t ix_chunks[chunks_per_block];
+  volatile uint32_t& this_ix_chunk = ix_chunks[threadIdx.y];
 
-  if (threadIdx.x == 0) {
-    this_ix_chunk = blockIdx.x;
+  if (cg_group.thread_rank() == 0) {
+    this_ix_chunk = blockIdx.x * chunks_per_block + threadIdx.y;
   }
 
-  uint8_t* scratch_output_buffer = compression_args.scratch_buffer + blockIdx.x * compression_args.max_comp_chunk_size;  
-  __syncthreads();
-  
-  int initial_chunks = gridDim.x;  
+  cg_group.sync();
+
+  uint8_t* scratch_output_buffer = compression_args.scratch_buffer + this_ix_chunk * compression_args.max_comp_chunk_size;
+
+  int initial_chunks = gridDim.x * chunks_per_block;
 
   while (this_ix_chunk < compression_args.num_chunks) {
     size_t ix_decomp_start = this_ix_chunk * compression_args.uncomp_chunk_size;
@@ -169,17 +173,14 @@ __device__ inline void HlifCompressBatch(
         &compression_args.comp_chunk_sizes[this_ix_chunk]);
 
     // Determine the right place to output this buffer.
-    if (threadIdx.x == 0) {
-      static_assert(
-          sizeof(uint64_t) == sizeof(unsigned long long int),
-          "The cast below assumes that uint64_t and unsigned long long int are "
-          "the same size.");
+    if (cg_group.thread_rank() == 0) {
+      static_assert(sizeof(uint64_t) == sizeof(unsigned long long int));
       compression_args.comp_chunk_offsets[this_ix_chunk] = atomicAdd(
           reinterpret_cast<unsigned long long int*>(compression_args.ix_output), 
           compression_args.comp_chunk_sizes[this_ix_chunk]);
     }
 
-    __syncthreads();
+    cg_group.sync();
 
     copyScratchBuffer(
         compression_args.comp_chunk_offsets,
@@ -189,22 +190,23 @@ __device__ inline void HlifCompressBatch(
         compression_args.ix_output,
         this_ix_chunk);
 
-    if (threadIdx.x == 0) {
+    // Check for errors. Any error should be reported in the global status value
+    if (cg_group.thread_rank() == 0) {
+      if (compressor.get_output_status() != nvcompSuccess) {
+        *compression_args.output_status = compressor.get_output_status();
+      }
+    }
+
+    if (cg_group.thread_rank() == 0) {
       this_ix_chunk = initial_chunks + atomicAdd(compression_args.ix_chunk, size_t{1});
     }
-    __syncthreads();
-  }
-
-  // Check for errors. Any error should be reported in the global status value
-  if (threadIdx.x == 0) {
-    if (compressor.get_output_status() != nvcompSuccess) {
-      *compression_args.output_status = compressor.get_output_status();
-    }
+    cg_group.sync();
   }
 }
 
 template<typename CompressT, 
-         typename CompressorArg>
+         typename CompressorArg,
+         int chunks_per_block = 1>
 __global__ std::enable_if_t<std::is_base_of<hlif_compress_wrapper, CompressT>::value>
 HlifCompressBatchKernel(
     CompressArgs compression_args,
@@ -213,29 +215,39 @@ HlifCompressBatchKernel(
   extern __shared__ uint8_t share_buffer[];
 
   uint8_t* free_scratch_buffer = 
-      compression_args.scratch_buffer + compression_args.max_comp_chunk_size * gridDim.x;
+      compression_args.scratch_buffer + (compression_args.max_comp_chunk_size * gridDim.x * blockDim.y);
   
-  __shared__ nvcompStatus_t output_status;
+  __shared__ nvcompStatus_t output_status[chunks_per_block];
   
-  CompressT compressor{compressor_arg, free_scratch_buffer, share_buffer, &output_status};
-  
-  HlifCompressBatch(compression_args, compressor);
+  CompressT compressor{compressor_arg, free_scratch_buffer, share_buffer, &output_status[threadIdx.y]};
+
+  auto cta_group = cg::this_thread_block();
+  if (chunks_per_block == 1) {
+    HlifCompressBatch<chunks_per_block>(compression_args, compressor, cta_group);
+  } else {
+    HlifCompressBatch<chunks_per_block>(compression_args, compressor, cg::tiled_partition<32>(cta_group));
+  }
 }
 
-template<typename CompressT>
+template<typename CompressT, int chunks_per_block = 1>
 __global__ std::enable_if_t<std::is_base_of<hlif_compress_wrapper, CompressT>::value>
 HlifCompressBatchKernel(CompressArgs compression_args)
 {
   extern __shared__ uint8_t share_buffer[];
   
   uint8_t* free_scratch_buffer = 
-      compression_args.scratch_buffer + compression_args.max_comp_chunk_size * gridDim.x;
+      compression_args.scratch_buffer + (compression_args.max_comp_chunk_size * gridDim.x * blockDim.y);
 
-  __shared__ nvcompStatus_t output_status;
+  __shared__ nvcompStatus_t output_status[chunks_per_block];
 
-  CompressT compressor{free_scratch_buffer, share_buffer, &output_status};
-  
-  HlifCompressBatch(compression_args, compressor);
+  CompressT compressor{free_scratch_buffer, share_buffer, &output_status[threadIdx.y]};
+
+  auto cta_group = cg::this_thread_block();
+  if (chunks_per_block == 1) {
+    HlifCompressBatch<chunks_per_block>(compression_args, compressor, cta_group);
+  } else {
+    HlifCompressBatch<chunks_per_block>(compression_args, compressor, cg::tiled_partition<32>(cta_group));
+  }
 }
 
 /**
@@ -288,20 +300,20 @@ __device__ inline void HlifDecompressBatch(
         this_decomp_buffer,
         this_comp_buffer,
         comp_chunk_sizes[this_ix_chunk],
-        uncomp_chunk_size); 
+        uncomp_chunk_size);
+
+    // Check for errors. Any error should be reported in the global status value
+    if (cg_group.thread_rank() == 0) {
+      if (decompressor.get_output_status() != nvcompSuccess) {
+        *kernel_output_status = decompressor.get_output_status();
+      }
+    }
 
     if (cg_group.thread_rank() == 0) {
       this_ix_chunk = initial_chunks + atomicAdd(ix_chunk, uint32_t{1});
     }
 
     cg_group.sync();
-  }
-
-  // Check for errors. Any error should be reported in the global status value
-  if (cg_group.thread_rank() == 0) {
-    if (decompressor.get_output_status() != nvcompSuccess) {
-      *kernel_output_status = decompressor.get_output_status();
-    }
   }
 }    
 

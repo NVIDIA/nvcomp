@@ -38,7 +38,7 @@
 #include "common.h"
 #include "highlevel/BatchManager.hpp"
 #include "highlevel/SnappyHlifKernels.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 
 namespace nvcomp {
 

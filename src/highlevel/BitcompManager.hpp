@@ -33,7 +33,7 @@
 
 #include "nvcomp/bitcomp.hpp"
 #include "CudaUtils.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 #include "highlevel/ManagerBase.hpp"
 
 namespace nvcomp {

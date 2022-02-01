@@ -35,7 +35,7 @@
 #include "CudaUtils.h"
 #include "nvcomp/gdeflate.h"
 #include "common.h"
-#include "nvcomp_common_deps/hlif_shared_types.h"
+#include "nvcomp_common_deps/hlif_shared_types.hpp"
 #include "BatchManager.hpp"
 
 #ifdef ENABLE_GDEFLATE
