@@ -28,7 +28,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef ENABLE_BITCOMP
 #include <assert.h>
 
 #include "nvcomp/bitcomp.hpp"
@@ -50,6 +49,10 @@ public:
     CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(BitcompFormatSpecHeader), cudaHostAllocDefault));
     format_spec->data_type = data_type;
     format_spec->algo = bitcomp_algo;
+    int  major;
+    CudaUtils::check(cudaDeviceGetAttribute (&major, cudaDevAttrComputeCapabilityMajor, device_id));
+    if (major < 7)
+      throw NVCompException(nvcompErrorNotSupported, "Bitcomp requires GPU architectures >= 70");
 
     finish_init();
   }
@@ -136,13 +139,15 @@ BitcompManager::BitcompManager(
     cudaStream_t user_stream,
     const int device_id)
 {
+#ifdef ENABLE_BITCOMP
   impl = std::make_unique<BitcompSingleStreamManager>(
       data_type, bitcomp_algo, user_stream, device_id);
+#else
+  throw NVCompException(nvcompErrorNotSupported, "Bitcomp support not available in this build.");
+#endif
 }
 
 BitcompManager::~BitcompManager() 
 {}
 
 } // namespace nvcomp
-
-#endif // ENABLE_BITCOMP

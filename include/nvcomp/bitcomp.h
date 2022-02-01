@@ -34,8 +34,6 @@
 #include <cuda_runtime.h>
 #include <stdint.h>
 
-#ifdef ENABLE_BITCOMP
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -362,7 +360,5 @@ nvcompStatus_t nvcompBatchedBitcompDecompressGetTempSize(
 #ifdef __cplusplus
 }
 #endif
-
-#endif  // ENABLE_BITCOMP
 
 #endif

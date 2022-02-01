@@ -222,4 +222,59 @@ nvcompStatus_t nvcompBatchedBitcompDecompressGetTempSize(
   return nvcompSuccess;
 }
 
+#else
+
+nvcompStatus_t nvcompBatchedBitcompCompressGetMaxOutputChunkSize(
+    size_t, nvcompBatchedBitcompFormatOpts, size_t*)
+{
+  return nvcompErrorNotSupported;
+}
+
+nvcompStatus_t nvcompBatchedBitcompCompressAsync(
+    const void* const*,
+    const size_t*,
+    size_t,
+    size_t,
+    void*,
+    size_t,
+    void* const*,
+    size_t*,
+    const nvcompBatchedBitcompFormatOpts,
+    cudaStream_t)
+{
+  return nvcompErrorNotSupported;
+}
+
+nvcompStatus_t nvcompBatchedBitcompDecompressAsync(
+    const void* const*,
+    const size_t*,
+    const size_t*,
+    size_t*,
+    size_t,
+    void* const,
+    size_t,
+    void* const*,
+    nvcompStatus_t*,
+    cudaStream_t)
+{
+  return nvcompErrorNotSupported;
+}
+
+nvcompStatus_t nvcompBatchedBitcompGetDecompressSizeAsync(
+    const void* const*, const size_t*, size_t*, size_t, cudaStream_t)
+{
+  return nvcompErrorNotSupported;
+}
+
+nvcompStatus_t nvcompBatchedBitcompCompressGetTempSize(
+    size_t, size_t, nvcompBatchedBitcompFormatOpts, size_t*)
+{
+  return nvcompErrorNotSupported;
+}
+
+nvcompStatus_t nvcompBatchedBitcompDecompressGetTempSize(size_t, size_t, size_t*)
+{
+  return nvcompErrorNotSupported;
+}
+
 #endif
