@@ -92,6 +92,9 @@ void decomp_compressed_with_manager_factory_example(uint8_t* device_input_ptrs, 
 
   decomp_nvcomp_manager->decompress(res_decomp_buffer, comp_buffer, decomp_config);
 
+  CUDA_CHECK(cudaFree(comp_buffer));
+  CUDA_CHECK(cudaFree(res_decomp_buffer));
+
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   CUDA_CHECK(cudaStreamDestroy(stream));
@@ -129,6 +132,9 @@ void comp_decomp_with_single_manager(uint8_t* device_input_ptrs, const size_t in
   nvcomp_manager.decompress(res_decomp_buffer, comp_buffer, decomp_config);
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
+
+  CUDA_CHECK(cudaFree(comp_buffer));
+  CUDA_CHECK(cudaFree(res_decomp_buffer));
 
   CUDA_CHECK(cudaStreamDestroy(stream));
 }
