@@ -67,6 +67,24 @@ CompressionConfig::CompressionConfig(const CompressionConfig& other)
     num_chunks(other.num_chunks)
 {}
 
+CompressionConfig& CompressionConfig::operator=(const CompressionConfig& other) 
+{
+  impl = other.impl;
+  uncompressed_buffer_size = other.uncompressed_buffer_size;
+  max_compressed_buffer_size = other.max_compressed_buffer_size;
+  num_chunks = other.num_chunks;
+  return *this;
+}
+
+CompressionConfig& CompressionConfig::operator=(CompressionConfig&& other) 
+{
+  impl = std::move(other.impl);
+  uncompressed_buffer_size = other.uncompressed_buffer_size;
+  max_compressed_buffer_size = other.max_compressed_buffer_size;
+  num_chunks = other.num_chunks;
+  return *this;
+}
+
 /**
  * @brief Construct the config given an nvcompStatus_t memory pool
  */
@@ -102,6 +120,22 @@ DecompressionConfig::DecompressionConfig(DecompressionConfig&& other)
     decomp_data_size(other.decomp_data_size),
     num_chunks(other.num_chunks)
 {}
+
+DecompressionConfig& DecompressionConfig::operator=(const DecompressionConfig& other) 
+{
+  impl = other.impl;
+  decomp_data_size = other.decomp_data_size;
+  num_chunks = other.num_chunks;
+  return *this;
+}
+
+DecompressionConfig& DecompressionConfig::operator=(DecompressionConfig&& other) 
+{
+  impl = std::move(other.impl);
+  decomp_data_size = other.decomp_data_size;
+  num_chunks = other.num_chunks;
+  return *this;
+}
 
 DecompressionConfig::DecompressionConfig(const DecompressionConfig& other)
   : impl(other.impl),

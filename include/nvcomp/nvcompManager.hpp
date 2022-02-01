@@ -74,6 +74,8 @@ public: // API
   
   CompressionConfig(CompressionConfig&& other);
   CompressionConfig(const CompressionConfig& other);
+  CompressionConfig& operator=(CompressionConfig&& other);
+  CompressionConfig& operator=(const CompressionConfig& other);
 
   ~CompressionConfig();
 };
@@ -106,6 +108,8 @@ public: // API
 
   DecompressionConfig(DecompressionConfig&& other);
   DecompressionConfig(const DecompressionConfig& other);
+  DecompressionConfig& operator=(DecompressionConfig&& other);
+  DecompressionConfig& operator=(const DecompressionConfig& other);
 
   ~DecompressionConfig();
 };
