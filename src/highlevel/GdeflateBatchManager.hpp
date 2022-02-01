@@ -61,8 +61,11 @@ public:
       case(1) :
         throw std::invalid_argument("Invalid format_opts.algo value (high compression option (1) not currently supported)");
         break;
+      case(2) :
+        throw std::invalid_argument("Invalid format_opts.algo value (entropy only option (2) not currently supported)");
+        break;
       default :
-        throw std::invalid_argument("Invalid format_opts.algo value (not 0 or 1)");
+        throw std::invalid_argument("Invalid format_opts.algo value (not 0, 1 or 2)");
     }
 
     CudaUtils::check(cudaHostAlloc(&format_spec, sizeof(nvcompBatchedGdeflateOpts_t), cudaHostAllocDefault));

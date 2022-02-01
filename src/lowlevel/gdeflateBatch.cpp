@@ -60,8 +60,11 @@ gdeflate::gdeflate_compression_algo getGdeflateEnumFromFormatOpts(nvcompBatchedG
     case(1) :
       algo = gdeflate::HIGH_COMPRESSION;
       break;
+    case(2) :
+      algo = gdeflate::ENTROPY_ONLY;
+      break;
     default :
-      throw std::invalid_argument("Invalid format_opts.algo value (not 0 or 1)");
+      throw std::invalid_argument("Invalid format_opts.algo value (not 0, 1 or 2)");
   }
   return algo;
 }
