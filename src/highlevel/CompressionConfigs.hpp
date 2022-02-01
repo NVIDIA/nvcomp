@@ -56,46 +56,13 @@ public:
   /**
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
-  CompressionConfigImpl(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(pool.allocate())
-  {
-    *get_status() = nvcompSuccess;
-  }
+  CompressionConfigImpl(PinnedPtrPool<nvcompStatus_t>& pool);
 
   /**
    * @brief Get the raw nvcompStatus_t*
    */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
+  nvcompStatus_t* get_status() const;
 };
-
-CompressionConfig::CompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool, size_t uncompressed_buffer_size)
-  : impl(std::make_shared<CompressionConfig::CompressionConfigImpl>(pool)),
-    uncompressed_buffer_size(uncompressed_buffer_size),
-    max_compressed_buffer_size(0),
-    num_chunks(0)
-{}
-
-nvcompStatus_t* CompressionConfig::get_status() const {
-  return impl->get_status();
-}
-
-CompressionConfig::~CompressionConfig() {}
-
-CompressionConfig::CompressionConfig(CompressionConfig&& other)
-  : impl(std::move(other.impl)),
-    uncompressed_buffer_size(other.uncompressed_buffer_size),
-    max_compressed_buffer_size(other.max_compressed_buffer_size),
-    num_chunks(other.num_chunks)
-{}
-
-CompressionConfig::CompressionConfig(const CompressionConfig& other)
-  : impl(other.impl),
-    uncompressed_buffer_size(other.uncompressed_buffer_size),
-    max_compressed_buffer_size(other.max_compressed_buffer_size),
-    num_chunks(other.num_chunks)
-{}
 
 /**
  * @brief Config used to aggregate information about a particular decompression.
@@ -114,44 +81,12 @@ public:
   /**
    * @brief Construct the config given an nvcompStatus_t memory pool
    */
-  DecompressionConfigImpl(PinnedPtrPool<nvcompStatus_t>& pool)
-    : status(pool.allocate()),
-      decomp_data_size(),
-      num_chunks()
-  {
-    *get_status() = nvcompSuccess;
-  }
+  DecompressionConfigImpl(PinnedPtrPool<nvcompStatus_t>& pool);
 
   /**
    * @brief Get the raw nvcompStatus_t*
    */
-  nvcompStatus_t* get_status() const {
-    return status->get_ptr();
-  }
+  nvcompStatus_t* get_status() const;
 };
-
-DecompressionConfig::DecompressionConfig(PinnedPtrPool<nvcompStatus_t>& pool)
-  : impl(std::make_shared<DecompressionConfig::DecompressionConfigImpl>(pool)),
-    decomp_data_size(0),
-    num_chunks(0)
-{}
-
-nvcompStatus_t* DecompressionConfig::get_status() const {
-  return impl->get_status();
-}
-
-DecompressionConfig::~DecompressionConfig() {}
-
-DecompressionConfig::DecompressionConfig(DecompressionConfig&& other)
-  : impl(std::move(other.impl)),
-    decomp_data_size(other.decomp_data_size),
-    num_chunks(other.num_chunks)
-{}
-
-DecompressionConfig::DecompressionConfig(const DecompressionConfig& other)
-  : impl(other.impl),
-    decomp_data_size(other.decomp_data_size),
-    num_chunks(other.num_chunks)
-{}
 
 } // namespace nvcomp
