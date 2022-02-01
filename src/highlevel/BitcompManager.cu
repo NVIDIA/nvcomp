@@ -181,4 +181,21 @@ namespace nvcomp {
 
 } // namespace nvcomp
 
+#else // ENABLE_BITCOMP
+
+namespace nvcomp {
+void BitcompSingleStreamManager::do_compress(CommonHeader*, const uint8_t*, uint8_t*, const CompressionConfig&)
+{
+  throw NVCompException(nvcompErrorNotSupported, "Bitcomp support not available in this build.");
+}
+void BitcompSingleStreamManager::do_decompress(uint8_t*, const uint8_t*, const DecompressionConfig&)
+{
+  throw NVCompException(nvcompErrorNotSupported, "Bitcomp support not available in this build.");
+}
+size_t BitcompSingleStreamManager::calculate_max_compressed_output_size(CompressionConfig&)
+{
+  throw NVCompException(nvcompErrorNotSupported, "Bitcomp support not available in this build.");
+}
+}
+
 #endif // ENABLE_BITCOMP

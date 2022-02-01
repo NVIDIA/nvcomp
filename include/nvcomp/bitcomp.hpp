@@ -28,8 +28,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef ENABLE_BITCOMP
-
 #include "nvcompManager.hpp"
 
 namespace nvcomp {
@@ -47,5 +45,3 @@ struct BitcompManager : PimplManager {
 };
 
 } // namespace nvcomp
-
-#endif // ENABLE_BITCOMP

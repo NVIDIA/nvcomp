@@ -25,7 +25,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include "nvcomp/bitcomp.hpp"
 #include "benchmark_hlif.hpp"
 
@@ -115,7 +114,7 @@ int main(int argc, char* argv[])
   BitcompManager comp_manager{data_type, 0, stream};
 
   run_benchmark_from_file(fname, comp_manager, verbose_memory, stream);
-  CudaUtils::check(cudaStreamDestroy(stream));
+  CUDA_CHECK(cudaStreamDestroy(stream));
 
   return 0;
 }
