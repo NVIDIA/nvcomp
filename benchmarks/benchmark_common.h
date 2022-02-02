@@ -85,8 +85,45 @@ inline double
 gbs(const std::chrono::time_point<std::chrono::steady_clock>& start,
     const std::chrono::time_point<std::chrono::steady_clock>& end,
     size_t s)
-{
+{  
   return (double)s / std::chrono::nanoseconds(end - start).count();
+}
+
+inline double
+gbs(const std::chrono::nanoseconds duration,
+    size_t s)
+{
+  return (double)s / duration.count();
+}
+
+inline double
+average_gbs(
+    const std::vector<std::chrono::nanoseconds>& durations,
+    size_t s)
+{
+  size_t count_sum = 0;
+  for (auto duration : durations) {
+    count_sum += duration.count();
+  }
+
+  size_t avg_duration = count_sum / durations.size();
+
+  return (double)s / avg_duration;
+}
+
+inline double
+average_gbs(
+    const std::vector<float>& durations,
+    size_t s)
+{
+  double duration_sum = 0;
+  for (auto duration : durations) {
+    duration_sum += duration;
+  }
+
+  double avg_duration = (duration_sum / durations.size()) / 1e3;
+
+  return (double)s / 1e9 / avg_duration;
 }
 
 #ifdef __GNUC__

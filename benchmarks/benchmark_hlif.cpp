@@ -26,18 +26,35 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "nvcomp/lz4.hpp"
-#include "benchmark_hlif.hpp"
-
+// Benchmark performance from the binary data file fname
+#include <vector>
 #include <string.h>
+
+#include "benchmark_common.h"
+#include "nvcomp.hpp"
+#include "nvcomp/nvcompManagerFactory.hpp"
+#include "benchmark_hlif.hpp"
 
 using namespace nvcomp;
 
+void run_benchmark_from_file(char* fname, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream, const int benchmark_exec_count)
+{
+  using T = uint8_t;
+
+  size_t input_elts = 0;
+  std::vector<T> data;
+  data = load_dataset_from_binary<T>(fname, &input_elts);
+  run_benchmark(data, batch_manager, verbose_memory, stream, benchmark_exec_count);
+}
+
 static void print_usage()
 {
-  printf("Usage: benchmark_lz4 [OPTIONS]\n");
+  printf("Usage: benchmark_hlif [format_type] [OPTIONS]\n");
+  printf("  %-35s One of <snappy / bitcomp / ans / cascaded/ gdeflate / lz4>\n", "[ format_type ]");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
+  printf("  %-35s Chunk size (default 64 kB).\n", "-c, --chunk-size");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
+  printf("  %-35s Number of times to execute the benchmark (for averaging) (default 1)\n", "-n, --num-iters");
   printf("  %-35s Data type (default 'char', options are 'char', 'short', 'int')\n", "-t, --type");
   printf(
       "  %-35s Output GPU memory allocation sizes (default off)\n",
@@ -45,17 +62,43 @@ static void print_usage()
   exit(1);
 }
 
-
 int main(int argc, char* argv[])
 {
   char* fname = NULL;
   int gpu_num = 0;
   int verbose_memory = 0;
+  int num_iters = 1;
+
+  // Cascaded opts
+  nvcompBatchedCascadedOpts_t cascaded_opts = nvcompBatchedCascadedDefaultOpts;
+
+  // Shared opts
+  int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
+
+  std::string comp_format;
+
+  bool explicit_type = false;
+  bool explicit_chunk_size = false;
 
   // Parse command-line arguments
   char** argv_end = argv + argc;
   argv += 1;
+
+  // First the format
+  comp_format = std::string{*argv++};
+  if (comp_format == "lz4") {
+  } else if (comp_format == "snappy") {
+  } else if (comp_format == "bitcomp") {
+  } else if (comp_format == "ans") {
+  } else if (comp_format == "cascaded") {
+  } else if (comp_format == "gdeflate") {
+  } else {
+    printf("invalid format\n");
+    print_usage();
+    return 1;
+  }
+
   while (argv != argv_end) {
     char* arg = *argv++;
     if (strcmp(arg, "--help") == 0 || strcmp(arg, "-?") == 0) {
@@ -66,6 +109,7 @@ int main(int argc, char* argv[])
       verbose_memory = 1;
       continue;
     }
+
 
     // all arguments below require at least a second value in argv
     if (argv >= argv_end) {
@@ -78,21 +122,49 @@ int main(int argc, char* argv[])
       fname = optarg;
       continue;
     }
+    
     if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
       gpu_num = atoi(optarg);
       continue;
     }
+
+    if (strcmp(arg, "--num-iters") == 0 || strcmp(arg, "-n") == 0) {
+      num_iters = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--chunk-size") == 0 || strcmp(arg, "-c") == 0) {
+      chunk_size = atoi(optarg);
+      explicit_chunk_size = true;
+      continue;
+    }
+
     if (strcmp(arg, "--type") == 0 || strcmp(arg, "-t") == 0) {
+      explicit_type = true;
       if (strcmp(optarg, "char") == 0) {
         data_type = NVCOMP_TYPE_CHAR;
       } else if (strcmp(optarg, "short") == 0) {
         data_type = NVCOMP_TYPE_SHORT;
       } else if (strcmp(optarg, "int") == 0) {
         data_type = NVCOMP_TYPE_INT;
+      } else if (strcmp(optarg, "longlong") == 0) {
+        data_type = NVCOMP_TYPE_LONGLONG;
       } else {
         print_usage();
         return 1;
       }
+      continue;
+    }
+
+    if (strcmp(arg, "--num_rles") == 0 || strcmp(arg, "-r") == 0) {
+      cascaded_opts.num_RLEs = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--num_deltas") == 0 || strcmp(arg, "-d") == 0) {
+      cascaded_opts.num_deltas = atoi(optarg);
+      continue;
+    }
+    if (strcmp(arg, "--num_bps") == 0 || strcmp(arg, "-b") == 0) {
+      cascaded_opts.use_bp = (atoi(optarg) != 0);
       continue;
     }
 
@@ -110,9 +182,33 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  LZ4Manager batch_manager{chunk_size, data_type, stream};
+  std::unique_ptr<nvcompManagerBase> manager;
+  if (comp_format == "lz4") {
+    manager = std::make_unique<LZ4Manager>(chunk_size, data_type, stream);
+  } else if (comp_format == "snappy") {
+    manager = std::make_unique<SnappyManager>(chunk_size, stream);
+  } else if (comp_format == "bitcomp") {
+    manager = std::make_unique<BitcompManager>(data_type, 0 /* algo--fixed for now */, stream);
+  } else if (comp_format == "ans") {
+    manager = std::make_unique<ANSManager>(chunk_size, stream);
+  } else if (comp_format == "cascaded") {
+    if (explicit_type) {
+      cascaded_opts.type = data_type;
+    }
 
-  run_benchmark_from_file(fname, batch_manager, verbose_memory, stream);
+    if (explicit_chunk_size) {
+      cascaded_opts.chunk_size = chunk_size;
+    }
+
+    manager = std::make_unique<CascadedManager>(cascaded_opts, stream);
+  } else if (comp_format == "gdeflate") {
+    manager = std::make_unique<GdeflateManager>(chunk_size, 0 /* algo--fixed for now */, stream);
+  } else {
+    print_usage();
+    return 1;
+  }
+
+  run_benchmark_from_file(fname, *manager, verbose_memory, stream, num_iters);
   CUDA_CHECK(cudaStreamDestroy(stream));
 
   return 0;

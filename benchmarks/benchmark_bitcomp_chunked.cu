@@ -26,26 +26,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "benchmark_template_chunked.cuh"
+#include "nvcomp/bitcomp.h"
 
-#include <cassert>
-
-#include "nvcompManager.hpp"
-#include "ans.hpp"
-#include "gdeflate.hpp"
-#include "lz4.hpp"
-#include "snappy.hpp"
-#include "bitcomp.hpp"
-#include "cascaded.hpp"
-
-namespace nvcomp {
-
-/** 
- * @brief Construct a ManagerBase from a buffer
- * 
- * This synchronizes the stream
- * 
- */ 
-std::shared_ptr<nvcompManagerBase> create_manager(const uint8_t* comp_buffer, cudaStream_t stream = 0, const int device_id = 0);
-
-} // namespace nvcomp
+GENERATE_CHUNKED_BENCHMARK(
+    nvcompBatchedBitcompCompressGetTempSize,
+    nvcompBatchedBitcompCompressGetMaxOutputChunkSize,
+    nvcompBatchedBitcompCompressAsync,
+    nvcompBatchedBitcompDecompressGetTempSize,
+    nvcompBatchedBitcompDecompressAsync,
+    nvcompBatchedBitcompDefaultOpts);

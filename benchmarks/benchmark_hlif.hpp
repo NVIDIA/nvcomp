@@ -40,7 +40,7 @@ using namespace nvcomp;
 const int chunk_size = 1 << 16;
 
 template<typename T = uint8_t>
-void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
+void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream, const int benchmark_exec_count = 1)
 {
   size_t input_element_count = data.size();
 
@@ -87,50 +87,70 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   }
 
   // Launch compression
-  auto start = std::chrono::steady_clock::now();
-  batch_manager.compress(
-      d_in_data,
-      d_comp_out,
-      compress_config);
-  CUDA_CHECK(cudaStreamSynchronize(stream));
-  auto end = std::chrono::steady_clock::now();
-  comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
+  cudaEvent_t start, end;
+  CUDA_CHECK(cudaEventCreate(&start));
+  CUDA_CHECK(cudaEventCreate(&end));
 
-  CUDA_CHECK(cudaFree(d_comp_scratch));
-  CUDA_CHECK(cudaFree(d_in_data));
+  std::vector<float> compress_run_times(benchmark_exec_count);
+  for (int ix_run = 0; ix_run < benchmark_exec_count; ++ix_run) {
+    CUDA_CHECK(cudaEventRecord(start, stream));
+    batch_manager.compress(
+        d_in_data,
+        d_comp_out,
+        compress_config);
+
+    CUDA_CHECK(cudaEventRecord(end, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+    comp_out_bytes = batch_manager.get_compressed_output_size(d_comp_out);
+
+    float compress_ms;
+    CUDA_CHECK(cudaEventElapsedTime(&compress_ms, start, end));
+    compress_run_times[ix_run] = compress_ms;
+  }
+
+  // compute average run time.
 
   std::cout << "comp_size: " << comp_out_bytes
             << ", compressed ratio: " << std::fixed << std::setprecision(2)
             << (double)data.size() * sizeof(T) / comp_out_bytes << std::endl;
   std::cout << "compression throughput (GB/s): "
-            << gbs(start, end, data.size() * sizeof(T)) << std::endl;
+            << average_gbs(compress_run_times, data.size() * sizeof(T)) << std::endl;
+  
+  CUDA_CHECK(cudaFree(d_in_data));
 
-  // allocate output buffer
+  std::vector<float> decompress_run_times(benchmark_exec_count);
   auto decomp_config = batch_manager.configure_decompression(d_comp_out);
+  // allocate output buffer
   const size_t decomp_bytes = decomp_config.decomp_data_size;
   uint8_t* decomp_out_ptr;
   CUDA_CHECK(cudaMalloc(&decomp_out_ptr, decomp_bytes));
-  const size_t decomp_temp_bytes = 0;
+  
+  for (int ix_run = 0; ix_run < benchmark_exec_count; ++ix_run) {
+    // get output size
+    if (verbose_memory) {
+      std::cout << "decompression memory (input+output+temp) (B): "
+                << (decomp_bytes + comp_out_bytes)
+                << std::endl;
+    }
 
-  // get output size
-  if (verbose_memory) {
-    std::cout << "decompression memory (input+output+temp) (B): "
-              << (decomp_bytes + comp_out_bytes + decomp_temp_bytes)
-              << std::endl;
-    std::cout << "decompression temp space (B): " << decomp_temp_bytes
-              << std::endl;
+    CUDA_CHECK(cudaEventRecord(start, stream));
+
+    // execute decompression (asynchronous)
+    batch_manager.decompress(decomp_out_ptr, d_comp_out, decomp_config);
+
+    CUDA_CHECK(cudaEventRecord(end, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    float decompress_ms;
+    CUDA_CHECK(cudaEventElapsedTime(&decompress_ms, start, end));
+    decompress_run_times[ix_run] = decompress_ms;
   }
 
-  start = std::chrono::steady_clock::now();
-
-  // execute decompression (asynchronous)
-  batch_manager.decompress(decomp_out_ptr, d_comp_out, decomp_config);
-
-  CUDA_CHECK(cudaStreamSynchronize(stream));
-  end = std::chrono::steady_clock::now();
+  CUDA_CHECK(cudaEventDestroy(start));
+  CUDA_CHECK(cudaEventDestroy(end));
 
   std::cout << "decompression throughput (GB/s): "
-            << gbs(start, end, decomp_bytes) << std::endl;
+            << average_gbs(decompress_run_times, decomp_bytes) << std::endl;
 
   CUDA_CHECK(cudaFree(d_comp_out));
 
@@ -155,16 +175,7 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
     std::cout << ((T*)out_ptr)[i] << " ";
   std::cout << std::endl;
 #endif
-
   benchmark_assert(res == data, "Decompressed data does not match input.");
-}
-
-void run_benchmark_from_file(char* fname, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream)
-{
-  using T = uint8_t;
-
-  size_t input_elts = 0;
-  std::vector<T> data;
-  data = load_dataset_from_binary<T>(fname, &input_elts);
-  run_benchmark(data, batch_manager, verbose_memory, stream);
+ 
+  CUDA_CHECK(cudaFree(d_comp_scratch));
 }
