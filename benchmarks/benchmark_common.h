@@ -243,48 +243,4 @@ std::vector<T> load_dataset_from_txt(char* fname, size_t* input_element_count)
   return buffer;
 }
 
-// Compress a single chunk
-template <typename T>
-static void compress_chunk(
-    const void* const d_in_data,
-    const size_t chunk_size,
-    const nvcompType_t type,
-    const nvcompCascadedFormatOpts* const comp_opts,
-    void* const d_comp_temp,
-    size_t comp_temp_bytes,
-    void* const d_comp_out,
-    size_t* const comp_out_bytes,
-    cudaStream_t stream)
-{
-  size_t metadata_bytes;
-
-  nvcompStatus_t status = nvcompCascadedCompressConfigure(
-      comp_opts,
-      type,
-      chunk_size,
-      &metadata_bytes,
-      &comp_temp_bytes,
-      comp_out_bytes);
-
-  benchmark_assert(
-      status == nvcompSuccess,
-      "nvcompCascadedCompressGetMetadata not successful, chunk");
-
-  status = nvcompCascadedCompressAsync(
-      comp_opts,
-      type,
-      d_in_data,
-      chunk_size,
-      d_comp_temp,
-      comp_temp_bytes,
-      d_comp_out,
-      comp_out_bytes,
-      stream);
-
-  benchmark_assert(
-      status == nvcompSuccess,
-      "nvcompCascadedCompressAsync not successfully launched");
-  CUDA_CHECK(cudaStreamSynchronize(stream));
-}
-
 } // namespace nvcomp
