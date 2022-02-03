@@ -2,6 +2,12 @@
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
 
+## Version 2.2 Release
+
+This minor release of nvCOMP introduces a new high-level interface and 2 extremely fast entropy-only compressors: ANS and gdeflate::ENTROPY_ONLY (see performance charts below).
+
+The redesigned [**high-level**](doc/highlevel_cpp_quickstart.md) interface in nvCOMP 2.2 enhances user experience by storing metadata in the compressed buffer. It can also manage the required scratch space for the user. Finally, unlike the low-level API, the high level interface automatically splits the data into independent chunks for parallel processing. This enables the easiest way to ramp up and use nvCOMP in applications, maintaining similar level of performance as the low-level interface. In nvCOMP 2.2 all compressors are available through both low-level and high-level APIs.
+
 ## nvCOMP Compression algorithms
 
 - Cascaded: Novel high-throughput compressor ideal for analytical or structured/tabular data.
@@ -9,8 +15,9 @@ nvCOMP is a CUDA library that features generic compression interfaces to enable 
 - Snappy: Similar to LZ4, this byte-level compressor is a popular existing format used for tabular data.
 - GDeflate: Proprietary compressor with entropy encoding and LZ77, high compression ratios on arbitrary data.
 - Bitcomp: Proprietary compressor designed for floating point data in Scientific Computing applications.
+- ANS: Proprietary entropy encoder based on asymmetric numerical systems (ANS).
 
-## Compression algorithm sample results
+## Compression algorithm sample results (TO BE UPDATED)
 
 Compression ratio and performance plots for each of the compression methods available in nvCOMP are now provided. Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The presented results are from the 2009Q2 dataset. Instructions for generating the column files used here are provided in the benchmark section below. The numbers were collected on a NVIDIA A100 40GB GPU (with ECC on). 
 
@@ -26,28 +33,8 @@ Compression ratio and performance plots for each of the compression methods avai
 
 ![decompression performance](/doc/DecompressionThroughput.svg)
 
-## Version 2.1 Release
-
-This minor release of nvCOMP enhances the low-level interface by adding configuration options, a new error reporting mechanism and functions that calculate the size of the decompressed output.
-
-nvCOMP 2.1 features new flexible APIs:
-* [**Low-level**](doc/lowlevel_c_quickstart.md) is targeting advanced users —
-  metadata and chunking must be handled outside of nvCOMP, low-level nvCOMP
-  APIs perform batch compression/decompression of multiple streams, they are
-  light-weight and fully asynchronous.
-* [**High-level**](doc/highlevel_cpp_quickstart.md) is provided for ease of use —
-  metadata and chunking is handled internally by nvCOMP, this enables the
-  easiest way to ramp up and use nvCOMP in applications, some of the high-level
-  APIs are synchronous and for best performance/flexibility it’s recommended to
-  use the low-level APIs.
-
-In nvCOMP 2.1 all compressors are available through the low-level API. A high-level API is provided for LZ4, Bitcomp and Cascaded.
-
 ## Known issues
 * Cascaded, GDeflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. However, there are no implicit checksums implemented for any of the compressors. For full verification of the stream, it's recommended to run checksum separately.  
-* The Cascaded high-level compression API requires a large amount of temporary workspace to
-operate. The current workaround is to compress/decompress large datasets in pieces,
-re-using temporary workspaces for each piece. Alternatively, the low-level Cascaded API may be used and uses shared memory for its temp space.
 * Cascaded and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values.
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
 
