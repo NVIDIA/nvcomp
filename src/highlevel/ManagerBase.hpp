@@ -186,7 +186,7 @@ public: // API
   {
     assert(finished_init);
 
-    if (not scratch_buffer_filled) {
+    if (!scratch_buffer_filled) {
       #if CUDART_VERSION >= 11020
         CudaUtils::check(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
       #else
@@ -213,7 +213,7 @@ public: // API
   {
     assert(finished_init);
 
-    if (not scratch_buffer_filled) {
+    if (!scratch_buffer_filled) {
       #if CUDART_VERSION >= 11020
         CudaUtils::check(cudaMallocAsync(&scratch_buffer, scratch_buffer_size, user_stream));
       #else

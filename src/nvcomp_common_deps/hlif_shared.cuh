@@ -31,6 +31,7 @@
 #include <cassert>
 #include <cooperative_groups.h>
 #include <stdio.h>
+#include <type_traits>
 
 #include "nvcomp/shared_types.h"
 #include "hlif_shared_types.hpp"
@@ -142,7 +143,7 @@ __device__ inline void HlifCompressBatch(
     CompressT&& compressor,
     GroupT&& cg_group)
 {
-  if (blockIdx.x == 0 and cg::this_thread_block().thread_rank() == 0) {
+  if (blockIdx.x == 0 && cg::this_thread_block().thread_rank() == 0) {
     fill_common_header(
         compression_args, 
         compressor.get_format_type());
@@ -174,8 +175,9 @@ __device__ inline void HlifCompressBatch(
 
     // Determine the right place to output this buffer.
     if (cg_group.thread_rank() == 0) {
-      static_assert(sizeof(uint64_t) == sizeof(unsigned long long int));
-      compression_args.comp_chunk_offsets[this_ix_chunk] = atomicAdd(
+        static_assert(sizeof(uint64_t) == sizeof(unsigned long long int),
+          "The cast below requires that the sizes are the same.");
+        compression_args.comp_chunk_offsets[this_ix_chunk] = atomicAdd(
           reinterpret_cast<unsigned long long int*>(compression_args.ix_output), 
           compression_args.comp_chunk_sizes[this_ix_chunk]);
     }
