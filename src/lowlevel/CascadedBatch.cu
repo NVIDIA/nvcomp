@@ -31,6 +31,8 @@
 #include "nvcomp/cascaded.h"
 #include "type_macros.h"
 #include "CascadedKernels.cuh"
+#include "Check.h"
+#include "CudaUtils.h"
 
 #include <cstdint>
 
@@ -43,6 +45,8 @@ using nvcomp::cascaded_compress_threadblock_size;
 using nvcomp::cascaded_decompress_threadblock_size;
 using nvcomp::partition_metadata_size;
 using nvcomp::compute_smem_size;
+using nvcomp::Check;
+using nvcomp::CudaUtils;
 
 namespace
 {
@@ -312,16 +316,20 @@ nvcompStatus_t nvcompBatchedCascadedCompressAsync(
     const nvcompBatchedCascadedOpts_t format_opts,
     cudaStream_t stream)
 {
-  NVCOMP_TYPE_ONE_SWITCH(
-      format_opts.type,
-      cascaded_batched_compression_typed,
-      format_opts,
-      device_uncompressed_ptrs,
-      device_uncompressed_bytes,
-      batch_size,
-      device_compressed_ptrs,
-      device_compressed_bytes,
-      stream);
+  try {
+    NVCOMP_TYPE_ONE_SWITCH(
+        format_opts.type,
+        cascaded_batched_compression_typed,
+        format_opts,
+        device_uncompressed_ptrs,
+        device_uncompressed_bytes,
+        batch_size,
+        device_compressed_ptrs,
+        device_compressed_bytes,
+        stream);
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(e, "nvcompBatchedCascadedCompressAsync()");
+  }
 
   return nvcompSuccess;
 }
@@ -345,54 +353,62 @@ nvcompStatus_t nvcompBatchedCascadedDecompressAsync(
     nvcompStatus_t* device_statuses,
     cudaStream_t stream)
 {
+  try {
+    // Just call kernel to perform compression. Macro for datatype happens
+    // within kernel
+    constexpr int threadblock_size = cascaded_decompress_threadblock_size;
 
-  // Just call kernel to perform compression. Macro for datatype happens within
-  // kernel
-  constexpr int threadblock_size = cascaded_decompress_threadblock_size;
+    // call for all 4 possible sizes, all except the correct one will
+    // immediately exit.
 
-  // call for all 4 possible sizes, all except the correct one will immediately
-  // exit.
-
-  // CHAR or UCHAR
-  cascaded_decompression_kernel_type_check<1, size_t, threadblock_size>
-      <<<batch_size, threadblock_size, 0, stream>>>(
-          batch_size,
-          device_compressed_ptrs,
-          device_compressed_bytes,
-          device_uncompressed_ptrs,
-          device_uncompressed_bytes,
-          device_actual_uncompressed_bytes,
-          device_statuses);
-  // SHORT or USHORT
-  cascaded_decompression_kernel_type_check<2, size_t, threadblock_size>
-      <<<batch_size, threadblock_size, 0, stream>>>(
-          batch_size,
-          device_compressed_ptrs,
-          device_compressed_bytes,
-          device_uncompressed_ptrs,
-          device_uncompressed_bytes,
-          device_actual_uncompressed_bytes,
-          device_statuses);
-  // INT or UINT
-  cascaded_decompression_kernel_type_check<4, size_t, threadblock_size>
-      <<<batch_size, threadblock_size, 0, stream>>>(
-          batch_size,
-          device_compressed_ptrs,
-          device_compressed_bytes,
-          device_uncompressed_ptrs,
-          device_uncompressed_bytes,
-          device_actual_uncompressed_bytes,
-          device_statuses);
-  // LONGLONG or ULONGLONG
-  cascaded_decompression_kernel_type_check<8, size_t, threadblock_size>
-      <<<batch_size, threadblock_size, 0, stream>>>(
-          batch_size,
-          device_compressed_ptrs,
-          device_compressed_bytes,
-          device_uncompressed_ptrs,
-          device_uncompressed_bytes,
-          device_actual_uncompressed_bytes,
-          device_statuses);
+    // CHAR or UCHAR
+    cascaded_decompression_kernel_type_check<1, size_t, threadblock_size>
+        <<<batch_size, threadblock_size, 0, stream>>>(
+            batch_size,
+            device_compressed_ptrs,
+            device_compressed_bytes,
+            device_uncompressed_ptrs,
+            device_uncompressed_bytes,
+            device_actual_uncompressed_bytes,
+            device_statuses);
+    CudaUtils::check_last_error();
+    // SHORT or USHORT
+    cascaded_decompression_kernel_type_check<2, size_t, threadblock_size>
+        <<<batch_size, threadblock_size, 0, stream>>>(
+            batch_size,
+            device_compressed_ptrs,
+            device_compressed_bytes,
+            device_uncompressed_ptrs,
+            device_uncompressed_bytes,
+            device_actual_uncompressed_bytes,
+            device_statuses);
+    CudaUtils::check_last_error();
+    // INT or UINT
+    cascaded_decompression_kernel_type_check<4, size_t, threadblock_size>
+        <<<batch_size, threadblock_size, 0, stream>>>(
+            batch_size,
+            device_compressed_ptrs,
+            device_compressed_bytes,
+            device_uncompressed_ptrs,
+            device_uncompressed_bytes,
+            device_actual_uncompressed_bytes,
+            device_statuses);
+    CudaUtils::check_last_error();
+    // LONGLONG or ULONGLONG
+    cascaded_decompression_kernel_type_check<8, size_t, threadblock_size>
+        <<<batch_size, threadblock_size, 0, stream>>>(
+            batch_size,
+            device_compressed_ptrs,
+            device_compressed_bytes,
+            device_uncompressed_ptrs,
+            device_uncompressed_bytes,
+            device_actual_uncompressed_bytes,
+            device_statuses);
+    CudaUtils::check_last_error();
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(
+        e, "nvcompBatchedCascadedDecompressAsync()");
+  }
 
   return nvcompSuccess;
 }
@@ -404,14 +420,21 @@ nvcompStatus_t nvcompBatchedCascadedGetDecompressSizeAsync(
     size_t batch_size,
     cudaStream_t stream)
 {
-  get_decompress_size_kernel<<<
-      roundUpDiv(batch_size, cascaded_decompress_threadblock_size),
-      cascaded_decompress_threadblock_size,
-      0,
-      stream>>>(
-      device_compressed_ptrs,
-      device_compressed_bytes,
-      device_uncompressed_bytes,
-      batch_size);
+  try {
+    get_decompress_size_kernel<<<
+        roundUpDiv(batch_size, cascaded_decompress_threadblock_size),
+        cascaded_decompress_threadblock_size,
+        0,
+        stream>>>(
+        device_compressed_ptrs,
+        device_compressed_bytes,
+        device_uncompressed_bytes,
+        batch_size);
+    CudaUtils::check_last_error();
+  } catch (const std::exception& e) {
+    return Check::exception_to_error(
+        e, "nvcompBatchedCascadedGetDecompressSizeAsync()");
+  }
+
   return nvcompSuccess;
 }
