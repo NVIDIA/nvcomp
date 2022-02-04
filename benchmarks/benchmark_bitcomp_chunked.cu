@@ -35,4 +35,5 @@ GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedBitcompCompressAsync,
     nvcompBatchedBitcompDecompressGetTempSize,
     nvcompBatchedBitcompDecompressAsync,
+    inputAlwaysValid,
     nvcompBatchedBitcompDefaultOpts);

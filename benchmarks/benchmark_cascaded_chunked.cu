@@ -29,11 +29,66 @@
 #include "benchmark_template_chunked.cuh"
 #include "nvcomp/cascaded.h"
 
+#include <iostream>
+#include <vector>
+
 // Template benchmark uses a fixed format Opts, so just defaulting to INT for
 // now.
 // TODO: Update benchmark to accept type as a command-line parameter
 static const nvcompBatchedCascadedOpts_t nvcompBatchedCascadedTestOpts
     = {4096, NVCOMP_TYPE_UINT, 2, 1, 1};
+
+static bool isCascadedInputValid(const std::vector<std::vector<char>>& data)
+{
+  size_t typeSize = 1;
+  auto type = nvcompBatchedCascadedTestOpts.type;
+  switch (type) {
+  case NVCOMP_TYPE_CHAR:
+  case NVCOMP_TYPE_UCHAR:
+    static_assert(
+        sizeof(uint8_t) == 1 && sizeof(int8_t) == 1,
+        "Compile-time check for clarity");
+    return true;
+  case NVCOMP_TYPE_SHORT:
+  case NVCOMP_TYPE_USHORT:
+    static_assert(
+        sizeof(uint16_t) == 2 && sizeof(int16_t) == 2,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint16_t);
+    break;
+  case NVCOMP_TYPE_INT:
+  case NVCOMP_TYPE_UINT:
+    static_assert(
+        sizeof(uint32_t) == 4 && sizeof(int32_t) == 4,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint32_t);
+    break;
+  case NVCOMP_TYPE_LONGLONG:
+  case NVCOMP_TYPE_ULONGLONG:
+    static_assert(
+        sizeof(uint64_t) == 8 && sizeof(int64_t) == 8,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint64_t);
+    break;
+  default:
+    std::cerr << "ERROR: Cascaded data type must be 0-7 (CHAR, UCHAR, SHORT, "
+                 "USHORT, INT, UINT, LONGLONG, or ULONGLONG), "
+                 "but it is "
+              << int(type) << std::endl;
+    return false;
+  }
+
+  for (const auto& chunk : data) {
+    if ((chunk.size() % typeSize) != 0) {
+      std::cerr << "ERROR: Input data must have a length and chunk size that "
+                   "are a multiple of "
+                << typeSize << ", the size of the specified data type."
+                << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
 
 GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedCascadedCompressGetTempSize,
@@ -41,4 +96,5 @@ GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedCascadedCompressAsync,
     nvcompBatchedCascadedDecompressGetTempSize,
     nvcompBatchedCascadedDecompressAsync,
+    isCascadedInputValid,
     nvcompBatchedCascadedTestOpts);

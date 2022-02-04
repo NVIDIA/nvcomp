@@ -44,6 +44,7 @@
     comp_async, \
     decomp_get_temp, \
     decomp_async, \
+    is_input_valid, \
     format_opts) \
 void run_benchmark( \
     const std::vector<std::vector<char>>& data, \
@@ -60,6 +61,7 @@ void run_benchmark( \
       comp_async, \
       decomp_get_temp, \
       decomp_async, \
+      is_input_valid, \
       format_opts, \
       data, \
       warmup, \
@@ -68,6 +70,12 @@ void run_benchmark( \
       tab_separator, \
       duplicate_count, \
       num_files); \
+}
+
+// A helper function for if the input data requires no validation.
+static bool inputAlwaysValid(const std::vector<std::vector<char>>& data)
+{
+  return true;
 }
 
 using namespace nvcomp;
@@ -299,6 +307,7 @@ template<
     typename CompAsyncT,
     typename DecompGetTempT,
     typename DecompAsyncT,
+    typename IsInputValidT,
     typename FormatOptsT>
 void
 run_benchmark_template(
@@ -307,6 +316,7 @@ run_benchmark_template(
     CompAsyncT BatchedCompressAsync,
     DecompGetTempT BatchedDecompressGetTempSize,
     DecompAsyncT BatchedDecompressAsync,
+    IsInputValidT IsInputValid,
     const FormatOptsT format_opts,
     const std::vector<std::vector<char>>& data,
     const bool warmup,
@@ -316,6 +326,8 @@ run_benchmark_template(
     const size_t duplicates,
     const size_t num_files)
 {
+  benchmark_assert(IsInputValid(data), "Invalid input data");
+
   const std::string separator = use_tabs ? "\t" : ",";
 
   size_t total_bytes = 0;
@@ -470,7 +482,7 @@ run_benchmark_template(
     for (size_t i = 0; i < batch_size; ++i) {
       benchmark_assert(h_decomp_statuses[i] == nvcompSuccess, "Batch item not successfuly decompressed: i=" + std::to_string(i) + ": status=" +
       std::to_string(h_decomp_statuses[i]));
-      benchmark_assert(h_decomp_sizes[i] == h_input_sizes[i], "Batch item of wrong sizer: i=" + std::to_string(i) + ": act_size=" +
+      benchmark_assert(h_decomp_sizes[i] == h_input_sizes[i], "Batch item of wrong size: i=" + std::to_string(i) + ": act_size=" +
       std::to_string(h_decomp_sizes[i]) + " exp_size=" +
       std::to_string(h_input_sizes[i]));
     }
