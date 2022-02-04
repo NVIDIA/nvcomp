@@ -39,14 +39,23 @@ static bool isLZ4InputValid(const std::vector<std::vector<char>>& data)
   case NVCOMP_TYPE_BITS:
   case NVCOMP_TYPE_CHAR:
   case NVCOMP_TYPE_UCHAR:
+    static_assert(
+        sizeof(uint8_t) == 1 && sizeof(int8_t) == 1,
+        "Compile-time check for clarity");
     return true;
   case NVCOMP_TYPE_SHORT:
   case NVCOMP_TYPE_USHORT:
-    typeSize = 2;
+    static_assert(
+        sizeof(uint16_t) == 2 && sizeof(int16_t) == 2,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint16_t);
     break;
   case NVCOMP_TYPE_INT:
   case NVCOMP_TYPE_UINT:
-    typeSize = 4;
+    static_assert(
+        sizeof(uint32_t) == 4 && sizeof(int32_t) == 4,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint32_t);
     break;
   default:
     std::cerr << "ERROR: LZ4 data type must be 0-5 or 255 (CHAR, UCHAR, SHORT, "

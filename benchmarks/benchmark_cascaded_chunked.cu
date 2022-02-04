@@ -45,18 +45,30 @@ static bool isCascadedInputValid(const std::vector<std::vector<char>>& data)
   switch (type) {
   case NVCOMP_TYPE_CHAR:
   case NVCOMP_TYPE_UCHAR:
+    static_assert(
+        sizeof(uint8_t) == 1 && sizeof(int8_t) == 1,
+        "Compile-time check for clarity");
     return true;
   case NVCOMP_TYPE_SHORT:
   case NVCOMP_TYPE_USHORT:
-    typeSize = 2;
+    static_assert(
+        sizeof(uint16_t) == 2 && sizeof(int16_t) == 2,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint16_t);
     break;
   case NVCOMP_TYPE_INT:
   case NVCOMP_TYPE_UINT:
-    typeSize = 4;
+    static_assert(
+        sizeof(uint32_t) == 4 && sizeof(int32_t) == 4,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint32_t);
     break;
   case NVCOMP_TYPE_LONGLONG:
   case NVCOMP_TYPE_ULONGLONG:
-    typeSize = 8;
+    static_assert(
+        sizeof(uint64_t) == 8 && sizeof(int64_t) == 8,
+        "Compile-time check for clarity");
+    typeSize = sizeof(uint64_t);
     break;
   default:
     std::cerr << "ERROR: Cascaded data type must be 0-7 (CHAR, UCHAR, SHORT, "
