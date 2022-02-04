@@ -15,7 +15,7 @@ The redesigned [**high-level**](doc/highlevel_cpp_quickstart.md) interface in nv
 - Snappy: Similar to LZ4, this byte-level compressor is a popular existing format used for tabular data.
 - GDeflate: Proprietary compressor with entropy encoding and LZ77, high compression ratios on arbitrary data.
 - Bitcomp: Proprietary compressor designed for floating point data in Scientific Computing applications.
-- ANS: Proprietary entropy encoder based on asymmetric numerical systems (ANS).
+- ANS: Proprietary entropy encoder based on asymmetric numeral systems (ANS).
 
 ## Compression algorithm sample results
 
@@ -54,9 +54,10 @@ To configure nvCOMP extensions, simply define the `NVCOMP_EXTS_ROOT` variable
 to allow CMake to find the library
 
 First, download nvCOMP extensions from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp).
-There two available extensions.
+There three available extensions.
 1. Bitcomp
 2. GDeflate
+3. ANS
 ```
 git clone https://github.com/NVIDIA/nvcomp.git
 cd nvcomp
@@ -137,26 +138,27 @@ Convert CSV files to binary files:
 - *Note*: make sure that the delimiter is set correctly, default is `,`
 
 Run benchmarks:
-- Various benchmarks are provided in the benchmarks/ folder. For example, here we demonstrate execution of `./bin/benchmark_cascaded_auto`  and `./bin/benchmark_lz4` with `-f column_data.bin <options>`.
+- Various benchmarks are provided in the benchmarks/ folder. For example, here we demonstrate execution of the low-level and high level benchmarks for lz4.
+Other formats can be executed similarly.
 
-Below are some example benchmark results on a RTX 3090 for the Mortgage 2000Q4 column 0:
+Below are some example benchmark results on a A100 for the Mortgage 2009Q2 column 0:
 
 ```
-$ ./bin/benchmark_cascaded_auto -f ../../nvcomp-data/perf/2000Q4.bin -t long
+./bin/benchmark_hlif lz4 -f /data/nvcomp/benchmark/mortgage-2009Q2-col0-long.bin
 ----------
-uncompressed (B): 81289736
-comp_size: 2047064, compressed ratio: 39.71
-compression throughput (GB/s): 225.60
-decompression throughput (GB/s): 374.95
+uncompressed (B): 329055928
+comp_size: 8582564, compressed ratio: 38.34
+compression throughput (GB/s): 90.48
+decompression throughput (GB/s): 312.81
 ```
 
 ```
-$ ./bin/benchmark_lz4 -f ../../nvcomp-data/perf/2000Q4.bin
+./bin/benchmark_lz4_chunked -f /data/nvcomp/benchmark/mortgage-2009Q2-col0-long.bin
 ----------
-uncompressed (B): 81289736
-comp_size: 3831058, compressed ratio: 21.22
-compression throughput (GB/s): 36.64
-decompression throughput (GB/s): 118.47
+uncompressed (B): 329055928
+comp_size: 8461988, compressed ratio: 38.89
+compression throughput (GB/s): 95.87
+decompression throughput (GB/s): 320.70
 ```
 
 ## Running examples

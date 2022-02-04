@@ -30,7 +30,8 @@
 #include <assert.h>
 #include <iostream>
 
-#include "nvcomp/nvcompManager.hpp"
+#include "nvcomp/lz4.hpp"
+#include "nvcomp.hpp"
 #include "nvcomp/nvcompManagerFactory.hpp"
 
 /* 
@@ -57,8 +58,7 @@ using namespace nvcomp;
   } while (false)
 
 /**
- * In this example, we 
- * 
+ * In this example, we:
  *  1) compress the input data
  *  2) construct a new manager using the input data for demonstration purposes
  *  3) decompress the input data
@@ -101,13 +101,10 @@ void decomp_compressed_with_manager_factory_example(uint8_t* device_input_ptrs, 
 }
 
 /**
- * Or, we can use the same manager for both compression and decompression.
- * 
- * In this example, we 
- * 
- *  0) construct an nvcompManager
- *  1) compress the input data
- *  2) decompress the input data
+ * In this example, we:
+ *  1) construct an nvcompManager
+ *  2) compress the input data
+ *  3) decompress the input data
  */ 
 void comp_decomp_with_single_manager(uint8_t* device_input_ptrs, const size_t input_buffer_len)
 {
