@@ -29,11 +29,47 @@
 #include "benchmark_template_chunked.cuh"
 #include "nvcomp/cascaded.h"
 
+#include <iostream>
+#include <vector>
+
 // Template benchmark uses a fixed format Opts, so just defaulting to INT for
 // now.
 // TODO: Update benchmark to accept type as a command-line parameter
 static const nvcompBatchedCascadedOpts_t nvcompBatchedCascadedTestOpts
     = {4096, NVCOMP_TYPE_UINT, 2, 1, 1};
+
+static bool isCascadedInputValid(const std::vector<std::vector<char>>& data)
+{
+  size_t typeSize = 1;
+  auto type = nvcompBatchedCascadedTestOpts.type;
+  switch (type) {
+  case NVCOMP_TYPE_SHORT:
+  case NVCOMP_TYPE_USHORT:
+    typeSize = 2;
+    break;
+  case NVCOMP_TYPE_INT:
+  case NVCOMP_TYPE_UINT:
+    typeSize = 4;
+    break;
+  case NVCOMP_TYPE_LONGLONG:
+  case NVCOMP_TYPE_ULONGLONG:
+    typeSize = 8;
+    break;
+  default:
+    return true;
+  }
+
+  for (const auto& chunk : data) {
+    if ((chunk.size() % typeSize) != 0) {
+      std::cerr << "ERROR: Input data must have a length and chunk size that "
+                   "are a multiple of "
+                << typeSize << ", the size of the specified data type."
+                << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
 
 GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedCascadedCompressGetTempSize,
@@ -41,4 +77,5 @@ GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedCascadedCompressAsync,
     nvcompBatchedCascadedDecompressGetTempSize,
     nvcompBatchedCascadedDecompressAsync,
+    isCascadedInputValid,
     nvcompBatchedCascadedTestOpts);
