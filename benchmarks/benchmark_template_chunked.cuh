@@ -326,9 +326,7 @@ run_benchmark_template(
     const size_t duplicates,
     const size_t num_files)
 {
-  if (!IsInputValid(data)) {
-    return;
-  }
+  benchmark_assert(IsInputValid(data), "Invalid input data");
 
   const std::string separator = use_tabs ? "\t" : ",";
 
