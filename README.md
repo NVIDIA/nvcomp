@@ -17,7 +17,7 @@ The redesigned [**high-level**](doc/highlevel_cpp_quickstart.md) interface in nv
 - Bitcomp: Proprietary compressor designed for floating point data in Scientific Computing applications.
 - ANS: Proprietary entropy encoder based on asymmetric numerical systems (ANS).
 
-## Compression algorithm sample results (TO BE UPDATED)
+## Compression algorithm sample results
 
 Compression ratio and performance plots for each of the compression methods available in nvCOMP are now provided. Each column shows results for a single column from an analytical dataset derived from [Fannie Mae’s Single-Family Loan Performance Data](http://www.fanniemae.com/portal/funding-the-market/data/loan-performance-data.html). The presented results are from the 2009Q2 dataset. Instructions for generating the column files used here are provided in the benchmark section below. The numbers were collected on a NVIDIA A100 40GB GPU (with ECC on). 
 
