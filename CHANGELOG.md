@@ -1,3 +1,22 @@
+# nvcomp 2.2.0 (2022-02-07)
+## New Features
+ - Entropy-only mode for GDeflate
+ - New high-level interface
+ - Windows support
+ - Support for GPU-accelerated ANS
+
+## Interface Changes
+
+### High level interface
+ - High level interface is now standardized across compressor formats. 
+ - This interface provides a single nvcompManagerBase object that
+ can do compression and decompression. Users can now decompress nvcomp-compressed
+ files without knowing how they were compressed. The interface also can manage scratch space 
+ and splitting the input buffer into independent chunks for parallel processing.
+
+### API Consolidation
+ - nvCOMP now supports only the low-level batch API and the new high level interface
+
 # nvcomp 2.1.0 (2021-10-28)
 
 ## New Features
