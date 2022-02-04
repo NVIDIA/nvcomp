@@ -29,11 +29,50 @@
 #include "benchmark_template_chunked.cuh"
 #include "nvcomp/lz4.h"
 
+static const nvcompBatchedLZ4Opts_t nvcompBatchedLZ4TestOpts{NVCOMP_TYPE_CHAR};
+
+static bool isLZ4InputValid(const std::vector<std::vector<char>>& data)
+{
+  size_t typeSize = 1;
+  auto type = nvcompBatchedLZ4TestOpts.data_type;
+  switch (type) {
+  case NVCOMP_TYPE_BITS:
+  case NVCOMP_TYPE_CHAR:
+  case NVCOMP_TYPE_UCHAR:
+    return true;
+  case NVCOMP_TYPE_SHORT:
+  case NVCOMP_TYPE_USHORT:
+    typeSize = 2;
+    break;
+  case NVCOMP_TYPE_INT:
+  case NVCOMP_TYPE_UINT:
+    typeSize = 4;
+    break;
+  default:
+    std::cerr << "ERROR: LZ4 data type must be 0-5 or 255 (CHAR, UCHAR, SHORT, "
+                 "USHORT, INT, UINT, or BITS), "
+                 "but it is "
+              << int(type) << std::endl;
+    return false;
+  }
+
+  for (const auto& chunk : data) {
+    if ((chunk.size() % typeSize) != 0) {
+      std::cerr << "ERROR: Input data must have a length and chunk size that "
+                   "are a multiple of "
+                << typeSize << ", the size of the specified data type."
+                << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
+
 GENERATE_CHUNKED_BENCHMARK(
     nvcompBatchedLZ4CompressGetTempSize,
     nvcompBatchedLZ4CompressGetMaxOutputChunkSize,
     nvcompBatchedLZ4CompressAsync,
     nvcompBatchedLZ4DecompressGetTempSize,
     nvcompBatchedLZ4DecompressAsync,
-    inputAlwaysValid,
-    nvcompBatchedLZ4DefaultOpts);
+    isLZ4InputValid,
+    nvcompBatchedLZ4TestOpts);

@@ -43,6 +43,9 @@ static bool isCascadedInputValid(const std::vector<std::vector<char>>& data)
   size_t typeSize = 1;
   auto type = nvcompBatchedCascadedTestOpts.type;
   switch (type) {
+  case NVCOMP_TYPE_CHAR:
+  case NVCOMP_TYPE_UCHAR:
+    return true;
   case NVCOMP_TYPE_SHORT:
   case NVCOMP_TYPE_USHORT:
     typeSize = 2;
@@ -56,7 +59,11 @@ static bool isCascadedInputValid(const std::vector<std::vector<char>>& data)
     typeSize = 8;
     break;
   default:
-    return true;
+    std::cerr << "ERROR: Cascaded data type must be 0-7 (CHAR, UCHAR, SHORT, "
+                 "USHORT, INT, UINT, LONGLONG, or ULONGLONG), "
+                 "but it is "
+              << int(type) << std::endl;
+    return false;
   }
 
   for (const auto& chunk : data) {
