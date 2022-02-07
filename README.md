@@ -94,7 +94,6 @@ or on Windows by right-clicking the "INSTALL" project in Visual Studio and selec
 
 * [High-level Quick Start Guide](doc/highlevel_cpp_quickstart.md)
 * [Low-level Quick Start Guide](doc/lowlevel_c_quickstart.md)
-* [Cascaded Format Selector Guide](doc/selector-quickstart.md)
 
 
 ## Further information about some of our compression algorithms
