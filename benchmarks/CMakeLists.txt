@@ -1,11 +1,11 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.cu)
 
 if(NOT ans_FOUND)
-  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_ans.cpp")
+  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_ans_chunked.cu")
 endif()
 
 if(NOT bitcomp_FOUND)
-  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_bitcomp.cpp")
+  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_bitcomp_chunked.cu")
 endif()
 
 foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
