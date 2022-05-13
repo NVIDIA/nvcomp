@@ -29,32 +29,40 @@
 #include "benchmark_template_chunked.cuh"
 #include "nvcomp/lz4.h"
 
-static const nvcompBatchedLZ4Opts_t nvcompBatchedLZ4TestOpts{NVCOMP_TYPE_CHAR};
+static nvcompBatchedLZ4Opts_t nvcompBatchedLZ4TestOpts{NVCOMP_TYPE_CHAR};
+
+static bool handleCommandLineArgument(
+    const std::string& arg,
+    const char* const* additionalArgs,
+    size_t& additionalArgsUsed)
+{
+  if (arg == "--type" || arg == "-t") {
+    const char* const typeArg = *additionalArgs;
+    additionalArgsUsed = 1;
+    bool valid;
+    nvcompBatchedLZ4TestOpts.data_type = string_to_data_type(typeArg, valid);
+    return valid;
+  }
+  return false;
+}
 
 static bool isLZ4InputValid(const std::vector<std::vector<char>>& data)
 {
+  // Find the type size, to check that all chunk sizes are a multiple of it.
   size_t typeSize = 1;
   auto type = nvcompBatchedLZ4TestOpts.data_type;
   switch (type) {
   case NVCOMP_TYPE_BITS:
   case NVCOMP_TYPE_CHAR:
   case NVCOMP_TYPE_UCHAR:
-    static_assert(
-        sizeof(uint8_t) == 1 && sizeof(int8_t) == 1,
-        "Compile-time check for clarity");
+    // Type size is 1 byte, so chunk sizes are always a multiple of it.
     return true;
   case NVCOMP_TYPE_SHORT:
   case NVCOMP_TYPE_USHORT:
-    static_assert(
-        sizeof(uint16_t) == 2 && sizeof(int16_t) == 2,
-        "Compile-time check for clarity");
     typeSize = sizeof(uint16_t);
     break;
   case NVCOMP_TYPE_INT:
   case NVCOMP_TYPE_UINT:
-    static_assert(
-        sizeof(uint32_t) == 4 && sizeof(int32_t) == 4,
-        "Compile-time check for clarity");
     typeSize = sizeof(uint32_t);
     break;
   default:
@@ -77,11 +85,28 @@ static bool isLZ4InputValid(const std::vector<std::vector<char>>& data)
   return true;
 }
 
-GENERATE_CHUNKED_BENCHMARK(
-    nvcompBatchedLZ4CompressGetTempSize,
-    nvcompBatchedLZ4CompressGetMaxOutputChunkSize,
-    nvcompBatchedLZ4CompressAsync,
-    nvcompBatchedLZ4DecompressGetTempSize,
-    nvcompBatchedLZ4DecompressAsync,
-    isLZ4InputValid,
-    nvcompBatchedLZ4TestOpts);
+void run_benchmark(
+    const std::vector<std::vector<char>>& data,
+    const bool warmup,
+    const size_t count,
+    const bool csv_output,
+    const bool tab_separator,
+    const size_t duplicate_count,
+    const size_t num_files)
+{
+  run_benchmark_template(
+      nvcompBatchedLZ4CompressGetTempSize,
+      nvcompBatchedLZ4CompressGetMaxOutputChunkSize,
+      nvcompBatchedLZ4CompressAsync,
+      nvcompBatchedLZ4DecompressGetTempSize,
+      nvcompBatchedLZ4DecompressAsync,
+      isLZ4InputValid,
+      nvcompBatchedLZ4TestOpts,
+      data,
+      warmup,
+      count,
+      csv_output,
+      tab_separator,
+      duplicate_count,
+      num_files);
+}

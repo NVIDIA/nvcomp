@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  // if `-f` is speficieid, assume single file mode
+  // if `-f` is specified, assume single file mode
   if (strcmp(argv[1], "-f") == 0) {
     if (argc == 2) {
       std::cerr << "Missing file name following '-f'" << std::endl;

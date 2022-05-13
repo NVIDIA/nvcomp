@@ -62,7 +62,6 @@ static void run_example(const std::vector<std::vector<char>>& data)
   // Allocate and prepare output/compressed batch
   BatchDataCPU compress_data_cpu(max_out_bytes, input_data_cpu.size());
 
-#ifdef ENABLE_GDEFLATE
   // Compress on the CPU using gdeflate CPU batched API
   gdeflate::compressCPU(
       input_data_cpu.ptrs(),
@@ -71,10 +70,6 @@ static void run_example(const std::vector<std::vector<char>>& data)
       input_data_cpu.size(),
       compress_data_cpu.ptrs(),
       compress_data_cpu.sizes());
-#else
-  throw std::runtime_error("nvcomp configured without gdeflate support. "
-      "Please check the documentation for details on configuring nvcomp with gdeflate.")
-#endif
 
   // compute compression ratio
   size_t* compressed_sizes_host = compress_data_cpu.sizes();
@@ -113,12 +108,10 @@ static void run_example(const std::vector<std::vector<char>>& data)
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
 
   size_t* d_decomp_sizes;
-  CUDA_CHECK(
-      cudaMalloc((void**)&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
+  CUDA_CHECK(cudaMalloc(&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
 
   nvcompStatus_t* d_statuses;
-  CUDA_CHECK(cudaMalloc(
-      (void**)&d_statuses, decomp_data.size() * sizeof(nvcompStatus_t)));
+  CUDA_CHECK(cudaMalloc(&d_statuses, decomp_data.size() * sizeof(nvcompStatus_t)));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -218,7 +211,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  // if `-f` is speficieid, assume single file mode
+  // if `-f` is specified, assume single file mode
   if (strcmp(argv[1], "-f") == 0) {
     if (argc == 2) {
       std::cerr << "Missing file name following '-f'" << std::endl;

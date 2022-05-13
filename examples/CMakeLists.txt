@@ -3,7 +3,7 @@ file(GLOB GDEFLATE_CPU_SOURCES *gdeflate_cpu*.cpp *gdeflate_cpu*.cu)
 # Add gdeflate CPU executables 
 # gdeflate CPU examples require gdeflate and zlib libraries
 # skip gdeflate CPU examples if required libraries are missing
-if (gdeflate_FOUND AND ZLIB_FOUND)
+if (ZLIB_FOUND)
   foreach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
     # cut off suffixes
     string(REPLACE ".cpp" "" EXAMPLE_NAME ${EXAMPLE_SOURCE})
@@ -15,12 +15,10 @@ if (gdeflate_FOUND AND ZLIB_FOUND)
     else()
       target_link_libraries(${BARE_NAME} PRIVATE nvcomp)
     endif()
-    target_include_directories(${BARE_NAME} PRIVATE ${GDEFLATE_INCLUDE_DIRS})
-    target_link_libraries(${BARE_NAME} PRIVATE gdeflate)
-    target_link_libraries(${BARE_NAME} PRIVATE gdeflate_cpu ZLIB::ZLIB)
+    target_link_libraries(${BARE_NAME} PRIVATE nvcomp_gdeflate_cpu ZLIB::ZLIB)
   endforeach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
 else()
-  message(WARNING "Skipping building gdeflate CPU example, as gdeflate and/or zlib libraries are not found.")
+  message(WARNING "Skipping building gdeflate CPU example, as zlib library not found.")
 endif()
 
 option (BUILD_GDS_EXAMPLE "Build NVCOMP + GDS example" OFF)

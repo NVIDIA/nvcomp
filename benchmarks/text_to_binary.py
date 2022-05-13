@@ -50,9 +50,22 @@ if len(sys.argv) != 5 and len(sys.argv) != 6:
     print("Usage:")
     print("\tcsv_to_binary.py <input filename> <column choice> <datatype> <output filename> [delimiter]")
     print()
+    print("This program converts one column of a text file containing a table of data,")
+    print("(a comma-separated values file by default), into a binary file.")
+    print()
     print("The <column choice> should be an integer in the range [0, N-1], where N is the number of columns.") 
-    print("The <datatype> option should be one of 'int', 'long', or 'float'.")
+    print("The <datatype> option should be one of 'int', 'long', 'float', 'double', or 'string'.")
+    print("'string' keeps the text, converting it to UTF-16 with no separators between the values.")
     print("The [delimiter] is an optional argument, and defaults to '%s'" % delimiter)
+    print("Some delimiters may need to be surrounded by quotation marks or prefixed by a backslash, depending on")
+    print("the shell, for example space, semicolon, or vertical pipe, due to the command line parsing")
+    print("interpreting the space or semicolon as a parameter separator or command separator, instead of a")
+    print("parameter to this script.")
+    print()
+    print("Examples:")
+    print("    text_to_binary.py ExampleFloatData.csv 2 float ZValues.bin")
+    print("    text_to_binary.py ExampleTable.txt 5 long Dates.bin '|'")
+    print("    text_to_binary.py SpaceSeparatedData.txt 0 int FirstColumn.bin ' '")
     print()
     exit()
 
@@ -71,17 +84,18 @@ elif datatype == "long":
     dtype = "int64"
 elif datatype == "float":
     dtype = "float32"
+elif datatype == "double":
+    dtype = "float64"
 elif datatype == "string":
     dtype = "str"
 else:
-    print("Please select datatype int or long")
+    print("Please select datatype int, long, float, double, or string")
     exit()
 
 
 print("Reading column " + col_num + ", of type " + datatype + "...")
 
 chunk_size = 10000000
-iters=0
 finished = False
 offset = 0
 with open(str(in_fname), "r") as inFile:
@@ -89,9 +103,7 @@ with open(str(in_fname), "r") as inFile:
         with warnings.catch_warnings():
             while not finished:
                 in_data=numpy.genfromtxt(inFile, dtype=dtype,
-                max_rows=chunk_size, usecols=[int(col_num)], delimiter=delimiter, loose=False)
-
-                iters = iters+1
+                max_rows=chunk_size, usecols=(int(col_num),), delimiter=delimiter, loose=False)
 
                 if offset == 0:
                     # don't warn about an empty file after we have read something
@@ -102,4 +114,7 @@ with open(str(in_fname), "r") as inFile:
                     offset += in_data.size
                 else:
                     finished = True
-print(iters)
+if offset != 0:
+    print('Wrote '+str(offset)+' '+datatype+'s to '+str(out_fname))
+else:
+    print('Wrote no data')

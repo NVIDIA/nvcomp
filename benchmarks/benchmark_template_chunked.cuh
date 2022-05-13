@@ -38,44 +38,55 @@
 #include <thrust/device_vector.h>
 #include <vector>
 
-#define GENERATE_CHUNKED_BENCHMARK( \
-    comp_get_temp, \
-    comp_get_output, \
-    comp_async, \
-    decomp_get_temp, \
-    decomp_async, \
-    is_input_valid, \
-    format_opts) \
-void run_benchmark( \
-    const std::vector<std::vector<char>>& data, \
-    const bool warmup, \
-    const size_t count, \
-    const bool csv_output, \
-    const bool tab_separator, \
-    const size_t duplicate_count, \
-    const size_t num_files) \
-{ \
-  run_benchmark_template( \
-      comp_get_temp, \
-      comp_get_output, \
-      comp_async, \
-      decomp_get_temp, \
-      decomp_async, \
-      is_input_valid, \
-      format_opts, \
-      data, \
-      warmup, \
-      count, \
-      csv_output, \
-      tab_separator, \
-      duplicate_count, \
-      num_files); \
-}
+// Each benchmark must implement this, returning true if the argument
+// was handled.  If the benchmark has no custom arguments, its
+// implementation can just return false.
+static bool handleCommandLineArgument(
+    const std::string& arg,
+    const char* const* additionalArgs,
+    size_t& additionalArgsUsed);
 
 // A helper function for if the input data requires no validation.
 static bool inputAlwaysValid(const std::vector<std::vector<char>>& data)
 {
   return true;
+}
+
+static nvcompType_t string_to_data_type(const char* name, bool& valid)
+{
+  valid = true;
+  if (strcmp(name, "char") == 0) {
+    return NVCOMP_TYPE_CHAR;
+  }
+  if (strcmp(name, "short") == 0) {
+    return NVCOMP_TYPE_SHORT;
+  }
+  if (strcmp(name, "int") == 0) {
+    return NVCOMP_TYPE_INT;
+  }
+  if (strcmp(name, "longlong") == 0) {
+    return NVCOMP_TYPE_LONGLONG;
+  }
+  if (strcmp(name, "uchar") == 0) {
+    return NVCOMP_TYPE_UCHAR;
+  }
+  if (strcmp(name, "ushort") == 0) {
+    return NVCOMP_TYPE_USHORT;
+  }
+  if (strcmp(name, "uint") == 0) {
+    return NVCOMP_TYPE_UINT;
+  }
+  if (strcmp(name, "ulonglong") == 0) {
+    return NVCOMP_TYPE_ULONGLONG;
+  }
+  if (strcmp(name, "bits") == 0) {
+    return NVCOMP_TYPE_BITS;
+  }
+
+  std::cerr << "ERROR: Unhandled type argument \"" << name << "\""
+            << std::endl;
+  valid = false;
+  return NVCOMP_TYPE_BITS;
 }
 
 using namespace nvcomp;
@@ -253,11 +264,11 @@ std::vector<std::vector<char>> readFileWithPageSizes(const std::string& filename
 
   while (!fin.eof()) {
     uint64_t chunk_size;
-    fin.read((char *)(&chunk_size), sizeof(uint64_t));
+    fin.read(reinterpret_cast<char *>(&chunk_size), sizeof(uint64_t));
     if (fin.eof())
       break;
     res.emplace_back(chunk_size);
-    fin.read((char *)(res.back().data()), chunk_size);
+    fin.read(reinterpret_cast<char*>(res.back().data()), chunk_size);
   }
 
   return res;
@@ -429,19 +440,18 @@ run_benchmark_template(
 
     size_t* d_decomp_sizes;
     CUDA_CHECK(cudaMalloc(
-        (void**)&d_decomp_sizes, batch_size*sizeof(*d_decomp_sizes)));
+        &d_decomp_sizes, batch_size*sizeof(*d_decomp_sizes)));
 
     nvcompStatus_t* d_decomp_statuses;
     CUDA_CHECK(cudaMalloc(
-        (void**)&d_decomp_statuses, batch_size*sizeof(*d_decomp_statuses)));
+        &d_decomp_statuses, batch_size*sizeof(*d_decomp_statuses)));
 
     std::vector<void*> h_output_ptrs(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
-      CUDA_CHECK(cudaMalloc((void**)&h_output_ptrs[i], h_input_sizes[i]));
+      CUDA_CHECK(cudaMalloc(&h_output_ptrs[i], h_input_sizes[i]));
     }
     void ** d_output_ptrs;
-    CUDA_CHECK(cudaMalloc((void**)&d_output_ptrs,
-        sizeof(*d_output_ptrs)*batch_size));
+    CUDA_CHECK(cudaMalloc(&d_output_ptrs, sizeof(*d_output_ptrs)*batch_size));
     CUDA_CHECK(cudaMemcpy(d_output_ptrs, h_output_ptrs.data(),
         sizeof(*d_output_ptrs)*batch_size, cudaMemcpyHostToDevice));
 
@@ -475,7 +485,7 @@ run_benchmark_template(
     std::vector<size_t> h_decomp_sizes(batch_size);
     CUDA_CHECK(cudaMemcpy(h_decomp_sizes.data(), d_decomp_sizes,
       sizeof(*d_decomp_sizes)*batch_size, cudaMemcpyDeviceToHost));
-
+    
     std::vector<nvcompStatus_t> h_decomp_statuses(batch_size);
     CUDA_CHECK(cudaMemcpy(h_decomp_statuses.data(), d_decomp_statuses,
       sizeof(*d_decomp_statuses)*batch_size, cudaMemcpyDeviceToHost));
@@ -502,7 +512,7 @@ run_benchmark_template(
             h_input_sizes[i], cudaMemcpyDeviceToHost));
         std::vector<uint8_t> act_data(h_decomp_sizes[i]);
         CUDA_CHECK(cudaMemcpy(act_data.data(), h_output_ptrs[i],
-            h_decomp_sizes[i], cudaMemcpyDeviceToHost));
+        h_decomp_sizes[i], cudaMemcpyDeviceToHost));
         for (size_t j = 0; j < h_input_sizes[i]; ++j) {
           if (act_data[j] != exp_data[j]) {
             benchmark_assert(false, "Batch item decompressed output did not match input: i="+std::to_string(i) + ": j=" + std::to_string(j) + " act=" + std::to_string(act_data[j]) + " exp=" +
@@ -540,7 +550,7 @@ run_benchmark_template(
       std::cout << "files: " << num_files << std::endl;
       std::cout << "uncompressed (B): " << total_bytes << std::endl;
       std::cout << "comp_size: " << compressed_size 
-                << ", compressed ratio: " << std::fixed << std::setprecision(2)
+                << ", compressed ratio: " << std::fixed << std::setprecision(4)
                 << comp_ratio << std::endl;
       std::cout << "compression throughput (GB/s): " << compression_throughput_gbs << std::endl;
       std::cout << "decompression throughput (GB/s): " << decompression_throughput_gbs << std::endl;
@@ -653,7 +663,7 @@ args_type parse_args(int argc, char ** argv) {
   args.chunk_size = 65536;
 
   const std::vector<parameter_type> params{
-    {"h", "help", "Show options.", ""},
+    {"?", "help", "Show options.", ""},
     {"g", "gpu", "GPU device number", std::to_string(args.gpu)},
     {"f", "input_file", "The list of inputs files. All files must start "
         "with a character other than '-'", "_required_"},
@@ -661,14 +671,14 @@ args_type parse_args(int argc, char ** argv) {
         std::to_string(args.warmup_count)},
     {"i", "iteration_count", "The number of runs to average.",
         std::to_string(args.iteration_count)},
-    {"x", "duplicate_data", "CLone uncompressed chunks multiple times.",
+    {"x", "duplicate_data", "Clone uncompressed chunks multiple times.",
         std::to_string(args.duplicate_count)},
     {"c", "csv_output", "Output in column/csv format.",
         bool_to_string(args.csv_output)},
-    {"t", "tab_separator", "Use tabs instead of commas when "
+    {"e", "tab_separator", "Use tabs instead of commas when "
         "'--csv_output' is specificed.",
         bool_to_string(args.use_tabs)},
-    {"w", "file_with_page_sizes", "File(s) contain pages, each prefix "
+    {"s", "file_with_page_sizes", "File(s) contain pages, each prefixed "
         "with int64 size.", bool_to_string(args.has_page_sizes)},
     {"p", "chunk_size", "Chunk size when splitting uncompressed data.",
         std::to_string(args.chunk_size)},
@@ -740,11 +750,13 @@ args_type parse_args(int argc, char ** argv) {
         }
       }
     }
-    if (!found) {
+    size_t argumentsUsed = 0;
+    if (!found && !handleCommandLineArgument(arg, argv, argumentsUsed)) {
       std::cerr << "ERROR: Unknown argument '" << arg << "'." << std::endl;
       usage(name, params);
       std::exit(1);
     }
+    argv += argumentsUsed;
   }
 
   if (args.filenames.empty()) {

@@ -35,8 +35,6 @@
 #include "nvcomp.hpp"
 #include "nvcomp/cascaded.h"
 
-#include "../src/common.h"
-
 #include <chrono>
 #include <iomanip>
 #include <iostream>

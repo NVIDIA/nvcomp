@@ -1,11 +1,11 @@
 file(GLOB EXAMPLE_SOURCES *.cpp *.cu)
 
-if(NOT ans_FOUND)
-  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_ans_chunked.cu")
+set(GPU_ARCHS "60;70-real")
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER "9")
+  set(GPU_ARCHS ${GPU_ARCHS} "75-real")
 endif()
-
-if(NOT bitcomp_FOUND)
-  list(FILTER EXAMPLE_SOURCES EXCLUDE REGEX "benchmark_bitcomp_chunked.cu")
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11")
+  set(GPU_ARCHS ${GPU_ARCHS} "80")
 endif()
 
 foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
@@ -14,6 +14,7 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   string(REPLACE ".cu" "" EXAMPLE_NAME ${EXAMPLE_NAME})
   get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
+  set_property(TARGET ${BARE_NAME} PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
   if (NOT MSVC)
     target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::cudart CUDA::nvml)
   else()
@@ -24,4 +25,7 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   endif()
   target_include_directories(${BARE_NAME} PRIVATE
       "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/include>")
+  set_property(TARGET ${BARE_NAME} PROPERTY INSTALL_RPATH "\$ORIGIN/../lib")
+  install(TARGETS ${BARE_NAME}
+    RUNTIME DESTINATION bin)
 endforeach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
