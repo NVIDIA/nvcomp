@@ -182,15 +182,15 @@ int main(int argc, char* argv[])
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  std::unique_ptr<nvcompManagerBase> manager;
+  std::shared_ptr<nvcompManagerBase> manager;
   if (comp_format == "lz4") {
-    manager = std::make_unique<LZ4Manager>(chunk_size, data_type, stream);
+    manager = std::make_shared<LZ4Manager>(chunk_size, data_type, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "snappy") {
-    manager = std::make_unique<SnappyManager>(chunk_size, stream);
+    manager = std::make_shared<SnappyManager>(chunk_size, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "bitcomp") {
-    manager = std::make_unique<BitcompManager>(data_type, 0 /* algo--fixed for now */, stream);
+    manager = std::make_shared<BitcompManager>(data_type, 0 /* algo--fixed for now */, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "ans") {
-    manager = std::make_unique<ANSManager>(chunk_size, stream);
+    manager = std::make_shared<ANSManager>(chunk_size, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "cascaded") {
     if (explicit_type) {
       cascaded_opts.type = data_type;
@@ -200,9 +200,9 @@ int main(int argc, char* argv[])
       cascaded_opts.chunk_size = chunk_size;
     }
 
-    manager = std::make_unique<CascadedManager>(cascaded_opts, stream);
+    manager = std::make_shared<CascadedManager>(cascaded_opts, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "gdeflate") {
-    manager = std::make_unique<GdeflateManager>(chunk_size, 0 /* algo--fixed for now */, stream);
+    manager = std::make_shared<GdeflateManager>(chunk_size, 0 /* algo--fixed for now */, stream, gpu_num, NoComputeNoVerify);
   } else {
     print_usage();
     return 1;

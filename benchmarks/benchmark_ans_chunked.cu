@@ -29,11 +29,55 @@
 #include "benchmark_template_chunked.cuh"
 #include "nvcomp/ans.h"
 
-GENERATE_CHUNKED_BENCHMARK(
-    nvcompBatchedANSCompressGetTempSize,
-    nvcompBatchedANSCompressGetMaxOutputChunkSize,
-    nvcompBatchedANSCompressAsync,
-    nvcompBatchedANSDecompressGetTempSize,
-    nvcompBatchedANSDecompressAsync,
-    inputAlwaysValid,
-    nvcompBatchedANSDefaultOpts);
+static const nvcompBatchedANSOpts_t nvcompBatchedANSOpts
+    = {nvcomp_rANS};
+
+static bool handleCommandLineArgument(
+    const std::string& arg,
+    const char* const* additionalArgs,
+    size_t& additionalArgsUsed)
+{
+  // There is an option, but the enum has only one value at the moment,
+  // so it's not really an option.
+  return false;
+}
+
+static bool isANSInputValid(const std::vector<std::vector<char>>& data)
+{
+  for (const auto& chunk : data) {
+    if (chunk.size() > 65536) {
+      std::cerr << "ERROR: ANS doesn't support chunk sizes larger than "
+                   "65536 bytes."
+                << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void run_benchmark(
+    const std::vector<std::vector<char>>& data,
+    const bool warmup,
+    const size_t count,
+    const bool csv_output,
+    const bool tab_separator,
+    const size_t duplicate_count,
+    const size_t num_files)
+{
+  run_benchmark_template(
+      nvcompBatchedANSCompressGetTempSize,
+      nvcompBatchedANSCompressGetMaxOutputChunkSize,
+      nvcompBatchedANSCompressAsync,
+      nvcompBatchedANSDecompressGetTempSize,
+      nvcompBatchedANSDecompressAsync,
+      isANSInputValid,
+      nvcompBatchedANSOpts,
+      data,
+      warmup,
+      count,
+      csv_output,
+      tab_separator,
+      duplicate_count,
+      num_files);
+}

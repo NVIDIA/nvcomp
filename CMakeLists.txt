@@ -1,15 +1,12 @@
 cmake_minimum_required(VERSION 3.18)
-project(nvcomp LANGUAGES C CUDA CXX)
+project(nvcomp_examples LANGUAGES C CUDA CXX)
 
-option(BUILD_TESTS "Build unit and end-to-end tests." OFF)
-option(BUILD_BENCHMARKS "Build benchmarks." OFF)
-option(BUILD_EXAMPLES "Build examples." OFF)
-option(BUILD_STATIC "Build a static library." OFF)
-
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CUDA_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(BUILD_BENCHMARKS "Build benchmarks." OFF)
 
 include(GNUInstallDirs)
 
@@ -18,6 +15,7 @@ list( APPEND CMAKE_MODULE_PATH
 )
 
 find_package(CUDAToolkit REQUIRED)
+find_package(nvcomp REQUIRED 2.3)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
     "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR
@@ -31,6 +29,11 @@ endif()
 # and cause launch failures
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG};-G")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g")
+
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11.2")
+  set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -t 0")
+  set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -t 0")
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Debug build.")
@@ -65,7 +68,6 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "11")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --Werror=all-warnings")
   endif()
-
   # TODO: add clang warnings
 endif()
 
@@ -95,108 +97,19 @@ if(NOT DEFINED NVCOMP_EXTS_ROOT AND DEFINED ENV{NVCOMP_EXTS_ROOT})
   set(NVCOMP_EXTS_ROOT "$ENV{NVCOMP_EXTS_ROOT}")
 endif()
 
-if( DEFINED NVCOMP_EXTS_ROOT )
-  unset( NVCOMP_FIND_QUIET )
-  set( ENV{ans_ROOT} ${NVCOMP_EXTS_ROOT} )
-  set( ENV{gdeflate_ROOT} ${NVCOMP_EXTS_ROOT} )
-  set( ENV{bitcomp_ROOT} ${NVCOMP_EXTS_ROOT} )
-endif()
-
-find_package(bitcomp ${NVCOMP_FIND_QUIET})
-if (bitcomp_FOUND)
-  message (STATUS "Found bitcomp")
-  add_definitions(-DENABLE_BITCOMP)
-endif()
-
-find_package(gdeflate ${NVCOMP_FIND_QUIET})
-if (gdeflate_FOUND)
-  message (STATUS "Found gdeflate")
-  add_definitions(-DENABLE_GDEFLATE)
-
-  # Find ZLIB for CPU compression
-  find_package(ZLIB)
-endif()
-
-find_package(ans ${NVCOMP_FIND_QUIET})
-if (ans_FOUND)
-  message (STATUS "Found ans")
-  add_definitions(-DENABLE_ANS)
-endif()
+find_package(ZLIB) # For Gdeflate CPU compression
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-file(COPY include/ DESTINATION ${CMAKE_BINARY_DIR}/include)
-
-# determine version
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.h" MAIN_HEADER)
-string(REGEX MATCH "#define NVCOMP_MAJOR_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
-set(VER_MAJOR "${CMAKE_MATCH_1}")
-string(REGEX MATCH "#define NVCOMP_MINOR_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
-set(VER_MINOR "${CMAKE_MATCH_1}")
-string(REGEX MATCH "#define NVCOMP_PATCH_VERSION ([0-9]+)" _ "${MAIN_HEADER}")
-set(VER_PATCH "${CMAKE_MATCH_1}")
-
-set(NVCOMP_VERSION "${VER_MAJOR}.${VER_MINOR}.${VER_PATCH}")
-
-message("Build nvCOMP version ${NVCOMP_VERSION}")
-
-if (BUILD_TESTS)
-  enable_testing()
-endif()
 
 if (UNIX)
   include(GNUInstallDirs)
 endif()
 
 
-add_subdirectory(src)
+add_subdirectory(examples)
 
-if (BUILD_TESTS)
-  add_subdirectory(tests)
-endif()
-if (BUILD_BENCHMARKS)
+if (DEFINED BUILD_BENCHMARKS) 
   add_subdirectory(benchmarks)
 endif()
-if (BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/nvcomp)
-
-
-#------
-# Build directory exporting
-include(CMakePackageConfigHelpers)
-configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/nvcomp-config.cmake.in"
-                              "${CMAKE_CURRENT_BINARY_DIR}/nvcomp-config.cmake"
-                              INSTALL_DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-export(TARGETS nvcomp
-       FILE "${CMAKE_CURRENT_BINARY_DIR}/nvcomp-targets.cmake"
-       )
-
-
-#------
-# Install directory setup
-configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/nvcomp-config.cmake.in"
-                              "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
-                              INSTALL_DESTINATION "${INSTALL_CONFIGDIR}")
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake
-    VERSION "${NVCOMP_VERSION}"
-    COMPATIBILITY SameMinorVersion)
-
-install(TARGETS nvcomp EXPORT nvcomp-exports DESTINATION lib)
-install(EXPORT nvcomp-exports
-        FILE          nvcomp-targets.cmake
-        NAMESPACE     nvcomp::
-        DESTINATION   "${INSTALL_CONFIGDIR}")
-
-
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nvcomp)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.hpp
-              ${CMAKE_CURRENT_SOURCE_DIR}/include/nvcomp.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcomp-config.cmake"
-              "${CMAKE_CURRENT_BINARY_DIR}/cmake/nvcompConfigVersion.cmake"
-        DESTINATION "${INSTALL_CONFIGDIR}")

@@ -58,7 +58,7 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
 
   T* d_in_data;
   const size_t in_bytes = sizeof(T) * input_element_count;
-  CUDA_CHECK(cudaMalloc((void**)&d_in_data, in_bytes));
+  CUDA_CHECK(cudaMalloc(&d_in_data, in_bytes));
   CUDA_CHECK(
       cudaMemcpy(d_in_data, data.data(), in_bytes, cudaMemcpyHostToDevice));
 
@@ -119,6 +119,7 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   CUDA_CHECK(cudaFree(d_in_data));
 
   std::vector<float> decompress_run_times(benchmark_exec_count);
+  
   auto decomp_config = batch_manager.configure_decompression(d_comp_out);
   // allocate output buffer
   const size_t decomp_bytes = decomp_config.decomp_data_size;
@@ -172,7 +173,7 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   // dump output data
   std::cout << "Output" << std::endl;
   for (size_t i = 0; i < data.size(); i++)
-    std::cout << ((T*)out_ptr)[i] << " ";
+    std::cout << reinterpret_cast<T*>(decomp_out_ptr)[i] << " ";
   std::cout << std::endl;
 #endif
   benchmark_assert(res == data, "Decompressed data does not match input.");

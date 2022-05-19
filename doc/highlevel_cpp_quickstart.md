@@ -8,7 +8,8 @@ The high level interface provides the following features:
 * Compression settings are stored in the nvcompManager object
 * Users can decompress nvcomp-compressed buffers without knowing how the buffer was compressed
 * The nvcompManager can automatically split a single, uncompressed, contiguous buffer into chunks
-  to allow the algorithms to exploit available parallelism. 
+  to allow the algorithms to exploit available parallelism.
+* Users can opt to store and verify checksums for the uncompressed and compressed buffers
 
 To use NVCOMP's C++ interface, you will need to include `nvcomp.hpp`
 and the headers of the specific compressors you will be using.  For example, 
@@ -27,7 +28,7 @@ In the below we introduce the interface and summarize the declarations of releva
 
 ## Manager Construction
 
-The user has two options for constructing an nvcompManager. In either case the user can specify a CUDA stream to use for all nvcompManager GPU operations. If a stream is not specified, the default stream will be used.
+The user has two options for constructing an nvcompManager. In either case the user can specify a CUDA stream to use for all nvcompManager GPU operations. If a stream is not specified, the default stream will be used. 
 
 #### 1) Construction from an nvcomp-compressed buffer
 
@@ -53,6 +54,9 @@ used to compress the buffers.
 
 Chunk size is a common parameter that determines the size of the chunking internally. Some compressors may provide a higher compression ratio 
 if given a larger chunk size. For example in LZ4, the larger the chunk size the larger the lookback window the algorithm can use to find matches.
+
+#### Checksum support
+Upon manager construction, the user may also specify whether to store and/or verify checksums for the uncompressed and compressed buffers. The HLIF checksums are computed on the GPU using a modified CRC32 algorithm. It should be noted that these checksums are intended for error-detection purposes, not security. Also, enabling checksums may incur a sizeable performance penalty depending on the compression algorithm. The fully worked examples `comp_decomp_with_single_manager_with_checksums` and  `decomp_compressed_with_manager_factory_with_checksums` within `high_level_quickstart_example.cpp` demonstrate how to use the HLIF checksums.
 
 ```c++
 cudaStream_t stream;

@@ -377,7 +377,7 @@ static void run_nvcomp_benchmark(
   copy_to_all<T>(
       gpus,
       chunks,
-      (T**)(d_comp_out.data()),
+      reinterpret_cast<T**>(d_comp_out.data()),
       comp_out_bytes,
       dest_ptrs.data(),
       streams,

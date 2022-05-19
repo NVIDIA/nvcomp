@@ -68,7 +68,7 @@ using namespace nvcomp;
   } while (0);
 
 // Kernel to initialize the input data with sequential bytes
-__global__ void initialize(char* data, size_t n)
+__global__ void initialize(uint8_t* data, size_t n)
 {
   size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)
@@ -76,7 +76,8 @@ __global__ void initialize(char* data, size_t n)
 }
 
 // Kernel to compare 2 buffers. Invalid flag must be set to zero before.
-__global__ void compare(char* ref, char* val, int* invalid, size_t n)
+__global__ void
+compare(const uint8_t* ref, const uint8_t* val, int* invalid, size_t n)
 {
   size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   int stride = gridDim.x * blockDim.x;
@@ -114,10 +115,10 @@ int main(int argc, char** argv)
   const size_t n = 100000000;
 
   // Device pointers for the data to be compressed / decompressed
-  char *d_input, *d_output;
+  uint8_t *d_input, *d_output;
   cudaStream_t stream;
-  CUDA_CHECK(cudaMalloc((void**)&d_input, n));
-  CUDA_CHECK(cudaMalloc((void**)&d_output, n));
+  CUDA_CHECK(cudaMalloc(&d_input, n));
+  CUDA_CHECK(cudaMalloc(&d_output, n));
   CUDA_CHECK(cudaStreamCreate(&stream));
 
   // Initialize the input data (sequential bytes)
@@ -128,20 +129,21 @@ int main(int argc, char** argv)
   nvtxRangePushA("Compressor setup");
 
   // Create an LZ4 compressor, get the max output size, and temp storage size
-  LZ4Compressor compressor(1 << 16);
-  size_t ltempbuf;
-  size_t lcompbuf;
-  compressor.configure(n, &ltempbuf, &lcompbuf);
+  LZ4Manager compressor(1 << 16, NVCOMP_TYPE_CHAR, stream, 0);
+  const CompressionConfig comp_config = compressor.configure_compression(n);
+  size_t lcompbuf = comp_config.max_compressed_buffer_size;
+  size_t ltempbuf = compressor.get_required_scratch_buffer_size();
 
   // Allocate temp workspace for the compressor
-  void* d_temp;
+  uint8_t* d_temp;
   CUDA_CHECK(cudaMalloc(&d_temp, ltempbuf));
+  compressor.set_scratch_buffer(d_temp);
 
   // The compressed output buffer is padded to the next multiple of 4KB
   // for best I/O performance. Unaligned I/Os go through an extra
   // memory copy (GDS's internal aligned registered buffer)
   lcompbuf = ((lcompbuf - 1) / 4096 + 1) * 4096;
-  void* d_compressed;
+  uint8_t* d_compressed;
   CUDA_CHECK(cudaMalloc(&d_compressed, lcompbuf));
 
   nvtxRangePop();
@@ -182,12 +184,11 @@ int main(int argc, char** argv)
 
   // The compressed size must be device-accessible, using pinned memory.
   size_t* dh_lcomp;
-  CUDA_CHECK(cudaMallocHost((void**)&dh_lcomp, sizeof(size_t)));
+  CUDA_CHECK(cudaMallocHost(&dh_lcomp, sizeof(size_t)));
   *dh_lcomp = lcompbuf;
 
   // Compress the data (asynchronous)
-  compressor.compress_async(
-      d_input, n, d_temp, ltempbuf, d_compressed, dh_lcomp, stream);
+  compressor.compress(d_input, d_compressed, comp_config);
 
   // Wait for compression to be done before querying the size
   CUDA_CHECK(cudaStreamSynchronize(stream));
@@ -236,20 +237,23 @@ int main(int argc, char** argv)
   nvtxRangePushA("Decompressor setup");
 
   // Decompressor, configured with the compressed data
-  LZ4Decompressor decompressor;
-  size_t ldecomp;
-  decompressor.configure(d_compressed, lcomp, &ltempbuf, &ldecomp, stream);
+  const DecompressionConfig decomp_config
+      = compressor.configure_decompression(comp_config);
+  size_t ldecomp = decomp_config.decomp_data_size;
   if (ldecomp != n) {
     printf("Error: Uncompressed size does not match the original size\n");
     return -1;
   }
 
+  ltempbuf = compressor.get_required_scratch_buffer_size();
+
   // Temporary storage for the decompressor
   CUDA_CHECK(cudaMalloc(&d_temp, ltempbuf));
+  compressor.set_scratch_buffer(d_temp);
 
   // Device-accessible flag to compare the data
   int* dh_invalid;
-  CUDA_CHECK(cudaMallocHost((void**)&dh_invalid, sizeof(int)));
+  CUDA_CHECK(cudaMallocHost(&dh_invalid, sizeof(int)));
   *dh_invalid = 0;
 
   nvtxRangePop();
@@ -257,8 +261,7 @@ int main(int argc, char** argv)
   printf("Decompressing\n");
 
   // Decompress the data (asynchronous)
-  decompressor.decompress_async(
-      d_compressed, lcomp, d_temp, ltempbuf, d_output, n, stream);
+  compressor.decompress(d_compressed, d_output, decomp_config);
 
   // Compare the uncompressed data with the original, in the same stream
   compare<<<2 * smcount, 1024, 0, stream>>>(d_input, d_output, dh_invalid, n);

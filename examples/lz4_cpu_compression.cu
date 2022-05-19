@@ -110,12 +110,10 @@ static void run_example(const std::vector<std::vector<char>>& data)
   CUDA_CHECK(cudaMalloc(&d_decomp_temp, decomp_temp_bytes));
 
   size_t* d_decomp_sizes;
-  CUDA_CHECK(
-      cudaMalloc((void**)&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
+  CUDA_CHECK(cudaMalloc(&d_decomp_sizes, decomp_data.size() * sizeof(size_t)));
 
   nvcompStatus_t* d_status_ptrs;
-  CUDA_CHECK(cudaMalloc(
-      (void**)&d_status_ptrs, decomp_data.size() * sizeof(nvcompStatus_t)));
+  CUDA_CHECK(cudaMalloc(&d_status_ptrs, decomp_data.size() * sizeof(nvcompStatus_t)));
 
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -213,7 +211,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  // if `-f` is speficieid, assume single file mode
+  // if `-f` is specified, assume single file mode
   if (strcmp(argv[1], "-f") == 0) {
     if (argc == 2) {
       std::cerr << "Missing file name following '-f'" << std::endl;

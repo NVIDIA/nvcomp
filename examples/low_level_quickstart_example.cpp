@@ -29,10 +29,10 @@ void execute_example(char* input_data, const size_t in_bytes)
   const size_t batch_size = (in_bytes + chunk_size - 1) / chunk_size;
 
   char* device_input_data;
-  cudaMalloc((void**)&device_input_data, in_bytes);
+  cudaMalloc(&device_input_data, in_bytes);
   cudaMemcpyAsync(device_input_data, input_data, in_bytes, cudaMemcpyHostToDevice, stream);
 
-  cudaMallocHost((void**)&host_uncompressed_bytes, sizeof(size_t)*batch_size);
+  cudaMallocHost(&host_uncompressed_bytes, sizeof(size_t)*batch_size);
   for (size_t i = 0; i < batch_size; ++i) {
     if (i + 1 < batch_size) {
       host_uncompressed_bytes[i] = chunk_size;
@@ -44,15 +44,15 @@ void execute_example(char* input_data, const size_t in_bytes)
 
   // Setup an array of pointers to the start of each chunk
   void ** host_uncompressed_ptrs;
-  cudaMallocHost((void**)&host_uncompressed_ptrs, sizeof(size_t)*batch_size);
+  cudaMallocHost(&host_uncompressed_ptrs, sizeof(size_t)*batch_size);
   for (size_t ix_chunk = 0; ix_chunk < batch_size; ++ix_chunk) {
     host_uncompressed_ptrs[ix_chunk] = device_input_data + chunk_size*ix_chunk;
   }
 
   size_t* device_uncompressed_bytes;
   void ** device_uncompressed_ptrs;
-  cudaMalloc((void**)&device_uncompressed_bytes, sizeof(size_t) * batch_size);
-  cudaMalloc((void**)&device_uncompressed_ptrs, sizeof(size_t) * batch_size);
+  cudaMalloc(&device_uncompressed_bytes, sizeof(size_t) * batch_size);
+  cudaMalloc(&device_uncompressed_ptrs, sizeof(size_t) * batch_size);
   
   cudaMemcpyAsync(device_uncompressed_bytes, host_uncompressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyHostToDevice, stream);
   cudaMemcpyAsync(device_uncompressed_ptrs, host_uncompressed_ptrs, sizeof(size_t) * batch_size, cudaMemcpyHostToDevice, stream);
@@ -69,32 +69,32 @@ void execute_example(char* input_data, const size_t in_bytes)
 
   // Next, allocate output space on the device
   void ** host_compressed_ptrs;
-  cudaMallocHost((void**)&host_compressed_ptrs, sizeof(size_t) * batch_size);
+  cudaMallocHost(&host_compressed_ptrs, sizeof(size_t) * batch_size);
   for(size_t ix_chunk = 0; ix_chunk < batch_size; ++ix_chunk) {
       cudaMalloc(&host_compressed_ptrs[ix_chunk], max_out_bytes);
   }
 
   void** device_compressed_ptrs;
-  cudaMalloc((void**)&device_compressed_ptrs, sizeof(size_t) * batch_size);
+  cudaMalloc(&device_compressed_ptrs, sizeof(size_t) * batch_size);
   cudaMemcpyAsync(
       device_compressed_ptrs, host_compressed_ptrs, 
       sizeof(size_t) * batch_size,cudaMemcpyHostToDevice, stream);
 
   // allocate space for compressed chunk sizes to be written to
   size_t * device_compressed_bytes;
-  cudaMalloc((void**)&device_compressed_bytes, sizeof(size_t) * batch_size);
+  cudaMalloc(&device_compressed_bytes, sizeof(size_t) * batch_size);
 
   // And finally, call the API to compress the data
-  nvcompStatus_t comp_res = nvcompBatchedLZ4CompressAsync(  
-      device_uncompressed_ptrs,    
-      device_uncompressed_bytes,  
-      chunk_size, // The maximum chunk size  
-      batch_size,  
-      device_temp_ptr,  
-      temp_bytes,  
-      device_compressed_ptrs,  
-      device_compressed_bytes,  
-      nvcompBatchedLZ4DefaultOpts,  
+  nvcompStatus_t comp_res = nvcompBatchedLZ4CompressAsync(
+      device_uncompressed_ptrs,
+      device_uncompressed_bytes,
+      chunk_size, // The maximum chunk size
+      batch_size,
+      device_temp_ptr,
+      temp_bytes,
+      device_compressed_ptrs,
+      device_compressed_bytes,
+      nvcompBatchedLZ4DefaultOpts,
       stream);
 
   if (comp_res != nvcompSuccess)
@@ -163,7 +163,7 @@ int main()
   const size_t in_bytes = 1000000;
   char* uncompressed_data;
   
-  cudaMallocHost((void**)&uncompressed_data, in_bytes);
+  cudaMallocHost(&uncompressed_data, in_bytes);
   
   std::mt19937 random_gen(42);
 
