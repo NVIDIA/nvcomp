@@ -1,3 +1,16 @@
+# nvcomp 2.3.0 (2022-04-29)
+## New Features
+  - Support ZSTD decompression in the LLIF
+  - Deflate support (RFC 1951)
+  - Modified-CRC32 checksum support added to HLIF. Includes optional verification of HLIF-compressed buffers intended for error detection
+## Bug fixes
+  - Added Pascal GPU architecture support for all compressors
+## Performance Optimizations
+  - Performance optimizations in ANS compression / decompression, leading to ~100% speedup in compression and ~50% speedup in decompression
+  - Developed algorithmic improvements to GDeflate's high-compression mode. This is now 30-40x faster on average while producing the same output as the previous version
+## Infrastructure
+  - Improvements to the benchmarking interface for LLIF -- common argument APIs
+  
 # nvcomp 2.2.0 (2022-02-07)
 ## New Features
  - Entropy-only mode for GDeflate
