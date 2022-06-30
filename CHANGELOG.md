@@ -1,3 +1,19 @@
+# nvcomp 2.3.2 (2022-06-24)
+## Bug Fixes
+  - Fixed various bugs in ZSTD decompression implementation
+  - Fixed the issue of deflate compression could not be correctly decompressed by zlib::inflate().
+
+# nvcomp 2.3.1 (2022-06-15)
+## Bug Fixes
+  - Fixed various bugs in ZSTD decompression implementation
+  - Fixed various bugs in ANS compression implementation
+  - Fix hang in GDeflate high-compression mode for large files
+  - Fix bug in library build that required dynamic link to cudart.
+## Interface Changes
+  - Added new API, nvcompBatched\<Format\>DecompressGetTempSizeEx(). 
+  This provides an optional capability for providing the total decompressed
+  size to the API, which for some formats can dramatically reduce the required
+  temp size.
 # nvcomp 2.3.0 (2022-04-29)
 ## New Features
   - Support ZSTD decompression in the LLIF
