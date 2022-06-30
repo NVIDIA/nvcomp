@@ -14,7 +14,8 @@ Hao Gao
 Maxim Milakov  
 Markus Tavenrath  
 Eric Schmidt  
-Neil Dickson  
+Neil Dickson
+Nico Iskos
 
 ## NVCOMP Product Manager
 Matthew Nicely
