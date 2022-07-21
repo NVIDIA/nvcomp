@@ -1,3 +1,11 @@
+# nvcomp 2.3.3 (2022-07-20)
+## Bug Fixes
+  - Add missing nvcompBatchedDeflateDecompressGetTempSizeEx API
+  - Fixed minor correctness issue in deflate compression. 
+  - Fixed cmake problem that caused an unnecessary implied cudart_static dependency
+## Performance Optimizations
+  - Optimized nvcompBatchedDeflateGetDecompressSizeAsync. Now 2-3x faster on A100.
+
 # nvcomp 2.3.2 (2022-06-24)
 ## Bug Fixes
   - Fixed various bugs in ZSTD decompression implementation
