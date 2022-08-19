@@ -71,10 +71,10 @@ if(DEFINED DEVEL AND NOT DEVEL EQUAL 0)
   # TODO: add clang warnings
 endif()
 
-  if (MSVC)
-    # Use "/permissive-" in order to be closer to GCC/Clang in what the MSVC compiler accepts.
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W3>" "$<$<COMPILE_LANGUAGE:CXX>:/permissive->")
-  endif()
+if (MSVC)
+  # Use "/permissive-" in order to be closer to GCC/Clang in what the MSVC compiler accepts.
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W3>" "$<$<COMPILE_LANGUAGE:CXX>:/permissive->" "$<$<COMPILE_LANGUAGE:CXX>:/D \"_CRT_SECURE_NO_WARNINGS\">")
+endif()
 
 if(NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})
   set(CUB_DIR ENV{CUB_DIR})

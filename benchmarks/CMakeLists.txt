@@ -15,14 +15,7 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
   set_property(TARGET ${BARE_NAME} PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
-  if (NOT MSVC)
-    target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::cudart CUDA::nvml)
-  else()
-    # Including CUDA::cudart on Windows resulted in multiple definition
-    # linker errors for gdeflate and bitcomp benchmarks, since
-    # cudart_static.lib is already included.
-    target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::nvml)
-  endif()
+  target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::cudart CUDA::nvml)
   set_property(TARGET ${BARE_NAME} PROPERTY INSTALL_RPATH "\$ORIGIN/../lib")
   install(TARGETS ${BARE_NAME}
     RUNTIME DESTINATION bin)

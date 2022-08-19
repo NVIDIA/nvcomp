@@ -3,18 +3,15 @@ file(GLOB GDEFLATE_CPU_SOURCES *gdeflate_cpu*.cpp *gdeflate_cpu*.cu)
 # Add gdeflate CPU executables 
 # gdeflate CPU examples require gdeflate and zlib libraries
 # skip gdeflate CPU examples if required libraries are missing
-if (ZLIB_FOUND)
+# Also, nvcomp_gdeflate_cpu is not supported by Windows nvcomp
+if (ZLIB_FOUND AND NOT MSVC)
   foreach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
     # cut off suffixes
     string(REPLACE ".cpp" "" EXAMPLE_NAME ${EXAMPLE_SOURCE})
     string(REPLACE ".cu" "" EXAMPLE_NAME ${EXAMPLE_NAME})
     get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
     add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
-    if (NOT MSVC)
-      target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::cudart)
-    else()
-      target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp)
-    endif()
+    target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::cudart)
     target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp_gdeflate_cpu ZLIB::ZLIB)
   endforeach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
 else()
@@ -30,7 +27,8 @@ endif()
 # Add LZ4 CPU executable
 find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
 find_library(LZ4_LIBRARY NAMES lz4)
-if (LZ4_INCLUDE_DIR AND LZ4_LIBRARY) 
+# LZ4 CPU code is not supported by Windows nvcomp
+if (LZ4_INCLUDE_DIR AND LZ4_LIBRARY AND NOT MSVC) 
   # lz4 CPU example requires lz4 libraries
   add_executable(lz4_cpu_compression lz4_cpu_compression.cu)
   target_link_libraries(lz4_cpu_compression PRIVATE nvcomp::nvcomp CUDA::cudart)
@@ -46,15 +44,7 @@ endif()
 
 # Add quickstart example
 add_executable(low_level_quickstart_example low_level_quickstart_example.cpp)
-if (NOT MSVC)
-  target_link_libraries(low_level_quickstart_example PRIVATE nvcomp::nvcomp CUDA::cudart)
-else()
-  target_link_libraries(low_level_quickstart_example PRIVATE nvcomp::nvcomp)
-endif()
+target_link_libraries(low_level_quickstart_example PRIVATE nvcomp::nvcomp CUDA::cudart)
 
 add_executable(high_level_quickstart_example high_level_quickstart_example.cpp)
-if (NOT MSVC)
-  target_link_libraries(high_level_quickstart_example PRIVATE nvcomp::nvcomp CUDA::cudart)
-else()
-  target_link_libraries(high_level_quickstart_example PRIVATE nvcomp::nvcomp)
-endif()
+target_link_libraries(high_level_quickstart_example PRIVATE nvcomp::nvcomp CUDA::cudart)
