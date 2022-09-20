@@ -260,8 +260,9 @@ static void run_uncompressed_benchmark(
             << "Per-GPU benchmark throughput (GB/s): "
             << gbs(start,
                    end,
-                   h_data->size() * (((double)gpus - 1.0) / (double)gpus)
-                       * sizeof(T))
+                   static_cast<size_t>(
+                       h_data->size() * (((double)gpus - 1.0) / (double)gpus)
+                       * sizeof(T)))
             << std::endl;
   std::cout << "Total data transferred across system (B): "
             << h_data->size() * (gpus - 1) * sizeof(T) << std::endl
@@ -454,8 +455,9 @@ static void run_nvcomp_benchmark(
             << "Per-GPU benchmark throughput (GB/s): "
             << gbs(start,
                    end,
-                   h_data->size() * (((double)gpus - 1.0) / (double)gpus)
-                       * sizeof(T))
+                   static_cast<size_t>(
+                       h_data->size() * (((double)gpus - 1.0) / (double)gpus)
+                       * sizeof(T)))
             << std::endl;
   std::cout << "Compressed data size (B): " << total_comp_bytes
             << ", compression ratio: "

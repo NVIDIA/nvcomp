@@ -4,44 +4,42 @@ nvCOMP is a CUDA library that features generic compression interfaces to enable 
 
 Example benchmarking results and a brief description of each algorithm are available on the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp).
 
-## Version 2.3 Release
+## Version 2.4 Release
 
-This minor release of nvCOMP introduces support for zStandard (https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md) and Deflate standards (https://datatracker.ietf.org/doc/html/rfc1951) .
+This minor release of nvCOMP completes support for zStandard compression (https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md) 
 
-Modified-CRC32 checksum support was added to the HLIF. This optional capability is intended for error detection in HLIF-compressed buffers, but is not targeted towards security.
+Beginning with this release, we provide Linux SBSA binaries.
 
-This release includes the following performance improvements:
-- ANS performance was significantly improved. This included a ~100% speedup in compression and a ~50% speedup in decompression. 
-- The GDeflate high compression mode now has 30-40x faster compression throughput.
-
-For 2.3, zStandard support is limited to decompression in the low-level interface. Deflate support is not included in the high level interface.
+This release also includes the following performance improvements:
+  - GDeflate high-compression mode up to 2x faster.
+  - ZSTD decompression up to 1.2x faster.
+  - Deflate decompression up to 1.5x faster.
+  - ANS compression improvements based on strong scaling allows for up to 7x higher compression and decompression throughput for files on the order of a few MB in size. Decompression throughput is improved by at least 20% on all tested files.
 
 From version 2.3 onwards, the compression / decompression source code will not be released. We'll continue to maintain this Github for documentation and code sample purposes.
 
 ## Known issues
-* Cascaded, GDeflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
-* Cascaded ZSTD and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values.
+* Cascaded, GDeflate, zStandard, Deflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
+* Cascaded zStandard, Deflate and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values.
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
-* ZSTD Compression is not supported
-* HLIF is not available for Deflate or ZSTD
+* HLIF is not available for Deflate or zStandard
+* The Deflate batched decompression API doesn't currently support uncompressed data chunk sizes larger than the standard deflate block size (64 KB).
 
 ## Download
-* New in 2.3, you can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
+* You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
 * For linux, choose the package that corresponds to your CUDA toolkit version
-* For Windows, CUDA toolkit 11.6 is required
+* For Windows, CUDA toolkit 11.7 is required
 * On linux, the package includes
 ```
 include/ 
-  nvcomp/ 
-    // nvcomp API headers
-  gdeflate/
-    // Gdeflate CPU library headers
+  nvcomp/ #nvcomp API headers
+  gdeflate/ #Gdeflate CPU library headers
 lib/
   libnvcomp.so
-  // Other nvcomp libraries that are used internally by nvcomp's APIs
-  libnvcomp_gdeflate_cpu.so // CPU library for gdeflate
+  <Other nvcomp libraries that are used internally by nvcomp's APIs>
+  libnvcomp_gdeflate_cpu.so # CPU library for gdeflate
 bin/ 
-  // benchmark scripts
+  <benchmark scripts>
 ```
 
 ## Requirements

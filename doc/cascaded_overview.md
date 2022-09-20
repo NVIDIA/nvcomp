@@ -32,6 +32,8 @@ The bitpacking compression algorithm has two steps: 1) find min and max values, 
 
 Unpacking (decompression) involves computing the full value of each encoded symbol (symbol + min) and writing it out using the full B bits. Since we know B, we can easily compute the output location of each value and perform this in a thread-parallel manner.
 
+The only portion of the cascaded compressor that depends on whether the specified data type is signed or unsigned is the finding of min and max values for bitpacking when compressing with no delta encoding, since for a signed data type, values greater than the maximum signed value will be interpreted as negative, whereas for an unsigned data type, they will be interpreted as positive.  This means that if the data to be compressed represent integers that can only be positive, and no delta encoding is used, it may be beneficial in some cases to specify an unsigned data type, such as `uchar` or `uint`, instead of a signed data type, such as `char` or `int`.
+
 ### Combining into a Cascaded scheme
 Using the RLE, Delta, and bitpacking building blocks, we can assemble various cascaded schemes. We define each scheme by the number of RLEs, Deltas, and whether bitpacking is enabled. Thus, 2 2 1 would be a cascaded compression scheme with 2 RLEs, 2 Delta, and bitpacking enabled. Layers of RLE and Delta are interleaved. The building block compression schemes are then connected together in the following way: RLEs and Deltas are interleaved, with the values output from RLE used as input to Delta. Once all RLEs and Deltas are finished, bitpacking is performed on all resulting data (runs and values).
 

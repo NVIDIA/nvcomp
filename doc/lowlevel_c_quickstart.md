@@ -17,6 +17,8 @@ and compression.
 
 In the following API description, replace * with the desired compression algorithm. For example, for LZ4,  nvCompBatched\*CompressAsync becomes nvCompBatchedLZ4CompressAsync and nvcompBatched*DecompressAsync becomes nvcompBatchedLZ4DecompressAsync.
 
+Some compressors have (up-to 8 byte) alignment requirements on the input, output and/or scratch buffers that the user provides. Please view the documentation in the appropriate header located in include/ to see detail on the alignment requirements on any particular API. 
+
 ## Compression API  
 
 To do batched compression, a temporary workspace is required to be allocated in device memory. The size of this space is computed using:
@@ -59,7 +61,7 @@ nvcompStatus_t nvcompBatched*CompressAsync(
   size_t* device_compressed_bytes,  
   nvcompBatched*Opts_t format_opts,  
   cudaStream_t stream);
-```
+```  
 
 ## Decompression API
 
