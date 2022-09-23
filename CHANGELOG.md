@@ -1,3 +1,18 @@
+# nvcomp 2.4.0 (2022-09-23)
+## New features
+  - Added support for ZSTD compression to LL API
+## Bug fixes
+  - Fixed issue where cascaded compressor bitpack wasn't considering unsigned data type, causing suboptimal compression ratio
+  - Fixed cmake problem where we stated wrong version compatibility
+
+## Performance Optimizations
+  - Optimized GDeflate high-compression mode. Up to 2x faster.
+  - Optimized ZSTD decompression. Up to 1.2x faster.
+  - Optimized Deflate decompression. Up to 1.5x faster.
+  - Optimized ANS compression. Strong scaling allows for up to 7x higher compression and decompression
+    throughput for files on the order of a few MB in size. Decompression throughput is improved by at least 
+    20% on all tested files.
+  
 # nvcomp 2.3.3 (2022-07-20)
 ## Bug Fixes
   - Add missing nvcompBatchedDeflateDecompressGetTempSizeEx API
@@ -22,6 +37,7 @@
   This provides an optional capability for providing the total decompressed
   size to the API, which for some formats can dramatically reduce the required
   temp size.
+
 # nvcomp 2.3.0 (2022-04-29)
 ## New Features
   - Support ZSTD decompression in the LLIF

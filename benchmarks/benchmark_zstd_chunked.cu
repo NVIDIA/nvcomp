@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,26 +27,33 @@
  */
 
 #include "benchmark_template_chunked.cuh"
-#include "nvcomp/ans.h"
+#include "nvcomp/zstd.h"
 
-static const nvcompBatchedANSOpts_t nvcompBatchedANSOpts = {};
+static nvcompBatchedZstdOpts_t nvcompBatchedZstdTestOpts{};
+static std::string filename;
+static bool do_output;
 
 static bool handleCommandLineArgument(
     const std::string& arg,
     const char* const* additionalArgs,
     size_t& additionalArgsUsed)
 {
-  // There is an option, but the enum has only one value at the moment,
-  // so it's not really an option.
-  return false;
+  if (arg == "--output-file" || arg == "-o") {
+    const char* const typeArg = *additionalArgs;
+    additionalArgsUsed = 1;
+    filename = typeArg;
+    do_output = true;
+    return true;
+  }
+  return false; // Any other parameters means that we took in an invalid argument
 }
 
-static bool isANSInputValid(const std::vector<std::vector<char>>& data)
+static bool isZstdInputValid(const std::vector<std::vector<char>>& data)
 {
   for (const auto& chunk : data) {
-    if (chunk.size() > (1ULL << 32) - 1) {
-      std::cerr << "ERROR: ANS doesn't support chunk sizes larger than "
-                   "2^32-1 bytes."
+    if (chunk.size() > 65536) {
+      std::cerr << "ERROR: Zstd doesn't support chunk sizes larger than "
+                   "65536 bytes."
                 << std::endl;
       return false;
     }
@@ -65,18 +72,20 @@ void run_benchmark(
     const size_t num_files)
 {
   run_benchmark_template(
-      nvcompBatchedANSCompressGetTempSize,
-      nvcompBatchedANSCompressGetMaxOutputChunkSize,
-      nvcompBatchedANSCompressAsync,
-      nvcompBatchedANSDecompressGetTempSize,
-      nvcompBatchedANSDecompressAsync,
-      isANSInputValid,
-      nvcompBatchedANSOpts,
+      nvcompBatchedZstdCompressGetTempSize,
+      nvcompBatchedZstdCompressGetMaxOutputChunkSize,
+      nvcompBatchedZstdCompressAsync,
+      nvcompBatchedZstdDecompressGetTempSize,
+      nvcompBatchedZstdDecompressAsync,
+      isZstdInputValid,
+      nvcompBatchedZstdTestOpts,
       data,
       warmup,
       count,
       csv_output,
       tab_separator,
       duplicate_count,
-      num_files);
+      num_files,
+      do_output,
+      filename);
 }

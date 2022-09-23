@@ -29,6 +29,14 @@
 #ifndef NVCOMP_BENCHMARKS_BENCHMARK_TEMPLATE_CHUNKED_CUH
 #define NVCOMP_BENCHMARKS_BENCHMARK_TEMPLATE_CHUNKED_CUH
 
+// nvcc has a known issue with MSVC debug iterators, leading to a warning
+// hit by thrust::device_vector construction from std::vector below, so this
+// pragma disables the warning.
+// More info at: https://github.com/NVIDIA/thrust/issues/1273
+#ifdef __CUDACC__
+#pragma nv_diag_suppress 20011
+#endif
+
 #include "benchmark_common.h"
 
 #include <fstream>
@@ -277,7 +285,7 @@ std::vector<std::vector<char>> readFileWithPageSizes(const std::string& filename
 
 std::vector<std::vector<char>>
 multi_file(const std::vector<std::string>& filenames, const size_t chunk_size,
-    const bool has_page_sizes, const size_t num_duplicates)
+    const bool has_page_sizes, const size_t duplicate_count)
 {
   std::vector<std::vector<char>> split_data;
 
@@ -302,10 +310,19 @@ multi_file(const std::vector<std::string>& filenames, const size_t chunk_size,
     }
   }
 
-  const size_t num_chunks = split_data.size();
-  for (size_t d = 0; d < num_duplicates; ++d) {
-    split_data.insert(split_data.end(), split_data.begin(),
-        split_data.begin()+num_chunks);
+  if (duplicate_count > 1) {
+    // Make duplicate_count copies of the contents of split_data,
+    // but copy into a separate std::vector, to avoid issues with the
+    // memory being reallocated while the contents are being copied.
+    std::vector<std::vector<char>> duplicated;
+    const size_t original_num_chunks = split_data.size();
+    duplicated.reserve(original_num_chunks * duplicate_count);
+    for (size_t d = 0; d < duplicate_count; ++d) {
+      duplicated.insert(duplicated.end(), split_data.begin(), split_data.end());
+    }
+    // Now that there are duplicate_count copies of split_data in
+    // duplicated, swap them, so that they're in split_data.
+    duplicated.swap(split_data);
   }
 
   return split_data;
@@ -334,8 +351,10 @@ run_benchmark_template(
     const size_t count,
     const bool csv_output,
     const bool use_tabs,
-    const size_t duplicates,
-    const size_t num_files)
+    const size_t duplicate_count,
+    const size_t num_files,
+    const bool file_output = false,
+    const std::string output_filename = "")
 {
   benchmark_assert(IsInputValid(data), "Invalid input data");
 
@@ -422,10 +441,28 @@ run_benchmark_template(
         compress_data.sizes(),
         compress_data.size() * sizeof(*compress_data.sizes()),
         cudaMemcpyDeviceToHost));
-
+    // for (int ix = 0; ix < compress_data.size(); ++ix) {
+    //   printf("Frame %d comp ratio %f\n", ix, double{64*1024} / (double)(compressed_sizes_host[ix]));
+    // }
     size_t comp_bytes = 0;
     for (const size_t s : compressed_sizes_host) {
       comp_bytes += s;
+    }
+
+    // Then do file output
+    if (file_output) {
+      std::vector<uint8_t> comp_data(comp_bytes);
+      std::vector<uint8_t*> comp_ptrs(batch_size);
+      cudaMemcpy(comp_ptrs.data(), compress_data.ptrs(), sizeof(size_t) * batch_size, cudaMemcpyDefault);
+      size_t ix_offset = 0;
+      for (int ix_chunk = 0; ix_chunk < batch_size; ++ix_chunk) {
+        cudaMemcpy(&comp_data[ix_offset], comp_ptrs[ix_chunk], compressed_sizes_host[ix_chunk], cudaMemcpyDefault);
+        ix_offset += compressed_sizes_host[ix_chunk];
+      }
+
+      std::ofstream outfile{output_filename.c_str(), outfile.binary};
+      outfile.write(reinterpret_cast<char*>(comp_data.data()), ix_offset);
+      outfile.close();
     }
 
     // LZ4 decompression
@@ -506,19 +543,19 @@ run_benchmark_template(
       std::vector<void*> h_input_ptrs(batch_size);
       CUDA_CHECK(cudaMemcpy(h_input_ptrs.data(), input_data.ptrs(),
           sizeof(void*)*batch_size, cudaMemcpyDeviceToHost));
-      for (size_t i = 0; i < batch_size; ++i) {
-        std::vector<uint8_t> exp_data(h_input_sizes[i]);
-        CUDA_CHECK(cudaMemcpy(exp_data.data(), h_input_ptrs[i],
-            h_input_sizes[i], cudaMemcpyDeviceToHost));
-        std::vector<uint8_t> act_data(h_decomp_sizes[i]);
-        CUDA_CHECK(cudaMemcpy(act_data.data(), h_output_ptrs[i],
-        h_decomp_sizes[i], cudaMemcpyDeviceToHost));
-        for (size_t j = 0; j < h_input_sizes[i]; ++j) {
-          if (act_data[j] != exp_data[j]) {
-            benchmark_assert(false, "Batch item decompressed output did not match input: i="+std::to_string(i) + ": j=" + std::to_string(j) + " act=" + std::to_string(act_data[j]) + " exp=" +
-            std::to_string(exp_data[j]));
+      for (size_t ix_chunk = 0; ix_chunk < batch_size; ++ix_chunk) {
+        std::vector<uint8_t> exp_data(h_input_sizes[ix_chunk]);
+        CUDA_CHECK(cudaMemcpy(exp_data.data(), h_input_ptrs[ix_chunk],
+            h_input_sizes[ix_chunk], cudaMemcpyDeviceToHost));
+        std::vector<uint8_t> act_data(h_decomp_sizes[ix_chunk]);
+        CUDA_CHECK(cudaMemcpy(act_data.data(), h_output_ptrs[ix_chunk],
+        h_decomp_sizes[ix_chunk], cudaMemcpyDeviceToHost));
+        for (size_t ix_byte = 0; ix_byte < h_input_sizes[ix_chunk]; ++ix_byte) {
+          if (act_data[ix_byte] != exp_data[ix_byte]) {
+            benchmark_assert(false, "Batch item decompressed output did not match input: ix_chunk="+std::to_string(ix_chunk) + ": ix_byte=" + std::to_string(ix_byte) + " act=" + std::to_string(act_data[ix_byte]) + " exp=" +
+            std::to_string(exp_data[ix_byte]));
           }
-        }
+        }      
       }
     }
 
@@ -571,7 +608,7 @@ run_benchmark_template(
 
       // values
       std::cout << num_files;
-      std::cout << separator << duplicates;
+      std::cout << separator << duplicate_count;
       std::cout << separator << (total_bytes * 1e-6); // MB
       std::cout << separator << data.size();
       std::cout << separator << ((1e-3*total_bytes) / data.size()); // KB
