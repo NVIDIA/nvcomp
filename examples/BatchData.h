@@ -27,6 +27,15 @@
  */
 
 #pragma once
+
+// nvcc has a known issue with MSVC debug iterators, leading to a warning
+// hit by thrust::device_vector construction from std::vector below, so this
+// pragma disables the warning.
+// More info at: https://github.com/NVIDIA/thrust/issues/1273
+#ifdef __CUDACC__
+#pragma nv_diag_suppress 20011
+#endif
+
 #include "BatchDataCPU.h"
 
 class BatchData
@@ -195,7 +204,6 @@ inline bool operator==(const BatchDataCPU& lhs, const BatchData& rhs)
     std::vector<uint8_t> rhs_data(rhs_sizes[i]);
     CUDA_CHECK(cudaMemcpy(
         rhs_data.data(), rhs_ptr, rhs_sizes[i], cudaMemcpyDeviceToHost));
-
     for (size_t j = 0; j < rhs_sizes[i]; ++j)
       if (lhs_ptr[j] != rhs_data[j]) {
         return false;
