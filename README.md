@@ -59,15 +59,18 @@ GPU Benchmark source are included in the binary releases. Source code for the be
 
 ## CPU compression examples
 
-We provide some examples of how you might use CPU compression and GPU decompression or vice versa for LZ4 and GDeflate. These require some external dependencies, namely:
-- [zlib](https://github.com/madler/zlib) for the GDeflate CPU compression example (`zlib1g-dev` on debian based systems)
+We provide some examples of how you might use CPU compression and GPU decompression or vice versa for LZ4 GDeflate and Deflate. These require some external dependencies, namely:
+- [zlib](https://github.com/madler/zlib) for the GDeflate and Deflate CPU compression/decompression example (`zlib1g-dev` on debian based systems)
 - [LZ4](https://github.com/lz4/lz4) for the LZ4 CPU compression example (`liblz4-dev` on debian based systems)
+- [libdeflate](https://github.com/ebiggers/libdeflate) for the Deflate CPU compression/decompression example (`libdeflate-dev` on debian based systems)
 
 The CPU example executables are:
 ```
 gdeflate_cpu_compression {-f <input_file>}
 lz4_cpu_compression {-f <input_file>}
 lz4_cpu_decompression {-f <input_file>}
+deflate_cpu_compression {-a <0 libdeflate, 1 zlib_compress2, 2 zlib_deflate> -f <input_file>}
+deflate_cpu_decompression {-a <0 libdeflate, 1 zlib_inflate> -f <input_file>}
 ```
 
 ## Building CPU and GPU Examples, GPU Benchmarks provided on Github

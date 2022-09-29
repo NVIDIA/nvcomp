@@ -15,7 +15,7 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
   get_filename_component(BARE_NAME ${EXAMPLE_NAME} NAME)
   add_executable(${BARE_NAME} ${EXAMPLE_SOURCE})
   set_property(TARGET ${BARE_NAME} PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS})
-  target_link_libraries(${BARE_NAME} PRIVATE nvcomp CUDA::cudart CUDA::nvml)
+  target_link_libraries(${BARE_NAME} PRIVATE nvcomp::nvcomp CUDA::cudart CUDA::nvml)
   target_include_directories(${BARE_NAME} PRIVATE
       "$<BUILD_INTERFACE:${nvcomp_SOURCE_DIR}/include>")
   set_property(TARGET ${BARE_NAME} PROPERTY INSTALL_RPATH "\$ORIGIN/../lib")
