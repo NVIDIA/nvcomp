@@ -1,3 +1,12 @@
+# nvcomp 2.4.1 (2022-10-06)
+## New features
+  - The Deflate batched decompression API can now accept nullptr for actual_decompressed_bytes.
+## Bug fixes
+  - Fixed incorrect behavior, failure, or crash when using duplicates feature (`-x <count>`) of the low-level "chunked" benchmarks.
+  - Updated deflate_cpu_compression example to use the correct APIs.
+  - The Deflate batched decompression API can work on uncomprressed data chunk larger than 64KB.
+  - Fixed correctness / stability issue in compute capability 6.1
+
 # nvcomp 2.4.0 (2022-09-23)
 ## New features
   - Added support for ZSTD compression to LL API

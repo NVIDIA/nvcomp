@@ -4,23 +4,22 @@ nvCOMP is a CUDA library that features generic compression interfaces to enable 
 
 Example benchmarking results and a brief description of each algorithm are available on the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp).
 
+From version 2.3 onwards, the compression / decompression source code will not be released. We'll continue to maintain this Github for documentation and code sample purposes.
+
 ## Version 2.4 Release
 
 This minor release of nvCOMP completes support for zStandard compression (https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md) 
 
-Beginning with this release, we provide Linux SBSA binaries.
-
-This release also includes the following performance improvements:
+This release also includes the following:
+  - Early Access Linux SBSA binaries.
   - GDeflate high-compression mode up to 2x faster.
   - ZSTD decompression up to 1.2x faster.
   - Deflate decompression up to 1.5x faster.
   - ANS compression improvements based on strong scaling allows for up to 7x higher compression and decompression throughput for files on the order of a few MB in size. Decompression throughput is improved by at least 20% on all tested files.
 
-From version 2.3 onwards, the compression / decompression source code will not be released. We'll continue to maintain this Github for documentation and code sample purposes.
-
 ## Known issues
 * Cascaded, GDeflate, zStandard, Deflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
-* Cascaded, zStandard, Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate cannot accept nullptr for device_statuses values. 
+* Cascaded, zStandard and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate cannot accept nullptr for device_statuses values. 
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
 * HLIF is not available for Deflate or zStandard
 
