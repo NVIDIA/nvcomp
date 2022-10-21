@@ -20,10 +20,9 @@ From version 2.3 onwards, the compression / decompression source code will not b
 
 ## Known issues
 * Cascaded, GDeflate, zStandard, Deflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
-* Cascaded zStandard, Deflate and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values.
+* Cascaded, zStandard, Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate cannot accept nullptr for device_statuses values. 
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
 * HLIF is not available for Deflate or zStandard
-* The Deflate batched decompression API doesn't currently support uncompressed data chunk sizes larger than the standard deflate block size (64 KB).
 
 ## Download
 * You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
