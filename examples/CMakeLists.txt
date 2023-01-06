@@ -48,6 +48,9 @@ add_executable(high_level_quickstart_example high_level_quickstart_example.cpp)
 target_link_libraries(high_level_quickstart_example PRIVATE nvcomp::nvcomp CUDA::cudart)
 target_include_directories(high_level_quickstart_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
+add_executable(bitcomp_native_lossyFP bitcomp_native_lossyFP.cu)
+target_link_libraries(bitcomp_native_lossyFP PRIVATE nvcomp::nvcomp)
+
 
 # Add deflate example
 find_path(LIBDEFLATE_INCLUDE_DIR NAMES libdeflate.h)
