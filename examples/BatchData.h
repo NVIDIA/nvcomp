@@ -51,17 +51,17 @@ public:
   {
     m_size = compute_batch_size(host_data, chunk_size);
 
-    m_data = thrust::device_vector<uint8_t>(chunk_size * size());
+    m_data = nvcomp::thrust::device_vector<uint8_t>(chunk_size * size());
 
     std::vector<void*> uncompressed_ptrs(size());
     for (size_t i = 0; i < size(); ++i) {
       uncompressed_ptrs[i] = static_cast<void*>(data() + chunk_size * i);
     }
 
-    m_ptrs = thrust::device_vector<void*>(uncompressed_ptrs);
+    m_ptrs = nvcomp::thrust::device_vector<void*>(uncompressed_ptrs);
     std::vector<size_t> sizes
         = compute_chunk_sizes(host_data, size(), chunk_size);
-    m_sizes = thrust::device_vector<size_t>(sizes);
+    m_sizes = nvcomp::thrust::device_vector<size_t>(sizes);
 
     // copy data to GPU
     size_t offset = 0;
@@ -85,14 +85,14 @@ public:
       m_size()
   {
     m_size = batch_data.size();
-    m_sizes = thrust::device_vector<size_t>(
+    m_sizes = nvcomp::thrust::device_vector<size_t>(
         batch_data.sizes(), batch_data.sizes() + size());
 
     size_t data_size = std::accumulate(
         batch_data.sizes(),
         batch_data.sizes() + size(),
         static_cast<size_t>(0));
-    m_data = thrust::device_vector<uint8_t>(data_size);
+    m_data = nvcomp::thrust::device_vector<uint8_t>(data_size);
 
     size_t offset = 0;
     std::vector<void*> ptrs(size());
@@ -100,7 +100,7 @@ public:
       ptrs[i] = data() + offset;
       offset += batch_data.sizes()[i];
     }
-    m_ptrs = thrust::device_vector<void*>(ptrs);
+    m_ptrs = nvcomp::thrust::device_vector<void*>(ptrs);
 
     if (copy_data) {
       const void* const* src = batch_data.ptrs();
@@ -117,16 +117,16 @@ public:
       m_data(),
       m_size(batch_size)
   {
-    m_data = thrust::device_vector<uint8_t>(max_output_size * size());
+    m_data = nvcomp::thrust::device_vector<uint8_t>(max_output_size * size());
 
     std::vector<size_t> sizes(size(), max_output_size);
-    m_sizes = thrust::device_vector<size_t>(sizes);
+    m_sizes = nvcomp::thrust::device_vector<size_t>(sizes);
 
     std::vector<void*> ptrs(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
       ptrs[i] = data() + max_output_size * i;
     }
-    m_ptrs = thrust::device_vector<void*>(ptrs);
+    m_ptrs = nvcomp::thrust::device_vector<void*>(ptrs);
   }
 
   BatchData(BatchData&& other) = default;
@@ -168,9 +168,9 @@ public:
   }
 
 private:
-  thrust::device_vector<void*> m_ptrs;
-  thrust::device_vector<size_t> m_sizes;
-  thrust::device_vector<uint8_t> m_data;
+  nvcomp::thrust::device_vector<void*> m_ptrs;
+  nvcomp::thrust::device_vector<size_t> m_sizes;
+  nvcomp::thrust::device_vector<uint8_t> m_data;
   size_t m_size;
 };
 

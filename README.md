@@ -4,30 +4,19 @@ nvCOMP is a CUDA library that features generic compression interfaces to enable 
 
 Example benchmarking results and a brief description of each algorithm are available on the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp).
 
-From version 2.3 onwards, the compression / decompression source code will not be released. We'll continue to maintain this Github for documentation and code sample purposes.
-
-## Version 2.4 Release
-
-This minor release of nvCOMP completes support for zStandard compression (https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md) 
-
-This release also includes the following:
-  - Early Access Linux SBSA binaries.
-  - GDeflate high-compression mode up to 2x faster.
-  - ZSTD decompression up to 1.2x faster.
-  - Deflate decompression up to 1.5x faster.
-  - ANS compression improvements based on strong scaling allows for up to 7x higher compression and decompression throughput for files on the order of a few MB in size. Decompression throughput is improved by at least 20% on all tested files.
+From version 2.3 onwards, the compression / decompression source code will not be released. 
 
 ## Known issues
-* Cascaded, GDeflate, zStandard, Deflate and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
-* Cascaded, zStandard and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate cannot accept nullptr for device_statuses values. 
+* Cascaded, GDeflate, zStandard, Deflate, Gzip and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
+* Cascaded, zStandard and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate and Gzip cannot accept nullptr for device_statuses values. 
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
-* HLIF is not available for Deflate or zStandard
+* The high-level interface is not available for Deflate, zStandard or Gzip.
+* Gzip low-level interface only provides decompression.
 
 ## Download
 * You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
-* For linux, choose the package that corresponds to your CUDA toolkit version
-* For Windows, CUDA toolkit 11.7 is required
-* On linux, the package includes
+* Choose the package that corresponds to your CUDA toolkit version, operating system, and arch
+* For example, on linux, the package includes
 ```
 include/ 
   nvcomp/ #nvcomp API headers
@@ -36,6 +25,7 @@ lib/
   libnvcomp.so
   <Other nvcomp libraries that are used internally by nvcomp's APIs>
   libnvcomp_gdeflate_cpu.so # CPU library for gdeflate
+  cmake/ <Package files to allow use through cmake>
 bin/ 
   <benchmark scripts>
 ```
@@ -69,6 +59,7 @@ lz4_cpu_compression {-f <input_file>}
 lz4_cpu_decompression {-f <input_file>}
 deflate_cpu_compression {-a <0 libdeflate, 1 zlib_compress2, 2 zlib_deflate> -f <input_file>}
 deflate_cpu_decompression {-a <0 libdeflate, 1 zlib_inflate> -f <input_file>}
+gzip_gpu_decompression {-f <input_file>}
 ```
 
 ## Building CPU and GPU Examples, GPU Benchmarks provided on Github
@@ -80,4 +71,3 @@ cmake .. -DCMAKE_PREFIX_PATH=<path_to_nvcomp_install>
 The `path_to_nvcomp_install` is the directory where you extracted the nvcomp artifact.
 
 To compile the benchmarks too, you can add `-DBUILD_BENCHMARKS=1`, but note this is only provided for an additional example of building against the artifacts. The benchmarks are already provided in the artifact `bin/` folder.
-

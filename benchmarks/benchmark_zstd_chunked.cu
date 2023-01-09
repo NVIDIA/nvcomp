@@ -51,9 +51,9 @@ static bool handleCommandLineArgument(
 static bool isZstdInputValid(const std::vector<std::vector<char>>& data)
 {
   for (const auto& chunk : data) {
-    if (chunk.size() > 65536) {
+    if (chunk.size() > nvcompZstdCompressionMaxAllowedChunkSize) {
       std::cerr << "ERROR: Zstd doesn't support chunk sizes larger than "
-                   "65536 bytes."
+                << nvcompZstdCompressionMaxAllowedChunkSize << " bytes."
                 << std::endl;
       return false;
     }

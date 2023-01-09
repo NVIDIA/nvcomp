@@ -1,3 +1,29 @@
+# nvcomp 2.5.1 (2023-1-9)
+## Bug fixes
+  - Improved GDeflate decompression throughput by up to 2x, fixing perf regression in 2.5.0
+  - Fixed issue where some uses of CUB and Thrust in nvCOMP weren't namespaced
+  - Fixed bug, introduced in 2.5.0, in ZSTD decompression of large frames produced by the CPU compressor
+
+# nvcomp 2.5.0 (2022-12-16)
+## New features
+  - Added Standard CRC32 support and its LLAPI.
+  - Added Gzip batched decompresssion LL APIs, include getting decompression size APIs.
+  - Added independent bitcomp.h header to access full feature set of bitcomp compressor
+  - Added doc directory in nvcomp package containing the documentation files
+  - Increased zStandard maximum compression chunk size from 64 KB to 16 MB 
+  - Improved zStandard decompression throughput by up to 2x on small batches and 40% on large batches
+  - Added `nvcomp*CompressionMaxAllowedChunkSize` constant variables for each compressor
+  - Updated GDeflate stream format to make it compatible with the GDeflate compression standard in NVIDIA RTX IO and Microsoft DirectStorage 1.1.
+  - Updated GDeflate to support 64 KB dictionary window which allows a higher compression ratio.
+  - Updated GDeflate CPU implementation to use the open source libdeflate repo: https://github.com/NVIDIA/libdeflate
+  - Added initial support for SM90
+
+## Bug fixes
+  - Fixed memcheck failure in Snappy compression
+  - Fixed deflate compression issue related to very small chunk sizes
+  - Fixed handling of zero-byte chunks in ANS, Bitcomp, Cascaded, Deflate, and Gdeflate compressors
+  - Fixed bug in Bitcomp where the maximum compressed size was slightly underestimated.
+
 # nvcomp 2.4.1 (2022-10-06)
 ## New features
   - The Deflate batched decompression API can now accept nullptr for actual_decompressed_bytes.
@@ -10,6 +36,7 @@
 # nvcomp 2.4.0 (2022-09-23)
 ## New features
   - Added support for ZSTD compression to LL API
+  - Early Access Linux SBSA binaries.
 ## Bug fixes
   - Fixed issue where cascaded compressor bitpack wasn't considering unsigned data type, causing suboptimal compression ratio
   - Fixed cmake problem where we stated wrong version compatibility
