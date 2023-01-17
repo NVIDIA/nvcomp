@@ -1,3 +1,12 @@
+# nvcomp 2.6.0 (2023-1-16)
+## New Features
+  - Added new nvcompBatched*CompressGetTempSizeEx API to allow
+  less pessimistic scratch allocation requirement in many cases.
+  - Further reduced zstd compression scratch requirement. For 
+  very large batches, in conjunction with the new extended API, 
+  the scratch allocation is now ~1.5x the total uncompressed 
+  size of the batch.
+
 # nvcomp 2.5.1 (2023-1-9)
 ## Bug fixes
   - Improved GDeflate decompression throughput by up to 2x, fixing perf regression in 2.5.0
