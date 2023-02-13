@@ -1,3 +1,7 @@
+# nvcomp 2.6.1 (2023-2-3)
+## Bug fixes
+  - Fixed a bug that caused non-deterministic decompression accuracy failures in ZSTD
+
 # nvcomp 2.6.0 (2023-1-16)
 ## New Features
   - Added new nvcompBatched*CompressGetTempSizeEx API to allow
