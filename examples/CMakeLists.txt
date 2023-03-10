@@ -1,5 +1,6 @@
 file(GLOB GDEFLATE_CPU_SOURCES *gdeflate_cpu*.cpp *gdeflate_cpu*.cu)
 
+add_compile_definitions("THRUST_CUB_WRAPPED_NAMESPACE=nvcomp")
 if(BUILD_GDEFLATE_CPU)
   # Add gdeflate CPU executables 
   foreach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
@@ -88,9 +89,9 @@ endif()
 if (ZLIB_FOUND)
   add_executable(gzip_gpu_decompression gzip_gpu_decompression.cu)
   if (NOT MSVC)
-    target_link_libraries(gzip_gpu_decompression PRIVATE nvcomp CUDA::cudart)
+    target_link_libraries(gzip_gpu_decompression PRIVATE nvcomp::nvcomp CUDA::cudart)
   else()
-    target_link_libraries(gzip_gpu_decompression PRIVATE nvcomp)
+    target_link_libraries(gzip_gpu_decompression PRIVATE nvcomp::nvcomp)
   endif()
   target_link_libraries(gzip_gpu_decompression PRIVATE ZLIB::ZLIB)
 else()

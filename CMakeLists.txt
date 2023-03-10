@@ -15,7 +15,7 @@ list( APPEND CMAKE_MODULE_PATH
 )
 
 find_package(CUDAToolkit REQUIRED)
-find_package(nvcomp REQUIRED 2.3)
+find_package(nvcomp 2.6.1 REQUIRED)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" OR
     "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR
