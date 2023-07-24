@@ -10,8 +10,9 @@ From version 2.3 onwards, the compression / decompression source code will not b
 * Cascaded, GDeflate, zStandard, Deflate, Gzip and Bitcomp decompressors can only operate on valid input data (data that was compressed using the same compressor). Other decompressors can sometimes detect errors in the compressed stream. 
 * Cascaded, zStandard and Bitcomp batched decompression C APIs cannot currently accept nullptr for actual_decompressed_bytes or device_statuses values. Deflate and Gzip cannot accept nullptr for device_statuses values. 
 * The Bitcomp low-level batched decompression function is not fully asynchronous.
-* The high-level interface is not available for Deflate, zStandard or Gzip.
 * Gzip low-level interface only provides decompression.
+* The device API only supports the ANS format
+* Gdeflate API test and ANS device test is not working on H100 with CTK 12.x, will be excluded in the X86_64 build.
 
 ## Download
 * You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
@@ -71,3 +72,14 @@ cmake .. -DCMAKE_PREFIX_PATH=<path_to_nvcomp_install>
 The `path_to_nvcomp_install` is the directory where you extracted the nvcomp artifact.
 
 To compile the benchmarks too, you can add `-DBUILD_BENCHMARKS=1`, but note this is only provided for an additional example of building against the artifacts. The benchmarks are already provided in the artifact `bin/` folder.
+
+## Logging
+
+To enable logging, set the `NVCOMP_LOG_LEVEL` environment variable to an integer:
+* 0 for no logging
+* 1 for only error messages
+* 2 for error and warning messages
+* 3 for errors, warnings, and information logged for every low-level interface API call
+* 4 or 5 for debug information, not yet supported
+
+By default, log messages will be written to a file named `nvcomp_yyyy-mm-dd_hh-mm.log`, with the date and time filled in.  If the `NVCOMP_LOG_FILE` environment variable is set to a valid file path, messages will be logged to that file.  Specifying `stdout` or `stderr` as the file will log to the console via the appropriate pipe, with color.

@@ -1,6 +1,23 @@
+# nvcomp 3.0.0
+## New features
+  - Added `nvcomp*RequiredAlignment` constant variables for each compressor
+  - Low-level batched functions now return `nvcompErrorAlignment` if device buffers aren't sufficiently aligned
+  - Added HLIF for ZSTD, Deflate. Updated HLIF design such that HLIF now dispatches to LLIF.
+  - Introduced device-side API. Currently limited to the ANS format
+  - Added support for logging using `NVCOMP_LOG_LEVEL` (0-5) and `NVCOMP_LOG_FILE` environment variables.
+
+## Performance Optimizations
+  - Optimize zSTD decompression. Up to 2.2x faster on H100 and 1.5x faster on A100
+  - Optimize LZ4 decompression. Up to 1.4x faster on H100 and 1.4x faster on A100.
+  - Optimize Snappy decompression. Up to 1.3x faster on H100 and 1.9x faster on A100.
+  - Optimize Bitcomp decompression (standard algo). Up to 2x faster and more consistent accross datasets
+  - Improve ZSTD compression ratio by up to 5% on 64 KB chunks, 30% on 512 KB chunks to closely match CPU L1 Compression.
+  
 # nvcomp 2.6.1 (2023-2-3)
 ## Bug fixes
   - Fixed a bug that caused non-deterministic decompression accuracy failures in ZSTD
+  - Added support for Ada (sm89) GPUs 
+  - Fixed inconsistent compression stream format on some datasets when using GDeflate high-compression algorithm.
 
 # nvcomp 2.6.0 (2023-1-16)
 ## New Features
