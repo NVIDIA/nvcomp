@@ -57,7 +57,9 @@ void run_tests(std::mt19937& rng)
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
-  LZ4Manager batch_manager{CHUNK_SIZE, data_type, stream};
+  
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager batch_manager{CHUNK_SIZE, format_opts, stream};
 
   // test all zeros
   for (size_t b = 0; b < 14; ++b) {

@@ -30,6 +30,7 @@
 
 // Benchmark performance from the binary data file fname
 #include <vector>
+#include <numeric>
 
 #include "benchmark_common.h"
 #include "nvcomp.hpp"
@@ -40,7 +41,9 @@ using namespace nvcomp;
 const int chunk_size = 1 << 16;
 
 template<typename T = uint8_t>
-void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager, int verbose_memory, cudaStream_t stream, const int benchmark_exec_count = 1)
+void run_benchmark(
+    const std::vector<T>& data, nvcompManagerBase& batch_manager, int verbose_memory, 
+    cudaStream_t stream, const int benchmark_exec_count = 1, const bool warmup = true)
 {
   size_t input_element_count = data.size();
 
@@ -69,27 +72,21 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
       comp_out_bytes > 0, "Output size must be greater than zero.");
 
   // Allocate temp workspace
-  size_t comp_scratch_bytes = batch_manager.get_required_scratch_buffer_size();
-  uint8_t* d_comp_scratch;
-  CUDA_CHECK(cudaMalloc(&d_comp_scratch, comp_scratch_bytes));
-  batch_manager.set_scratch_buffer(d_comp_scratch);
-
-  // Allocate compressed output buffer
   uint8_t* d_comp_out;
   CUDA_CHECK(cudaMalloc(&d_comp_out, comp_out_bytes));
-
-  if (verbose_memory) {
-    std::cout << "compression memory (input+output+scratch) (B): "
-              << (in_bytes + comp_out_bytes + comp_scratch_bytes) << std::endl;
-    std::cout << "compression scratch space (B): " << comp_scratch_bytes << std::endl;
-    std::cout << "compression output space (B): " << comp_out_bytes
-              << std::endl;
-  }
 
   // Launch compression
   cudaEvent_t start, end;
   CUDA_CHECK(cudaEventCreate(&start));
   CUDA_CHECK(cudaEventCreate(&end));
+
+  if (warmup) {
+    batch_manager.compress(
+        d_in_data,
+        d_comp_out,
+        compress_config);
+    cudaStreamSynchronize(stream);
+  }
 
   std::vector<float> compress_run_times(benchmark_exec_count);
   for (int ix_run = 0; ix_run < benchmark_exec_count; ++ix_run) {
@@ -151,7 +148,11 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   CUDA_CHECK(cudaEventDestroy(end));
 
   std::cout << "decompression throughput (GB/s): "
-            << average_gbs(decompress_run_times, decomp_bytes) << std::endl;
+            << average_gbs(decompress_run_times, decomp_bytes) << std::endl
+            << "decompression time: "
+            << std::accumulate(decompress_run_times.begin(), decompress_run_times.end(), 0.0) / benchmark_exec_count
+            << " ms."
+            << std::endl;
 
   CUDA_CHECK(cudaFree(d_comp_out));
 
@@ -177,6 +178,4 @@ void run_benchmark(const std::vector<T>& data, nvcompManagerBase& batch_manager,
   std::cout << std::endl;
 #endif
   benchmark_assert(res == data, "Decompressed data does not match input.");
- 
-  CUDA_CHECK(cudaFree(d_comp_scratch));
 }

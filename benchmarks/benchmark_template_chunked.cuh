@@ -46,6 +46,31 @@
 #include <thrust/device_vector.h>
 #include <vector>
 
+
+namespace nvcomp {
+
+static constexpr uint32_t WARP_SIZE = 32;
+
+template <typename U, typename T>
+constexpr __host__ __device__ U roundUpDiv(U const num, T const chunk)
+{
+  return (num + chunk - 1) / chunk;
+}
+
+template <typename U, typename T>
+constexpr __host__ __device__ U roundDownTo(U const num, T const chunk)
+{
+  return (num / chunk) * chunk;
+}
+
+template <typename U, typename T>
+constexpr __host__ __device__ U roundUpTo(U const num, T const chunk)
+{
+  return roundUpDiv(num, chunk) * chunk;
+}
+
+}
+
 // Each benchmark must implement this, returning true if the argument
 // was handled.  If the benchmark has no custom arguments, its
 // implementation can just return false.
@@ -153,22 +178,24 @@ public:
       if (chunk_size < host_data[i].size()) {
         chunk_size = host_data[i].size();
       }
-      prefixsum[i+1] = prefixsum[i] + host_data[i].size();
+      // align to 8B boundaries for now
+      // TODO: Set appropriate alignment based on reqs for each compressor
+      prefixsum[i+1] = nvcomp::roundUpTo(prefixsum[i] + host_data[i].size(), 8);
     }
 
-    m_data = thrust::device_vector<uint8_t>(prefixsum.back());
+    m_data = nvcomp::thrust::device_vector<uint8_t>(prefixsum.back());
 
     std::vector<void*> uncompressed_ptrs(size());
     for (size_t i = 0; i < size(); ++i) {
       uncompressed_ptrs[i] = static_cast<void*>(data() + prefixsum[i]);
     }
 
-    m_ptrs = thrust::device_vector<void*>(uncompressed_ptrs);
+    m_ptrs = nvcomp::thrust::device_vector<void*>(uncompressed_ptrs);
     std::vector<size_t> sizes(m_size);
     for (size_t i = 0; i < sizes.size(); ++i) {
       sizes[i] = host_data[i].size();
     }
-    m_sizes = thrust::device_vector<size_t>(sizes);
+    m_sizes = nvcomp::thrust::device_vector<size_t>(sizes);
 
     // copy data to GPU
     for (size_t i = 0; i < host_data.size(); ++i) {
@@ -186,16 +213,16 @@ public:
       m_data(),
       m_size(batch_size)
   {
-    m_data = thrust::device_vector<uint8_t>(max_output_size * size());
+    m_data = nvcomp::thrust::device_vector<uint8_t>(max_output_size * size());
 
     std::vector<size_t> sizes(size(), max_output_size);
-    m_sizes = thrust::device_vector<size_t>(sizes);
+    m_sizes = nvcomp::thrust::device_vector<size_t>(sizes);
 
     std::vector<void*> ptrs(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
       ptrs[i] = data() + max_output_size * i;
     }
-    m_ptrs = thrust::device_vector<void*>(ptrs);
+    m_ptrs = nvcomp::thrust::device_vector<void*>(ptrs);
   }
 
   BatchData(BatchData&& other) = default;
@@ -230,9 +257,9 @@ public:
   }
 
 private:
-  thrust::device_vector<void*> m_ptrs;
-  thrust::device_vector<size_t> m_sizes;
-  thrust::device_vector<uint8_t> m_data;
+  nvcomp::thrust::device_vector<void*> m_ptrs;
+  nvcomp::thrust::device_vector<size_t> m_sizes;
+  nvcomp::thrust::device_vector<uint8_t> m_data;
   size_t m_size;
 };
 
@@ -441,12 +468,9 @@ run_benchmark_template(
         compress_data.sizes(),
         compress_data.size() * sizeof(*compress_data.sizes()),
         cudaMemcpyDeviceToHost));
-    // for (int ix = 0; ix < compress_data.size(); ++ix) {
-    //   printf("Frame %d comp ratio %f\n", ix, double{64*1024} / (double)(compressed_sizes_host[ix]));
-    // }
     size_t comp_bytes = 0;
-    for (const size_t s : compressed_sizes_host) {
-      comp_bytes += s;
+    for (size_t ix = 0 ; ix < batch_size; ++ix) {
+      comp_bytes += compressed_sizes_host[ix];
     }
 
     // Then do file output

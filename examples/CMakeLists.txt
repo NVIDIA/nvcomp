@@ -14,11 +14,8 @@ if(BUILD_GDEFLATE_CPU)
   endforeach(EXAMPLE_SOURCE ${GDEFLATE_CPU_SOURCES})
 endif()
 
-option (BUILD_GDS_EXAMPLE "Build NVCOMP + GDS example" OFF)
-if (BUILD_GDS_EXAMPLE)
-  add_executable (nvcomp_gds nvcomp_gds.cu)
-  target_link_libraries(nvcomp_gds PRIVATE nvcomp::nvcomp CUDA::cudart cufile)
-endif()
+add_executable (nvcomp_gds nvcomp_gds.cu)
+target_link_libraries(nvcomp_gds PRIVATE nvcomp::nvcomp CUDA::cudart cufile)
 
 #option(BUILD_CHECKSUM_EXAMPLE "Build standard CRC checksum example (requires Boost)" OFF)
 if(Boost_FOUND)
@@ -59,7 +56,7 @@ target_include_directories(high_level_quickstart_example PRIVATE ${CMAKE_CURRENT
 # Add deflate example
 find_path(LIBDEFLATE_INCLUDE_DIR NAMES libdeflate.h)
 find_library(LIBDEFLATE_LIBRARY NAMES libdeflate)
-if (ZLIB_FOUND AND LIBDEFLATE_INCLUDE_DIR AND LIBDEFLATE_INCLUDE_DIR)
+if (ZLIB_FOUND AND LIBDEFLATE_INCLUDE_DIR AND LIBDEFLATE_LIBRARY)
   add_executable(deflate_cpu_compression deflate_cpu_compression.cu)
   if (NOT MSVC)
     target_link_libraries(deflate_cpu_compression PRIVATE nvcomp::nvcomp CUDA::cudart)

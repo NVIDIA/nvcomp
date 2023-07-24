@@ -50,7 +50,7 @@ void run_benchmark_from_file(char* fname, nvcompManagerBase& batch_manager, int 
 static void print_usage()
 {
   printf("Usage: benchmark_hlif [format_type] [OPTIONS]\n");
-  printf("  %-35s One of <snappy / bitcomp / ans / cascaded/ gdeflate / lz4>\n", "[ format_type ]");
+  printf("  %-35s One of <snappy / bitcomp / ans / cascaded/ gdeflate / deflate / lz4 / zstd>\n", "[ format_type ]");
   printf("  %-35s Binary dataset filename (required).\n", "-f, --filename");
   printf("  %-35s Chunk size (default 64 kB).\n", "-c, --chunk-size");
   printf("  %-35s GPU device number (default 0)\n", "-g, --gpu");
@@ -93,6 +93,8 @@ int main(int argc, char* argv[])
   } else if (comp_format == "ans") {
   } else if (comp_format == "cascaded") {
   } else if (comp_format == "gdeflate") {
+  } else if (comp_format == "deflate") {
+  } else if (comp_format == "zstd") {
   } else {
     printf("invalid format\n");
     print_usage();
@@ -122,7 +124,7 @@ int main(int argc, char* argv[])
       fname = optarg;
       continue;
     }
-    
+
     if (strcmp(arg, "--gpu") == 0 || strcmp(arg, "-g") == 0) {
       gpu_num = atoi(optarg);
       continue;
@@ -184,13 +186,13 @@ int main(int argc, char* argv[])
 
   std::shared_ptr<nvcompManagerBase> manager;
   if (comp_format == "lz4") {
-    manager = std::make_shared<LZ4Manager>(chunk_size, data_type, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<LZ4Manager>(chunk_size, nvcompBatchedLZ4Opts_t{data_type}, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "snappy") {
-    manager = std::make_shared<SnappyManager>(chunk_size, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<SnappyManager>(chunk_size, nvcompBatchedSnappyOpts_t{}, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "bitcomp") {
-    manager = std::make_shared<BitcompManager>(data_type, 0 /* algo--fixed for now */, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<BitcompManager>(chunk_size, nvcompBatchedBitcompFormatOpts{0 /* algo--fixed for now */, data_type}, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "ans") {
-    manager = std::make_shared<ANSManager>(chunk_size, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<ANSManager>(chunk_size, nvcompBatchedANSOpts_t{}, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "cascaded") {
     if (explicit_type) {
       cascaded_opts.type = data_type;
@@ -200,9 +202,14 @@ int main(int argc, char* argv[])
       cascaded_opts.chunk_size = chunk_size;
     }
 
-    manager = std::make_shared<CascadedManager>(cascaded_opts, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<CascadedManager>(chunk_size, cascaded_opts, stream, gpu_num, NoComputeNoVerify);
   } else if (comp_format == "gdeflate") {
-    manager = std::make_shared<GdeflateManager>(chunk_size, 0 /* algo--fixed for now */, stream, gpu_num, NoComputeNoVerify);
+    manager = std::make_shared<GdeflateManager>(chunk_size, nvcompBatchedGdeflateOpts_t{0 /* algo--fixed for now */}, stream, gpu_num, NoComputeNoVerify);
+  } else if (comp_format == "deflate") {
+    manager = std::make_shared<DeflateManager>(chunk_size, nvcompBatchedDeflateDefaultOpts, stream, gpu_num, NoComputeNoVerify);    
+  } else if (comp_format == "zstd") {
+    // Get file size
+    manager = std::make_shared<ZstdManager>(static_cast<size_t>(chunk_size), nvcompBatchedZstdDefaultOpts, stream, gpu_num, NoComputeNoVerify);
   } else {
     print_usage();
     return 1;

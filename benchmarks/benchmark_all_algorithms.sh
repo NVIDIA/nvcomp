@@ -5,54 +5,44 @@ declare -A cascaded_algo_map
 cascaded_algo_map["geometrycache.tar"]="1 0 1 int"
 cascaded_algo_map["silesia.tar"]="0 0 1 char"
 cascaded_algo_map["texturecache.tar"]="1 0 1 short"
-cascaded_algo_map["mortgage-2009Q2-float-columns.bin"]="2 2 1 int"
-cascaded_algo_map["mortgage-2009Q2-string-columns.bin"]="2 0 1 char"
 cascaded_algo_map["mortgage-2009Q2-col0-long.bin"]="1 0 1 longlong"
 
-declare -A datatype_map
-datatype_map["geometrycache.tar"]="int"
-datatype_map["silesia.tar"]="char"
-datatype_map["texturecache.tar"]="char"
-datatype_map["mortgage-2009Q2-float-columns.bin"]="int"
-datatype_map["mortgage-2009Q2-string-columns.bin"]="char"
-datatype_map["mortgage-2009Q2-col0-long.bin"]="int"
+declare -A lz4_datatype_map
+lz4_datatype_map["geometrycache.tar"]="char"
+lz4_datatype_map["silesia.tar"]="char"
+lz4_datatype_map["texturecache.tar"]="char"
+lz4_datatype_map["mortgage-2009Q2-col0-long.bin"]="int"
 
-declare -a typed_algo_list=("lz4")
+declare -A bitcomp_datatype_map
+bitcomp_datatype_map["mortgage-2009Q2-col0-long.bin"]="uchar"
+bitcomp_datatype_map["silesia.tar"]="ulonglong"
+bitcomp_datatype_map["texturecache.tar"]="ushort"
+bitcomp_datatype_map["geometrycache.tar"]="ulonglong"
 
-function get_group()
-{
-  local fname="$1"
-  if [[ "$fname" == *"mortgage"* ]]; then
-    GROUP="tabular"
-  elif [[ "$fname" == *"silesia"* ]]; then
-    GROUP="silesia"
-  else 
-    GROUP="graphics"
-  fi  
-}
+declare -A display_fname_map
+display_fname_map["geometrycache.tar"]="Graphics: Geometry Data"
+display_fname_map["silesia.tar"]="Silesia"
+display_fname_map["texturecache.tar"]="Graphics: Textures Data"
+display_fname_map["mortgage-2009Q2-col0-long.bin"]="Data Analytics: INT Columns"
+
+declare -a typed_algo_list=("lz4" "bitcomp")
 
 function get_dtype()
 {
   local fname="$1"
   local algo="$2"
 
-  found_algo=0
-  for typed_algo in $typed_algo_list; do
-    if [[ $algo == $typed_algo ]]; then
-      found_algo=1
-      break
-    fi
-  done
-
-  if [[ $found_algo == "1" ]]; then
-    dtype="${datatype_map[$fname]}"
+  if [[ $algo == "bitcomp" ]]; then
+    dtype="${bitcomp_datatype_map[$fname]}"
+  elif [[ $algo == "lz4" ]]; then
+    dtype="${lz4_datatype_map[$fname]}"
   else
     dtype="-1"
   fi
 }
 
 output_header() {
-  echo dataset,uncompressed_bytes,compression_ratio,compression_throughput,decompression_throughput,algorithm,interface,algorithm_variant,gpu,rles,deltas,use_bp,dataset_group
+  echo ,,Compression Ratio,Compression Throughput,Decompression Throughput
   return 0
 }
 
@@ -61,17 +51,30 @@ run_benchmark () {
   CMD="$1 -f ${INPUT_FILE}"
   INPUT_FILENAME=`basename $INPUT_FILE`
   ALGO=$3
-  IFC=$4
-  VARIANT=$5
-  DTYPE=$6
-  GROUP=$7
+  VARIANT=$4
+  DTYPE=$5
   BP="0"
   RLES="0"
   DELTAS="0"
   FILENAME="${LOGDIR}/$(basename $1)_$(basename $2).log"
-
+  variant_str=""
   if [[ $VARIANT -gt "-1" ]]; then
     CMD="${CMD} -a ${VARIANT}"
+    if [[ $ALGO == "bitcomp" ]]; then
+      if [[ $VARIANT == "0" ]]; then
+        variant_str="-default"
+      else
+        variant_str="-sparse"
+      fi
+    elif [[ $ALGO == "gdeflate" ]]; then
+      if [[ $VARIANT == "0" ]]; then
+        variant_str="-high-throughput"
+      elif [[ $VARIANT == "1" ]]; then
+        variant_str="-high-compression"
+      else
+        variant_str="-entropy-only"
+      fi
+    fi
   fi
 
   if [[ $ALGO == casc* ]]; then
@@ -97,6 +100,7 @@ run_benchmark () {
   echo "The command is ${CMD}"
   timeout 120 ${CMD} > "${FILENAME}"
   # ${CMD} > "${FILENAME}"
+
   EXIT_STATUS=$?
   if [ $EXIT_STATUS -eq 124 ]; then
     echo "Process timed out"
@@ -107,8 +111,27 @@ run_benchmark () {
   ratio=$(awk '/compressed ratio:/{print $5}' "${FILENAME}")
   comp_throughput=$(awk '/^compression throughput /{print $4}' "${FILENAME}")
   decomp_throughput=$(awk '/^decompression throughput /{print $4}' "${FILENAME}")
-  echo $(basename $2),$bytes,$ratio,$comp_throughput,$decomp_throughput,$ALGO,$IFC,$VARIANT,$GPU,$RLES,$DELTAS,$BP,$GROUP >> $OUTPUT_FILE
+  echo ,"${ALGO}${variant_str}",$ratio,$comp_throughput,$decomp_throughput >> $OUTPUT_FILE
   return 0
+}
+
+run_benchmarks () {
+  BINARY=$1
+  fname=$2
+  algo=$3
+  variant=$4
+  dtype=$5
+  if [[ $algo == "gdeflate" ]]; then
+    for variant in {0,1,2}; do
+      run_benchmark "$BINARY" $fname $algo $variant $dtype
+    done
+  elif [[ $algo == "bitcomp" ]]; then
+    for variant in {0,1}; do
+      run_benchmark "$BINARY" $fname $algo $variant $dtype
+    done
+  else 
+    run_benchmark "$BINARY" $fname $algo $variant $dtype
+  fi
 }
 
 ## Start main function
@@ -129,48 +152,29 @@ LOGDIR="$(mktemp -d)"
 trap 'rm -rf -- "${LOGDIR}"' EXIT
 
 # Run the benchmarks for all files in DIR
-output_header > $OUTPUT_FILE
-declare -a AlgoArray=("lz4" "snappy" "cascaded" "gdeflate" "bitcomp" "deflate" "ans")
+declare -a AlgoArray=("lz4" "snappy" "cascaded" "gdeflate" "bitcomp" "deflate" "ans" "zstd")
 # declare -a AlgoArray=( "cascaded" "lz4" "gdeflate" )
-# declare -a AlgoArray=("lz4")
+# declare -a AlgoArray=("bitcomp" "gdeflate" "zstd")
 
 #declare -a AlgoArray=("cascaded")
-for algo in "${AlgoArray[@]}"; 
+declare -a files=("mortgage-2009Q2-col0-long.bin" "silesia.tar" "texturecache.tar" "geometrycache.tar")
+# declare -a files=("mortgage-2009Q2-float-columns.bin")
+echo ,,$GPU > $OUTPUT_FILE
+output_header >> $OUTPUT_FILE
+for fname in "${files[@]}";
 do
-  BINARY="./bin/benchmark_${algo}_chunked"
-  for fname in ${DIR}/*
-  do
-    variant="-1"
-    GROUP=""
-    dtype=""
+  echo "${display_fname_map[$fname]}" >> $OUTPUT_FILE
+  base_filename=$fname
+  fname="${DIR}/${fname}"
+  for algo in "${AlgoArray[@]}"; 
+    do
+      BINARY="./bin/benchmark_${algo}_chunked"
+      variant="-1"
+      GROUP=""
+      dtype=""
 
-    base_filename=`basename $fname`
-    get_group $base_filename
-    get_dtype $base_filename $algo
-
-    if [[ $algo == "gdeflate" ]]; then
-      for variant in {0,1,2}; do
-        run_benchmark $BINARY $fname $algo "LL" $variant $dtype $GROUP
-      done
-    else 
-      run_benchmark $BINARY $fname $algo "LL" $variant $dtype $GROUP
-    fi
-  done
-
-  BINARY="./bin/benchmark_hlif ${algo}"
-  for fname in ${DIR}/*
-  do
-    if [[ $algo == "deflate" ]]; then
-      continue
-    fi
-
-    variant="-1"
-    GROUP=""
-    dtype=""
-
-    base_filename=`basename $fname`
-    get_group $base_filename
-    get_dtype $base_filename $algo    
-    run_benchmark "$BINARY" $fname $algo "HL" $variant $dtype $GROUP
-  done
+      get_dtype $base_filename $algo    
+      
+      run_benchmarks $BINARY $fname $algo $variant $dtype    
+    done  
 done

@@ -71,7 +71,8 @@ void decomp_compressed_with_manager_factory_example(uint8_t* device_input_ptrs, 
   const int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream};
   CompressionConfig comp_config = nvcomp_manager.configure_compression(input_buffer_len);
 
   uint8_t* comp_buffer;
@@ -114,7 +115,8 @@ void comp_decomp_with_single_manager(uint8_t* device_input_ptrs, const size_t in
   const int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream};
   CompressionConfig comp_config = nvcomp_manager.configure_compression(input_buffer_len);
 
   uint8_t* comp_buffer;
@@ -152,7 +154,8 @@ void multi_comp_decomp_example(const std::vector<uint8_t*>& device_input_ptrs, s
   const int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream};
   
   std::vector<uint8_t*> comp_result_buffers(num_buffers);
 
@@ -197,7 +200,8 @@ void multi_comp_decomp_example_comp_config(const std::vector<uint8_t*>& device_i
   const int chunk_size = 1 << 16;
   nvcompType_t data_type = NVCOMP_TYPE_CHAR;
 
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream};
   
   std::vector<CompressionConfig> comp_configs;
   comp_configs.reserve(num_buffers);
@@ -280,7 +284,8 @@ void comp_decomp_with_single_manager_with_checksums(uint8_t* device_input_ptrs, 
   int gpu_num = 0;
 
   // manager constructed with checksum mode as final argument
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream, gpu_num, ComputeAndVerify};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream, gpu_num, ComputeAndVerify};
   CompressionConfig comp_config = nvcomp_manager.configure_compression(input_buffer_len);
 
   uint8_t* comp_buffer;
@@ -332,7 +337,8 @@ void decomp_compressed_with_manager_factory_with_checksums(
    * constructed manager will compute checksums on compression, but not verify them
    * on decompression.
    */
-  LZ4Manager nvcomp_manager{chunk_size, data_type, stream, gpu_num, ComputeAndNoVerify};
+  nvcompBatchedLZ4Opts_t format_opts{data_type};
+  LZ4Manager nvcomp_manager{chunk_size, format_opts, stream, gpu_num, ComputeAndNoVerify};
   CompressionConfig comp_config = nvcomp_manager.configure_compression(input_buffer_len);
 
   uint8_t* comp_buffer;

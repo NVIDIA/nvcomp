@@ -129,15 +129,9 @@ int main(int argc, char** argv)
   nvtxRangePushA("Compressor setup");
 
   // Create an LZ4 compressor, get the max output size, and temp storage size
-  LZ4Manager compressor(1 << 16, NVCOMP_TYPE_CHAR, stream, 0);
+  LZ4Manager compressor(1 << 16, nvcompBatchedLZ4Opts_t{NVCOMP_TYPE_CHAR}, stream, 0);
   const CompressionConfig comp_config = compressor.configure_compression(n);
   size_t lcompbuf = comp_config.max_compressed_buffer_size;
-  size_t ltempbuf = compressor.get_required_scratch_buffer_size();
-
-  // Allocate temp workspace for the compressor
-  uint8_t* d_temp;
-  CUDA_CHECK(cudaMalloc(&d_temp, ltempbuf));
-  compressor.set_scratch_buffer(d_temp);
 
   // The compressed output buffer is padded to the next multiple of 4KB
   // for best I/O performance. Unaligned I/Os go through an extra
@@ -183,31 +177,26 @@ int main(int argc, char** argv)
   nvtxRangePushA("Compression");
 
   // The compressed size must be device-accessible, using pinned memory.
-  size_t* dh_lcomp;
-  CUDA_CHECK(cudaMallocHost(&dh_lcomp, sizeof(size_t)));
-  *dh_lcomp = lcompbuf;
 
   // Compress the data (asynchronous)
   compressor.compress(d_input, d_compressed, comp_config);
-
-  // Wait for compression to be done before querying the size
-  CUDA_CHECK(cudaStreamSynchronize(stream));
+  const size_t compressed_size = compressor.get_compressed_output_size(d_compressed);
 
   // Align the compressed size to the next multiple of 4KB.
-  size_t lcomp = ((*dh_lcomp - 1) / 4096 + 1) * 4096;
+  size_t aligned_compressed_size = ((compressed_size - 1) / 4096 + 1) * 4096;
   printf(
       "Data compressed from %lu Bytes to %lu Bytes, aligned to %lu Bytes\n",
       n,
-      *dh_lcomp,
-      lcomp);
+      compressed_size,
+      aligned_compressed_size);
 
   nvtxRangePop();
   nvtxRangePushA("GDS Write");
 
   // Write the data (padded to next 4KB), directly from the device, with GDS
   ssize_t nb;
-  if ((nb = cuFileWrite(cf_handle, d_compressed, lcomp, 0, 0)) != lcomp) {
-    printf("Error, write returned %ld instead of %lu \n", nb, lcomp);
+  if ((nb = cuFileWrite(cf_handle, d_compressed, aligned_compressed_size, 0, 0)) != aligned_compressed_size) {
+    printf("Error, write returned %ld instead of %lu \n", nb, aligned_compressed_size);
     return -1;
   } else
     printf("Wrote %ld bytes to file %s using GDS\n", nb, filename);
@@ -215,27 +204,26 @@ int main(int argc, char** argv)
   nvtxRangePop();
   nvtxRangePushA("Cleaning up compressor");
 
-  // Release the compression resources
-  CUDA_CHECK(cudaFree(d_temp));
-  CUDA_CHECK(cudaFreeHost(dh_lcomp));
-
   // Erase the content of the compressed buffer
-  cudaMemsetAsync(d_compressed, 0xff, lcompbuf, stream);
+  cudaMemsetAsync(d_compressed, 0xff, compressed_size, stream);
   CUDA_CHECK(cudaStreamSynchronize(stream));
 
   nvtxRangePop();
   nvtxRangePushA("GDS Read");
 
   // Read the compressed data from the GDS file into the device buffer
-  if ((nb = cuFileRead(cf_handle, d_compressed, lcomp, 0, 0)) != lcomp) {
-    printf("Error, GDS read returned %ld instead of %lu \n", nb, lcomp);
+  if ((nb = cuFileRead(cf_handle, d_compressed, aligned_compressed_size, 0, 0)) != aligned_compressed_size) {
+    nvtxRangePop();
+    printf("Error, GDS read returned %ld instead of %lu \n", nb, aligned_compressed_size);
     return -1;
-  } else
+  } else {
+    nvtxRangePop();
     printf("Read %ld bytes from file %s using GDS\n", nb, filename);
+  }
 
-  nvtxRangePop();
   nvtxRangePushA("Decompressor setup");
 
+  cudaStreamSynchronize(stream);
   // Decompressor, configured with the compressed data
   const DecompressionConfig decomp_config
       = compressor.configure_decompression(comp_config);
@@ -244,12 +232,6 @@ int main(int argc, char** argv)
     printf("Error: Uncompressed size does not match the original size\n");
     return -1;
   }
-
-  ltempbuf = compressor.get_required_scratch_buffer_size();
-
-  // Temporary storage for the decompressor
-  CUDA_CHECK(cudaMalloc(&d_temp, ltempbuf));
-  compressor.set_scratch_buffer(d_temp);
 
   // Device-accessible flag to compare the data
   int* dh_invalid;
@@ -261,8 +243,7 @@ int main(int argc, char** argv)
   printf("Decompressing\n");
 
   // Decompress the data (asynchronous)
-  compressor.decompress(d_compressed, d_output, decomp_config);
-
+  compressor.decompress(d_output, d_compressed, decomp_config);
   // Compare the uncompressed data with the original, in the same stream
   compare<<<2 * smcount, 1024, 0, stream>>>(d_input, d_output, dh_invalid, n);
 
@@ -294,7 +275,6 @@ int main(int argc, char** argv)
   CUDA_CHECK(cudaFree(d_input));
   CUDA_CHECK(cudaFree(d_output));
   CUDA_CHECK(cudaFree(d_compressed));
-  CUDA_CHECK(cudaFree(d_temp));
 
   printf("All done, exiting...\n");
   nvtxRangePop();
