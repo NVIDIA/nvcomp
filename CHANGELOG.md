@@ -1,4 +1,8 @@
-# nvcomp 3.0.0
+# nvcomp 3.0.1 (2023-8-8)
+## Bug Fixes
+  - Remove unnecessary nvml dependency added in 3.0.0
+
+# nvcomp 3.0.0 (2023-7-3)
 ## New features
   - Added `nvcomp*RequiredAlignment` constant variables for each compressor
   - Low-level batched functions now return `nvcompErrorAlignment` if device buffers aren't sufficiently aligned
