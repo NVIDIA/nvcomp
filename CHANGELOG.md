@@ -1,8 +1,12 @@
-# nvcomp 3.0.1 (2023-8-8)
+# nvcomp 3.0.2
+## Bug Fixes
+  - Fixed a bug (introduced in 3.0.0) that caused incorrect snappy decompression in some cases.
+
+# nvcomp 3.0.1
 ## Bug Fixes
   - Remove unnecessary nvml dependency added in 3.0.0
 
-# nvcomp 3.0.0 (2023-7-3)
+# nvcomp 3.0.0
 ## New features
   - Added `nvcomp*RequiredAlignment` constant variables for each compressor
   - Low-level batched functions now return `nvcompErrorAlignment` if device buffers aren't sufficiently aligned
