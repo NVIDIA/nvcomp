@@ -1,3 +1,7 @@
+# nvcomp 3.0.3
+## Bug Fixes
+  - Fixed another bug (introduced in 3.0.0) that caused incorrect snappy decompression in some cases.
+
 # nvcomp 3.0.2
 ## Bug Fixes
   - Fixed a bug (introduced in 3.0.0) that caused incorrect snappy decompression in some cases.

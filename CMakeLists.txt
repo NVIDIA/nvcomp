@@ -15,7 +15,7 @@ list( APPEND CMAKE_MODULE_PATH
 )
 
 find_package(CUDAToolkit REQUIRED)
-find_package(nvcomp 3.0.0 REQUIRED)
+find_package(nvcomp 3.0.3 REQUIRED)
 
 add_compile_definitions("THRUST_CUB_WRAPPED_NAMESPACE=nvcomp")
 
