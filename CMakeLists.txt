@@ -79,7 +79,7 @@ if (MSVC)
 endif()
 
 if(NOT DEFINED CUB_DIR AND DEFINED ENV{CUB_DIR})
-  set(CUB_DIR ENV{CUB_DIR})
+  set(CUB_DIR $ENV{CUB_DIR})
 endif()
 
 message(STATUS "Finding CUB")
