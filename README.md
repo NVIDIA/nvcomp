@@ -1,3 +1,6 @@
+> [!WARNING]
+> This page will be retired soon. With the release of [nvCOMP v4.0](https://developer.nvidia.com/nvcomp-download), the examples and benchmarks in this repository have been moved to the [CUDALibrarySamples](https://github.com/NVIDIA/CUDALibrarySamples/tree/master/nvCOMP) GitHub repository. Documentation has been moved to [NVIDIA Documentation Hub](https://docs.nvidia.com/cuda/nvcomp/index.html). Binary packages for nvCOMP can still be downloaded from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp-download).
+
 # What is nvCOMP?
 
 nvCOMP is a CUDA library that features generic compression interfaces to enable developers to use high-performance GPU compressors and decompressors in their applications.
@@ -15,7 +18,7 @@ From version 2.3 onwards, the compression / decompression source code will not b
 * Gdeflate API test and ANS device test is not working on H100 with CTK 12.x, will be excluded in the X86_64 build.
 
 ## Download
-* You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp)
+* You can download the appropriate built binary packages from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp-download)
 * Choose the package that corresponds to your CUDA toolkit version, operating system, and arch
 * For example, on linux, the package includes
 ```
