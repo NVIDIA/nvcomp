@@ -1,5 +1,5 @@
 > [!WARNING]
-> This page will be retired soon. With the release of [nvCOMP v4.0](https://developer.nvidia.com/nvcomp-download), the examples and benchmarks in this repository have been moved to the [CUDALibrarySamples](https://github.com/NVIDIA/CUDALibrarySamples/tree/master/nvCOMP) GitHub repository. Documentation has been moved to [NVIDIA Documentation Hub](https://docs.nvidia.com/cuda/nvcomp/index.html). Binary packages for nvCOMP can still be downloaded from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp-download).
+> This page will be retired soon. With the release of [nvCOMP v4.0](https://developer.nvidia.com/nvcomp-download), the examples and benchmarks in this repository have been moved to the [CUDALibrarySamples](https://github.com/NVIDIA/CUDALibrarySamples/tree/master/nvCOMP) GitHub repository. Please post new issues to the [CUDALibrarySamples](https://github.com/NVIDIA/CUDALibrarySamples/tree/master/nvCOMP) repository. Documentation has been moved to [NVIDIA Documentation Hub](https://docs.nvidia.com/cuda/nvcomp/index.html). Binary packages for nvCOMP can still be downloaded from the [nvCOMP Developer Page](https://developer.nvidia.com/nvcomp-download).
 
 # What is nvCOMP?
 
